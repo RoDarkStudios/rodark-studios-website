@@ -91,6 +91,87 @@ async function fetchGameStats() {
     }
 }
 
+// Function to fetch group member count from Roblox
+async function fetchGroupStats() {
+    const groupId = 5545660; // RoDark Studios group ID
+
+    try {
+        // Format numbers with commas
+        function formatNumber(num) {
+            return num.toLocaleString();
+        }
+
+        console.log('Fetching group statistics...');
+
+        // Try multiple API approaches
+        let groupData = null;
+
+        // Method 1: Try with AllOrigins proxy (most reliable for CORS)
+        try {
+            console.log('Trying AllOrigins proxy...');
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://groups.roblox.com/v1/groups/${groupId}`)}`;
+            const proxyResponse = await fetch(proxyUrl);
+
+            if (proxyResponse.ok) {
+                const proxyData = await proxyResponse.json();
+                if (proxyData.contents) {
+                    groupData = JSON.parse(proxyData.contents);
+                    console.log('✅ AllOrigins proxy successful:', groupData);
+                }
+            }
+        } catch (error) {
+            console.warn('AllOrigins proxy failed:', error);
+        }
+
+        // Method 2: Try with cors-anywhere proxy if first method failed
+        if (!groupData) {
+            try {
+                console.log('Trying cors-anywhere proxy...');
+                const corsResponse = await fetch(`https://cors-anywhere.herokuapp.com/https://groups.roblox.com/v1/groups/${groupId}`);
+
+                if (corsResponse.ok) {
+                    groupData = await corsResponse.json();
+                    console.log('✅ CORS-anywhere proxy successful:', groupData);
+                }
+            } catch (error) {
+                console.warn('CORS-anywhere proxy failed:', error);
+            }
+        }
+
+        // Method 3: Try direct API call (usually fails due to CORS but worth trying)
+        if (!groupData) {
+            try {
+                console.log('Trying direct API call...');
+                const directResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`);
+
+                if (directResponse.ok) {
+                    groupData = await directResponse.json();
+                    console.log('✅ Direct API call successful:', groupData);
+                }
+            } catch (error) {
+                console.warn('Direct API call failed:', error);
+            }
+        }
+
+        // If we got valid data, update the display
+        if (groupData && groupData.memberCount !== undefined) {
+            const memberCount = groupData.memberCount;
+            console.log(`Setting group members to: ${formatNumber(memberCount)}`);
+            document.getElementById('group-member-count').textContent = formatNumber(memberCount);
+            console.log('✅ Group statistics updated successfully');
+            return;
+        }
+
+        // If all methods failed, show error
+        console.error('All API methods failed to fetch group data');
+        document.getElementById('group-member-count').textContent = 'Failed to load';
+
+    } catch (error) {
+        console.error('Failed to fetch group statistics:', error);
+        document.getElementById('group-member-count').textContent = 'Failed to load';
+    }
+}
+
 // Update ages when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Calculate and display ages
@@ -103,13 +184,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('kasper-age').textContent = kasperAge;
 
     // Update current year in footer
-    document.getElementById('current-year').textContent = new Date().getFullYear();
-
-    // Shuffle team members randomly each time the page loads
+    document.getElementById('current-year').textContent = new Date().getFullYear();    // Shuffle team members randomly each time the page loads
     shuffleTeamMembers();
 
     // Fetch and display game statistics
     fetchGameStats();
+
+    // Fetch and display group statistics
+    fetchGroupStats();
+
+    // Fetch and display group statistics
+    fetchGroupStats();
 });
 
 // Mobile navigation toggle
