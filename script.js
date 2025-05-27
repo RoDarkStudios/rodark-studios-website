@@ -344,9 +344,9 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 window.addEventListener('scroll', function() {
     const navbar = document.querySelector('.navbar');
     if (window.scrollY > 50) {
-        navbar.style.background = 'rgba(15, 23, 42, 0.98)';
+        navbar.style.background = 'rgba(23, 23, 23, 0.98)';
     } else {
-        navbar.style.background = 'rgba(15, 23, 42, 0.95)';
+        navbar.style.background = 'rgba(23, 23, 23, 0.95)';
     }
 });
 

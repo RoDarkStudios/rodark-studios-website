@@ -6,17 +6,17 @@
 }
 
 :root {
-    --primary-color: #6366f1;
-    --primary-dark: #4f46e5;
-    --secondary-color: #ec4899;
+    --primary-color: #f97316;
+    --primary-dark: #ea580c;
+    --secondary-color: #fb923c;
     --accent-color: #06b6d4;
-    --dark-bg: #0f172a;
-    --darker-bg: #020617;
-    --card-bg: #1e293b;
+    --dark-bg: #171717;
+    --darker-bg: #0a0a0a;
+    --card-bg: #262626;
     --text-primary: #f8fafc;
     --text-secondary: #cbd5e1;
     --text-muted: #94a3b8;
-    --border-color: #334155;
+    --border-color: #404040;
     --gradient: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
     --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -45,7 +45,7 @@ body {
     position: fixed;
     top: 0;
     width: 100%;
-    background: rgba(15, 23, 42, 0.95);
+    background: rgba(23, 23, 23, 0.95);
     backdrop-filter: blur(10px);
     z-index: 1000;
     border-bottom: 1px solid var(--border-color);
@@ -147,7 +147,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><radialGradient id="a"><stop offset="0%" stop-color="%236366f1" stop-opacity="0.1"/><stop offset="100%" stop-color="%236366f1" stop-opacity="0"/></radialGradient></defs><circle cx="500" cy="500" r="400" fill="url(%23a)"/></svg>');
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><radialGradient id="a"><stop offset="0%" stop-color="%23f97316" stop-opacity="0.1"/><stop offset="100%" stop-color="%23f97316" stop-opacity="0"/></radialGradient></defs><circle cx="500" cy="500" r="400" fill="url(%23a)"/></svg>');
     opacity: 0.3;
 }
 
@@ -732,11 +732,10 @@ body {
 }
 
 .community-highlight {
-    display: inline-flex;
-    align-items: center;
+    display: inline-flex;    align-items: center;
     gap: 1rem;
     padding: 1rem 1.5rem;
-    background: rgba(99, 102, 241, 0.1);
+    background: rgba(249, 115, 22, 0.1);
     border: 2px solid var(--primary-color);
     border-radius: 16px;
     backdrop-filter: blur(10px);
@@ -745,7 +744,7 @@ body {
 
 .community-highlight:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.2);
+    box-shadow: 0 10px 25px rgba(249, 115, 22, 0.2);
 }
 
 .community-highlight i {
