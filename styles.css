@@ -498,6 +498,36 @@ body {
     margin: 0 auto 1.5rem;
     font-size: 3rem;
     color: white;
+    overflow: hidden;
+}
+
+.avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    transition: opacity 0.3s ease;
+}
+
+/* Loading and error states for avatars */
+.member-avatar .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Ensure avatar images load smoothly */
+.avatar-image {
+    opacity: 0;
+    animation: fadeInAvatar 0.5s ease forwards;
+}
+
+@keyframes fadeInAvatar {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .member-name {
