@@ -377,17 +377,36 @@ body {
     display: flex;
     gap: 2rem;
     margin-bottom: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
 }
 
 .stat {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-    color: var(--text-secondary);
+    text-align: center;
+    gap: 0.25rem;
+    min-width: 100px;
 }
 
 .stat i {
     color: var(--primary-color);
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.stat span {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.stat small {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* About Section */
@@ -502,6 +521,66 @@ body {
 .member-bio {
     color: var(--text-muted);
     line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+.member-socials {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.member-social {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 1.2rem;
+}
+
+.member-social:hover:not(.disabled) {
+    transform: translateY(-2px);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.member-social.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.member-social.youtube:hover {
+    border-color: #ff0000;
+    color: #ff0000;
+}
+
+.member-social.twitter:hover {
+    border-color: #000000;
+    color: #000000;
+}
+
+.member-social.instagram:hover {
+    border-color: #e4405f;
+    color: #e4405f;
+}
+
+.member-social.roblox:hover {
+    border-color: #00a2ff;
+    color: #00a2ff;
+}
+
+.member-social .x-icon {
+    font-size: 1rem;
+    font-weight: bold;
+    font-family: 'Times New Roman', serif;
 }
 
 /* Social Section */
@@ -542,6 +621,12 @@ body {
     font-size: 1.5rem;
 }
 
+.social-link .x-icon {
+    font-size: 1.5rem;
+    font-weight: bold;
+    font-family: 'Times New Roman', serif;
+}
+
 .social-link.discord:hover {
     border-color: #5865f2;
     color: #5865f2;
@@ -553,8 +638,8 @@ body {
 }
 
 .social-link.twitter:hover {
-    border-color: #1da1f2;
-    color: #1da1f2;
+    border-color: #000000;
+    color: #000000;
 }
 
 .social-link.youtube:hover {

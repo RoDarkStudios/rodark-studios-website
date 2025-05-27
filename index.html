@@ -86,10 +86,9 @@
     <section id="games" class="featured-game">
         <div class="container">
             <h2 class="section-title">Our Flagship Game</h2>
-            <div class="game-showcase">
-                <div class="game-card featured">
+            <div class="game-showcase">                <div class="game-card featured">
                     <div class="game-thumbnail">
-                        <img src="https://tr.rbxcdn.com/180DAY-c24b0c458be1c16c4490ebd1e4c7b7d6/768/432/Image/Webp"
+                        <img src="GameIcon.png"
                              alt="Coding Simulator" class="game-image">
                         <div class="play-overlay">
                             <a href="https://www.roblox.com/games/16230991879/Coding-Simulator"
@@ -104,15 +103,11 @@
                         <p class="game-description">
                             Experience the world of programming in this innovative simulation game.
                             Learn coding concepts while having fun in an immersive Roblox environment.
-                        </p>
-                        <div class="game-stats">
+                        </p>                        <div class="game-stats">
                             <div class="stat">
-                                <i class="fas fa-users"></i>
-                                <span>Active Players</span>
-                            </div>
-                            <div class="stat">
-                                <i class="fas fa-star"></i>
-                                <span>High Rated</span>
+                                <i class="fas fa-eye"></i>
+                                <span id="visit-count">Loading...</span>
+                                <small>Total Visits</small>
                             </div>
                         </div>
                         <a href="https://www.roblox.com/games/16230991879/Coding-Simulator"
@@ -162,36 +157,77 @@
     <!-- Team Section -->
     <section id="team" class="team">
         <div class="container">
-            <h2 class="section-title">Meet Our Team</h2>
-            <div class="team-grid">
-                <div class="team-member">
+            <h2 class="section-title">Meet Our Team</h2>            <div class="team-grid" id="team-grid">
+                <div class="team-member" id="kasper-member">
                     <div class="member-avatar">
                         <i class="fas fa-user"></i>
                     </div>
                     <h3 class="member-name">Kasper</h3>
-                    <p class="member-role">Co-Founder & Developer</p>
+                    <p class="member-role">Owner, Founder & Programmer</p>
                     <p class="member-age">Age: <span id="kasper-age">20</span></p>
                     <p class="member-bio">Passionate about creating innovative game mechanics and user experiences.</p>
+                    <div class="member-socials">
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <i class="fab fa-youtube"></i>
+                        </a>
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <span class="x-icon">𝕏</span>
+                        </a>
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <i class="fas fa-cube"></i>
+                        </a>
+                    </div>
                 </div>
 
-                <div class="team-member">
+                <div class="team-member" id="tristan-member">
                     <div class="member-avatar">
                         <i class="fas fa-user"></i>
                     </div>
                     <h3 class="member-name">Tristan</h3>
-                    <p class="member-role">Co-Founder & Designer</p>
+                    <p class="member-role">Owner, Founder & Designer</p>
                     <p class="member-age">Age: <span id="tristan-age">20</span></p>
                     <p class="member-bio">Expert in game design and creating visually stunning gaming experiences.</p>
+                    <div class="member-socials">
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <i class="fab fa-youtube"></i>
+                        </a>
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <span class="x-icon">𝕏</span>
+                        </a>
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="member-social disabled" title="Coming Soon">
+                            <i class="fas fa-cube"></i>
+                        </a>
+                    </div>
                 </div>
 
-                <div class="team-member">
+                <div class="team-member" id="myron-member">
                     <div class="member-avatar">
                         <i class="fas fa-user"></i>
                     </div>
                     <h3 class="member-name">Myron</h3>
-                    <p class="member-role">Co-Founder & Lead Developer</p>
+                    <p class="member-role">Owner, Founder & Programmer</p>
                     <p class="member-age">Age: <span id="myron-age">16</span></p>
                     <p class="member-bio">Technical lead specializing in advanced scripting and game optimization.</p>
+                    <div class="member-socials">
+                        <a href="https://www.youtube.com/@Myron_RDS" target="_blank" class="member-social youtube">
+                            <i class="fab fa-youtube"></i>
+                        </a>
+                        <a href="https://x.com/Myron_RDS" target="_blank" class="member-social twitter">
+                            <span class="x-icon">𝕏</span>
+                        </a>
+                        <a href="https://instagram.com/Myron_RDS" target="_blank" class="member-social instagram">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="https://www.roblox.com/users/2735760162" target="_blank" class="member-social roblox">
+                            <i class="fas fa-cube"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -205,14 +241,12 @@
                 <a href="https://discord.com/RoDarkStudios" target="_blank" class="social-link discord">
                     <i class="fab fa-discord"></i>
                     <span>Discord</span>
-                </a>
-                <a href="https://www.roblox.com/communities/5545660" target="_blank" class="social-link roblox">
-                    <i class="fab fa-roblox"></i>
+                </a>                <a href="https://www.roblox.com/communities/5545660" target="_blank" class="social-link roblox">
+                    <i class="fas fa-cube"></i>
                     <span>Roblox Group</span>
-                </a>
-                <a href="https://x.com/RoDarkStudios" target="_blank" class="social-link twitter">
-                    <i class="fab fa-x-twitter"></i>
-                    <span>Twitter</span>
+                </a>                <a href="https://x.com/RoDarkStudios" target="_blank" class="social-link twitter">
+                    <span class="x-icon">𝕏</span>
+                    <span>X</span>
                 </a>
                 <a href="https://www.youtube.com/@RoDarkStudios" target="_blank" class="social-link youtube">
                     <i class="fab fa-youtube"></i>
