@@ -87,6 +87,26 @@ body {
     gap: 2rem;
 }
 
+.nav-account {
+    display: flex;
+    align-items: center;
+    margin-left: 1.25rem;
+}
+
+.nav-username {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(6, 182, 212, 0.45);
+    background: rgba(6, 182, 212, 0.14);
+    color: #67e8f9;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: lowercase;
+}
+
 .nav-link {
     color: var(--text-secondary);
     text-decoration: none;
@@ -416,6 +436,12 @@ body {
 /* Passkey Account Section */
 .auth-section {
     padding: 6rem 0;
+    background: linear-gradient(180deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
+}
+
+.auth-page-main {
+    min-height: 100vh;
+    padding-top: 80px;
     background: linear-gradient(180deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
 }
 
@@ -933,6 +959,16 @@ body {
         box-shadow: var(--shadow);
         border-top: 1px solid var(--border-color);
         padding: 2rem 0;
+    }
+
+    .nav-account {
+        margin-left: auto;
+        margin-right: 0.75rem;
+    }
+
+    .nav-username {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.65rem;
     }
 
     .nav-menu.active {

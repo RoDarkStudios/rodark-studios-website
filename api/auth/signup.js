@@ -3,7 +3,13 @@ const { parseCookies, serializeCookie, appendSetCookie, WEBAUTHN_STATE_COOKIE, S
 const { issueSignedToken, verifySignedToken } = require('../_lib/signed-token');
 const { getAuthSecret, getExpectedOrigin, getExpectedRpId } = require('../_lib/auth-config');
 const { randomBase64Url, normalizeTransports, verifyRegistrationCredential } = require('../_lib/webauthn');
-const { findUserByEmail, createUser, createCredential, deleteUserById } = require('../_lib/passkey-store');
+const {
+    findUserByEmail,
+    findUserByUsername,
+    createUser,
+    createCredential,
+    deleteUserById
+} = require('../_lib/passkey-store');
 
 const WEBAUTHN_STATE_TTL_SECONDS = 60 * 5;
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -12,15 +18,17 @@ function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
 }
 
-function normalizeDisplayName(value) {
-    const displayName = String(value || '').trim();
-    if (!displayName) {
-        return 'Player';
-    }
-    if (displayName.length > 50) {
+function normalizeUsername(value) {
+    const username = String(value || '').trim().toLowerCase();
+    if (!username) {
         return null;
     }
-    return displayName;
+
+    if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+        return null;
+    }
+
+    return username;
 }
 
 function setWebAuthnStateCookie(res, token) {
@@ -73,19 +81,24 @@ function validateCredentialPayload(body) {
 
 async function handleOptions(req, res, body) {
     const email = normalizeEmail(body.email);
-    const displayName = normalizeDisplayName(body.displayName);
+    const username = normalizeUsername(body.username);
 
     if (!email || !email.includes('@')) {
         return sendJson(res, 400, { error: 'A valid email is required' });
     }
 
-    if (!displayName) {
-        return sendJson(res, 400, { error: 'displayName must be 1-50 characters' });
+    if (!username) {
+        return sendJson(res, 400, { error: 'username must be 3-30 chars: lowercase letters, numbers, or _' });
     }
 
     const existingUser = await findUserByEmail(email);
     if (existingUser) {
         return sendJson(res, 409, { error: 'An account with this email already exists' });
+    }
+
+    const existingUsername = await findUserByUsername(username);
+    if (existingUsername) {
+        return sendJson(res, 409, { error: 'This username is already taken' });
     }
 
     const challenge = randomBase64Url(32);
@@ -95,7 +108,7 @@ async function handleOptions(req, res, body) {
         type: 'signup',
         challenge,
         email,
-        displayName,
+        username,
         userHandle
     }, getAuthSecret(), WEBAUTHN_STATE_TTL_SECONDS);
 
@@ -110,8 +123,8 @@ async function handleOptions(req, res, body) {
             },
             user: {
                 id: userHandle,
-                name: email,
-                displayName
+                name: username,
+                displayName: username
             },
             pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
             timeout: 60000,
@@ -131,6 +144,12 @@ async function handleVerify(req, res, body) {
     if (!state || state.type !== 'signup') {
         clearWebAuthnStateCookie(res);
         return sendJson(res, 400, { error: 'Signup session expired. Please try again.' });
+    }
+
+    const stateUsername = normalizeUsername(state.username);
+    if (!state.email || !stateUsername) {
+        clearWebAuthnStateCookie(res);
+        return sendJson(res, 400, { error: 'Signup session is invalid. Please try again.' });
     }
 
     const credential = validateCredentialPayload(body);
@@ -158,9 +177,15 @@ async function handleVerify(req, res, body) {
         return sendJson(res, 409, { error: 'An account with this email already exists' });
     }
 
+    const existingUsername = await findUserByUsername(stateUsername);
+    if (existingUsername) {
+        clearWebAuthnStateCookie(res);
+        return sendJson(res, 409, { error: 'This username is already taken' });
+    }
+
     let user;
     try {
-        user = await createUser(state.email, state.displayName);
+        user = await createUser(state.email, stateUsername);
     } catch (error) {
         clearWebAuthnStateCookie(res);
         return sendJson(res, 500, { error: 'Failed to create user', details: error.message });
@@ -200,7 +225,7 @@ async function handleVerify(req, res, body) {
             email: user.email,
             created_at: user.created_at,
             user_metadata: {
-                display_name: user.display_name
+                username: user.username
             }
         }
     });

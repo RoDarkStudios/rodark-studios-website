@@ -21,7 +21,7 @@ function normalizeUserRecord(record) {
     return {
         id: record.id,
         email: record.email,
-        display_name: record.display_name || 'Player',
+        username: record.username,
         created_at: record.created_at,
         updated_at: record.updated_at
     };
@@ -29,7 +29,7 @@ function normalizeUserRecord(record) {
 
 async function findUserById(userId) {
     const idFilter = encodeFilterValue(userId);
-    const { response, data } = await supabaseAdminRestRequest(`/passkey_users?id=eq.${idFilter}&select=id,email,display_name,created_at,updated_at&limit=1`, {
+    const { response, data } = await supabaseAdminRestRequest(`/passkey_users?id=eq.${idFilter}&select=id,email,username,created_at,updated_at&limit=1`, {
         method: 'GET'
     });
 
@@ -39,7 +39,7 @@ async function findUserById(userId) {
 
 async function findUserByEmail(email) {
     const emailFilter = encodeFilterValue(email);
-    const { response, data } = await supabaseAdminRestRequest(`/passkey_users?email=eq.${emailFilter}&select=id,email,display_name,created_at,updated_at&limit=1`, {
+    const { response, data } = await supabaseAdminRestRequest(`/passkey_users?email=eq.${emailFilter}&select=id,email,username,created_at,updated_at&limit=1`, {
         method: 'GET'
     });
 
@@ -47,10 +47,20 @@ async function findUserByEmail(email) {
     return normalizeUserRecord(Array.isArray(data) ? data[0] || null : null);
 }
 
-async function createUser(email, displayName) {
+async function findUserByUsername(username) {
+    const usernameFilter = encodeFilterValue(username);
+    const { response, data } = await supabaseAdminRestRequest(`/passkey_users?username=eq.${usernameFilter}&select=id,email,username,created_at,updated_at&limit=1`, {
+        method: 'GET'
+    });
+
+    ensureOkResponse(response, data, 'Failed to load user by username');
+    return normalizeUserRecord(Array.isArray(data) ? data[0] || null : null);
+}
+
+async function createUser(email, username) {
     const payload = {
         email,
-        display_name: displayName || 'Player'
+        username
     };
 
     const { response, data } = await supabaseAdminRestRequest('/passkey_users', {
@@ -74,7 +84,7 @@ async function deleteUserById(userId) {
     ensureOkResponse(response, data, 'Failed to delete user');
 }
 
-async function updateUserDisplayName(userId, displayName) {
+async function updateUserUsername(userId, username) {
     const idFilter = encodeFilterValue(userId);
     const { response, data } = await supabaseAdminRestRequest(`/passkey_users?id=eq.${idFilter}`, {
         method: 'PATCH',
@@ -82,12 +92,12 @@ async function updateUserDisplayName(userId, displayName) {
             Prefer: 'return=representation'
         },
         body: {
-            display_name: displayName,
+            username,
             updated_at: new Date().toISOString()
         }
     });
 
-    ensureOkResponse(response, data, 'Failed to update display name');
+    ensureOkResponse(response, data, 'Failed to update username');
     return normalizeUserRecord(Array.isArray(data) ? data[0] || null : null);
 }
 
@@ -175,9 +185,10 @@ async function updateCredentialCounter(credentialPrimaryId, signCount) {
 module.exports = {
     findUserById,
     findUserByEmail,
+    findUserByUsername,
     createUser,
     deleteUserById,
-    updateUserDisplayName,
+    updateUserUsername,
     listCredentialsByUserId,
     findCredentialByIdForUser,
     createCredential,

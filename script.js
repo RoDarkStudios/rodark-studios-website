@@ -102,6 +102,8 @@ async function postJson(url, payload) {
     return data;
 }
 
+const FALLBACK_NAV_USERNAME = 'rodark_member';
+
 function setAuthMessage(message, type = '') {
     const authMessage = document.getElementById('auth-message');
     if (!authMessage) {
@@ -115,21 +117,40 @@ function setAuthMessage(message, type = '') {
     }
 }
 
+function getUserUsername(user) {
+    if (!user || !user.user_metadata || typeof user.user_metadata.username !== 'string') {
+        return '';
+    }
+
+    return user.user_metadata.username.trim();
+}
+
+function setNavbarUsername(user) {
+    const navUsername = document.getElementById('nav-username');
+    if (!navUsername) {
+        return;
+    }
+
+    const username = getUserUsername(user) || FALLBACK_NAV_USERNAME;
+    navUsername.textContent = `@${username}`;
+}
+
 function setAuthUi(user) {
     const authStateText = document.getElementById('auth-state-text');
     const authCard = document.getElementById('auth-card');
     const signoutBtn = document.getElementById('signout-btn');
+
+    setNavbarUsername(user);
 
     if (!authStateText || !authCard || !signoutBtn) {
         return;
     }
 
     if (user) {
-        const displayName = user.user_metadata && user.user_metadata.display_name
-            ? ` (${user.user_metadata.display_name})`
-            : '';
+        const username = getUserUsername(user) || FALLBACK_NAV_USERNAME;
+        const emailSuffix = user.email ? ` (${user.email})` : '';
 
-        authStateText.textContent = `Signed in as ${user.email}${displayName}`;
+        authStateText.textContent = `Signed in as @${username}${emailSuffix}`;
         authCard.classList.add('hidden');
         signoutBtn.classList.remove('hidden');
         return;
@@ -157,6 +178,10 @@ async function refreshAuthUi() {
     } catch (error) {
         setAuthUi(null);
     }
+}
+
+function isValidUsername(username) {
+    return /^[a-z0-9_]{3,30}$/.test(username);
 }
 
 function bindAuthTabs() {
@@ -197,14 +222,19 @@ async function handleSignUpSubmit(event) {
     }
 
     const emailInput = document.getElementById('signup-email');
-    const displayNameInput = document.getElementById('signup-display-name');
+    const usernameInput = document.getElementById('signup-username');
     const submitButton = event.currentTarget.querySelector('button[type="submit"]');
 
     const email = emailInput.value.trim().toLowerCase();
-    const displayName = displayNameInput.value.trim();
+    const username = usernameInput.value.trim().toLowerCase();
 
-    if (!email || !displayName) {
-        setAuthMessage('Email and display name are required.', 'error');
+    if (!email || !username) {
+        setAuthMessage('Email and username are required.', 'error');
+        return;
+    }
+
+    if (!isValidUsername(username)) {
+        setAuthMessage('Username must be 3-30 characters: lowercase letters, numbers, or _.', 'error');
         return;
     }
 
@@ -215,7 +245,7 @@ async function handleSignUpSubmit(event) {
         const optionsData = await postJson('/api/auth/signup', {
             action: 'options',
             email,
-            displayName
+            username
         });
 
         const credential = await navigator.credentials.create({
@@ -320,6 +350,8 @@ function initPasskeyAuth() {
     const loginForm = document.getElementById('login-form');
     const signoutBtn = document.getElementById('signout-btn');
 
+    refreshAuthUi();
+
     if (!signupForm || !loginForm || !signoutBtn) {
         return;
     }
@@ -328,7 +360,6 @@ function initPasskeyAuth() {
     signupForm.addEventListener('submit', handleSignUpSubmit);
     loginForm.addEventListener('submit', handleLoginSubmit);
     signoutBtn.addEventListener('click', handleSignOut);
-    refreshAuthUi();
 }
 
 // Age calculation function
@@ -348,6 +379,10 @@ function calculateAge(birthDate) {
 // Function to shuffle team members randomly
 function shuffleTeamMembers() {
     const teamGrid = document.getElementById('team-grid');
+    if (!teamGrid) {
+        return;
+    }
+
     const teamMembers = Array.from(teamGrid.children);
 
     // Shuffle the array using Fisher-Yates algorithm
@@ -365,6 +400,11 @@ function shuffleTeamMembers() {
 
 // Function to fetch game statistics from Roblox
 async function fetchGameStats() {
+    const visitCountElement = document.getElementById('visit-count');
+    if (!visitCountElement) {
+        return;
+    }
+
     const placeId = 16230991879; // Coding Simulator place ID
     const universeId = 5602610435; // Pre-converted Universe ID to avoid API calls
 
@@ -391,7 +431,7 @@ async function fetchGameStats() {
                       // Update visit count
                     if (game.visits !== undefined) {
                         console.log(`Setting visits to: ${formatNumber(game.visits)}`);
-                        document.getElementById('visit-count').textContent = formatNumber(game.visits);
+                        visitCountElement.textContent = formatNumber(game.visits);
                         console.log('✅ Game statistics updated successfully');
                         return;
                     } else {
@@ -413,19 +453,24 @@ async function fetchGameStats() {
             visits: 4354515  // 4.3M+ visits (actual current number)
         };
 
-        document.getElementById('visit-count').textContent = formatNumber(knownStats.visits);
+        visitCountElement.textContent = formatNumber(knownStats.visits);
 
         console.log('📊 Known accurate statistics loaded');
 
     } catch (error) {
         console.error('Failed to fetch game statistics:', error);
           // Show error state
-        document.getElementById('visit-count').textContent = 'N/A';
+        visitCountElement.textContent = 'N/A';
     }
 }
 
 // Function to fetch group member count from Roblox
 async function fetchGroupStats() {
+    const groupMemberCountElement = document.getElementById('group-member-count');
+    if (!groupMemberCountElement) {
+        return;
+    }
+
     const groupId = 5545660; // RoDark Studios group ID
 
     try {
@@ -490,18 +535,18 @@ async function fetchGroupStats() {
         if (groupData && groupData.memberCount !== undefined) {
             const memberCount = groupData.memberCount;
             console.log(`Setting group members to: ${formatNumber(memberCount)}`);
-            document.getElementById('group-member-count').textContent = formatNumber(memberCount);
+            groupMemberCountElement.textContent = formatNumber(memberCount);
             console.log('✅ Group statistics updated successfully');
             return;
         }
 
         // If all methods failed, show error
         console.error('All API methods failed to fetch group data');
-        document.getElementById('group-member-count').textContent = 'Failed to load';
+        groupMemberCountElement.textContent = 'Failed to load';
 
     } catch (error) {
         console.error('Failed to fetch group statistics:', error);
-        document.getElementById('group-member-count').textContent = 'Failed to load';
+        groupMemberCountElement.textContent = 'Failed to load';
     }
 }
 
@@ -512,6 +557,11 @@ async function fetchUserAvatars() {
         { id: 175190407, elementId: 'kasper-avatar' },   // Kasper
         { id: 290031319, elementId: 'tristan-avatar' }   // Tristan
     ];
+
+    const hasAvatarTargets = users.some((user) => document.getElementById(user.elementId));
+    if (!hasAvatarTargets) {
+        return;
+    }
 
     console.log('Fetching user avatars...');
 
@@ -626,17 +676,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const tristanAge = calculateAge('2004-12-25');
     const kasperAge = calculateAge('2004-12-25');
 
-    document.getElementById('myron-age').textContent = myronAge;
-    document.getElementById('tristan-age').textContent = tristanAge;
-    document.getElementById('kasper-age').textContent = kasperAge;
+    const myronAgeElement = document.getElementById('myron-age');
+    const tristanAgeElement = document.getElementById('tristan-age');
+    const kasperAgeElement = document.getElementById('kasper-age');
+    if (myronAgeElement) {
+        myronAgeElement.textContent = myronAge;
+    }
+    if (tristanAgeElement) {
+        tristanAgeElement.textContent = tristanAge;
+    }
+    if (kasperAgeElement) {
+        kasperAgeElement.textContent = kasperAge;
+    }
 
     // Update current year in footer
-    document.getElementById('current-year').textContent = new Date().getFullYear();    // Shuffle team members randomly each time the page loads
-    shuffleTeamMembers();    // Fetch and display game statistics
+    const currentYearElement = document.getElementById('current-year');
+    if (currentYearElement) {
+        currentYearElement.textContent = new Date().getFullYear();
+    }
+
+    // Shuffle team members randomly each time the page loads
+    shuffleTeamMembers();
+    // Fetch and display game statistics
     fetchGameStats();
 
     // Fetch and display group statistics
-    fetchGroupStats();    // Fetch and display user avatars
+    fetchGroupStats();
+    // Fetch and display user avatars
     fetchUserAvatars();
 
     console.log('✅ All initialization functions called');
@@ -646,18 +712,20 @@ document.addEventListener('DOMContentLoaded', function() {
 const hamburger = document.querySelector('.hamburger');
 const navMenu = document.querySelector('.nav-menu');
 
-hamburger.addEventListener('click', function() {
-    hamburger.classList.toggle('active');
-    navMenu.classList.toggle('active');
-});
-
-// Close mobile menu when clicking on a link
-document.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', () => {
-        hamburger.classList.remove('active');
-        navMenu.classList.remove('active');
+if (hamburger && navMenu) {
+    hamburger.addEventListener('click', function() {
+        hamburger.classList.toggle('active');
+        navMenu.classList.toggle('active');
     });
-});
+
+    // Close mobile menu when clicking on a link
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+            hamburger.classList.remove('active');
+            navMenu.classList.remove('active');
+        });
+    });
+}
 
 // Smooth scrolling for navigation links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -677,6 +745,10 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 // Navbar background on scroll
 window.addEventListener('scroll', function() {
     const navbar = document.querySelector('.navbar');
+    if (!navbar) {
+        return;
+    }
+
     if (window.scrollY > 50) {
         navbar.style.background = 'rgba(23, 23, 23, 0.98)';
     } else {

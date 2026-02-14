@@ -8,9 +8,9 @@ This repo now includes:
   - `/api/auth/logout`
 - Profile API: `/api/profile`
 - Health API: `/api/health`
-- SQL schema files:
-  - `supabase/001_auth_schema.sql` (existing)
-  - `supabase/002_passkey_auth.sql` (new passkey tables)
+- SQL files:
+  - `supabase/schema.sql` (single source of truth)
+  - `supabase/reset.sql` (destructive pre-launch reset helper)
 
 ## What You Must Do
 
@@ -20,8 +20,16 @@ This repo now includes:
 
 2. Apply SQL in Supabase
 - In `SQL Editor`, run:
-  - `supabase/001_auth_schema.sql`
-  - `supabase/002_passkey_auth.sql`
+  - `supabase/schema.sql`
+
+## Pre-Launch Workflow (No Migrations)
+
+Since you have not launched yet, use this every time schema changes:
+1. Run `supabase/reset.sql` (this wipes auth tables in this repo).
+2. Run `supabase/schema.sql`.
+3. Redeploy if API behavior changed.
+
+This keeps the repo migration-free while you iterate.
 
 3. Add env vars in Vercel
 - In `Settings` -> `Environment Variables`, add:

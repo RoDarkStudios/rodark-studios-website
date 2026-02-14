@@ -180,7 +180,7 @@ async function handleVerify(req, res, body) {
             email: user.email,
             created_at: user.created_at,
             user_metadata: {
-                display_name: user.display_name
+                username: user.username
             }
         }
     });

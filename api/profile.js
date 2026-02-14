@@ -1,16 +1,18 @@
 const { methodNotAllowed, readJsonBody, sendJson } = require('./_lib/http');
 const { requireUserFromSession } = require('./_lib/session');
-const { updateUserDisplayName } = require('./_lib/passkey-store');
+const { findUserByUsername, updateUserUsername } = require('./_lib/passkey-store');
 
-function normalizeDisplayName(value) {
-    const displayName = String(value || '').trim();
-    if (!displayName) {
+function normalizeUsername(value) {
+    const username = String(value || '').trim().toLowerCase();
+    if (!username) {
         return null;
     }
-    if (displayName.length > 50) {
+
+    if (!/^[a-z0-9_]{3,30}$/.test(username)) {
         return null;
     }
-    return displayName;
+
+    return username;
 }
 
 module.exports = async (req, res) => {
@@ -28,7 +30,7 @@ module.exports = async (req, res) => {
             return sendJson(res, 200, {
                 profile: {
                     id: user.id,
-                    display_name: user.display_name,
+                    username: user.username,
                     created_at: user.created_at,
                     updated_at: user.updated_at
                 }
@@ -36,16 +38,23 @@ module.exports = async (req, res) => {
         }
 
         const body = await readJsonBody(req);
-        const displayName = normalizeDisplayName(body.displayName);
-        if (!displayName) {
-            return sendJson(res, 400, { error: 'displayName must be 1-50 characters' });
+        const username = normalizeUsername(body.username);
+        if (!username) {
+            return sendJson(res, 400, { error: 'username must be 3-30 chars: lowercase letters, numbers, or _' });
         }
 
-        const updated = await updateUserDisplayName(user.id, displayName);
+        if (username !== user.username) {
+            const existingUsername = await findUserByUsername(username);
+            if (existingUsername && existingUsername.id !== user.id) {
+                return sendJson(res, 409, { error: 'This username is already taken' });
+            }
+        }
+
+        const updated = await updateUserUsername(user.id, username);
         return sendJson(res, 200, {
             profile: {
                 id: updated.id,
-                display_name: updated.display_name,
+                username: updated.username,
                 created_at: updated.created_at,
                 updated_at: updated.updated_at
             }
