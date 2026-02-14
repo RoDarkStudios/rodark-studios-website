@@ -30,36 +30,6 @@ function shuffleTeamMembers() {
     });    console.log('Team members shuffled for fairness!');
 }
 
-// Function to verify backend health endpoint
-async function checkBackendHealth() {
-    const statusElement = document.getElementById('backend-status-text');
-    if (!statusElement) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/health', {
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Health check failed with status ${response.status}`);
-        }
-
-        const data = await response.json();
-        statusElement.textContent = `Backend: online (${data.environment || 'unknown'})`;
-        statusElement.classList.remove('offline');
-        statusElement.classList.add('online');
-    } catch (error) {
-        console.warn('Backend health check failed:', error);
-        statusElement.textContent = 'Backend: offline';
-        statusElement.classList.remove('online');
-        statusElement.classList.add('offline');
-    }
-}
-
 // Function to fetch game statistics from Roblox
 async function fetchGameStats() {
     const placeId = 16230991879; // Coding Simulator place ID
@@ -334,9 +304,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fetch and display group statistics
     fetchGroupStats();    // Fetch and display user avatars
     fetchUserAvatars();
-
-    // Verify backend endpoint availability
-    checkBackendHealth();
 
     console.log('✅ All initialization functions called');
 });

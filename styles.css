@@ -773,26 +773,6 @@ body {
     font-weight: 600;
 }
 
-.backend-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin: 0 0 1.5rem;
-    color: var(--text-secondary);
-}
-
-.backend-check i {
-    color: var(--accent-color);
-}
-
-.backend-status-text.online {
-    color: #22c55e;
-}
-
-.backend-status-text.offline {
-    color: #ef4444;
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
     .hamburger {
@@ -873,9 +853,6 @@ body {
         font-size: 2rem;
     }
 
-    .backend-check {
-        justify-content: center;
-    }
 }
 
 @media (max-width: 480px) {
