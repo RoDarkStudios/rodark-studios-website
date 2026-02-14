@@ -102,8 +102,6 @@ async function postJson(url, payload) {
     return data;
 }
 
-const FALLBACK_NAV_USERNAME = 'rodark_member';
-
 function setAuthMessage(message, type = '') {
     const authMessage = document.getElementById('auth-message');
     if (!authMessage) {
@@ -131,8 +129,15 @@ function setNavbarUsername(user) {
         return;
     }
 
-    const username = getUserUsername(user) || FALLBACK_NAV_USERNAME;
-    navUsername.textContent = `@${username}`;
+    const username = getUserUsername(user);
+    if (username) {
+        navUsername.textContent = `@${username}`;
+        navUsername.classList.remove('guest');
+        return;
+    }
+
+    navUsername.textContent = 'Not signed in';
+    navUsername.classList.add('guest');
 }
 
 function setAuthUi(user) {
@@ -147,10 +152,9 @@ function setAuthUi(user) {
     }
 
     if (user) {
-        const username = getUserUsername(user) || FALLBACK_NAV_USERNAME;
-        const emailSuffix = user.email ? ` (${user.email})` : '';
-
-        authStateText.textContent = `Signed in as @${username}${emailSuffix}`;
+        const username = getUserUsername(user);
+        const identity = username ? `@${username}` : (user.email || 'your account');
+        authStateText.textContent = `Signed in as ${identity}`;
         authCard.classList.add('hidden');
         signoutBtn.classList.remove('hidden');
         return;
