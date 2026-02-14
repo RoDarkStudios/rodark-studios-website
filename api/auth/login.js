@@ -24,7 +24,7 @@ function readQuery(req) {
 function sanitizeReturnTo(value) {
     const raw = String(value || '').trim();
     if (!raw.startsWith('/') || raw.startsWith('//')) {
-        return '/auth.html';
+        return '/';
     }
     return raw;
 }
@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
 
     try {
         const query = readQuery(req);
-        const returnTo = sanitizeReturnTo(query.returnTo || '/auth.html');
+        const returnTo = sanitizeReturnTo(query.returnTo || '/');
         const oauthConfig = getRobloxOAuthConfig(req);
 
         const stateToken = issueSignedToken({

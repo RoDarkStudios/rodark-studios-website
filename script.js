@@ -23,19 +23,6 @@ async function postJson(url, payload) {
     return data;
 }
 
-function setAuthMessage(message, type = '') {
-    const authMessage = document.getElementById('auth-message');
-    if (!authMessage) {
-        return;
-    }
-
-    authMessage.textContent = message || '';
-    authMessage.classList.remove('success', 'error');
-    if (type) {
-        authMessage.classList.add(type);
-    }
-}
-
 function getUserUsername(user) {
     if (user && typeof user.username === 'string' && user.username.trim()) {
         return user.username.trim();
@@ -49,28 +36,22 @@ function getUserUsername(user) {
 }
 
 function readAuthStatusFromQuery() {
-    const authMessage = document.getElementById('auth-message');
-    if (!authMessage) {
-        return;
-    }
-
     const params = new URLSearchParams(window.location.search);
-    const authStatus = params.get('auth');
-    if (!authStatus) {
+    const hasAuthParams = params.has('auth') || params.has('reason');
+    if (!hasAuthParams) {
         return;
     }
 
-    if (authStatus === 'success') {
-        setAuthMessage('Signed in with Roblox successfully.', 'success');
-    } else if (authStatus === 'error') {
-        const reason = params.get('reason');
-        const detail = reason ? ` (${reason.replace(/_/g, ' ')})` : '';
-        setAuthMessage(`Roblox sign in failed${detail}.`, 'error');
-    }
+    params.delete('auth');
+    params.delete('reason');
+    const cleanedSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', nextUrl);
 }
 
 function setNavbarUsername(user) {
     const navUsername = document.getElementById('nav-username');
+    const navSignoutBtn = document.getElementById('nav-signout-btn');
     if (!navUsername) {
         return;
     }
@@ -79,36 +60,23 @@ function setNavbarUsername(user) {
     if (username) {
         navUsername.textContent = `@${username}`;
         navUsername.classList.remove('guest');
+        navUsername.removeAttribute('aria-label');
+        if (navSignoutBtn) {
+            navSignoutBtn.classList.remove('hidden');
+        }
         return;
     }
 
-    navUsername.textContent = 'Not signed in';
+    navUsername.textContent = 'Sign in with Roblox';
     navUsername.classList.add('guest');
+    navUsername.setAttribute('aria-label', 'Sign in with Roblox');
+    if (navSignoutBtn) {
+        navSignoutBtn.classList.add('hidden');
+    }
 }
 
 function setAuthUi(user) {
-    const authStateText = document.getElementById('auth-state-text');
-    const authCard = document.getElementById('auth-card');
-    const signoutBtn = document.getElementById('signout-btn');
-
     setNavbarUsername(user);
-
-    if (!authStateText || !authCard || !signoutBtn) {
-        return;
-    }
-
-    if (user) {
-        const username = getUserUsername(user);
-        const identity = username ? `@${username}` : (user.email || 'your account');
-        authStateText.textContent = `Signed in as ${identity}`;
-        authCard.classList.add('hidden');
-        signoutBtn.classList.remove('hidden');
-        return;
-    }
-
-    authStateText.textContent = 'Not signed in';
-    authCard.classList.remove('hidden');
-    signoutBtn.classList.add('hidden');
 }
 
 async function refreshAuthUi() {
@@ -131,42 +99,46 @@ async function refreshAuthUi() {
 }
 
 function handleRobloxLogin() {
-    setAuthMessage('');
-    window.location.href = '/api/auth/login';
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    const loginUrl = `/api/auth/login?returnTo=${encodeURIComponent(returnTo || '/')}`;
+    window.location.href = loginUrl;
 }
 
 async function handleSignOut() {
-    const signoutBtn = document.getElementById('signout-btn');
-    if (!signoutBtn) {
+    const navSignoutBtn = document.getElementById('nav-signout-btn');
+    if (!navSignoutBtn) {
         return;
     }
 
-    signoutBtn.disabled = true;
+    navSignoutBtn.disabled = true;
 
     try {
         await postJson('/api/auth/logout', {});
-        setAuthMessage('Signed out successfully.', 'success');
     } catch (error) {
-        setAuthMessage('Failed to sign out cleanly, local session was still cleared.', 'error');
+        // Keep UI consistent even if backend signout fails unexpectedly.
     } finally {
         await refreshAuthUi();
-        signoutBtn.disabled = false;
+        navSignoutBtn.disabled = false;
     }
 }
 
 function initAuth() {
-    const loginButton = document.getElementById('roblox-login-btn');
-    const signoutBtn = document.getElementById('signout-btn');
+    const navUsername = document.getElementById('nav-username');
+    const navSignoutBtn = document.getElementById('nav-signout-btn');
 
     readAuthStatusFromQuery();
     refreshAuthUi();
 
-    if (loginButton) {
-        loginButton.addEventListener('click', handleRobloxLogin);
+    if (navUsername) {
+        navUsername.addEventListener('click', () => {
+            if (navUsername.classList.contains('guest')) {
+                handleRobloxLogin();
+            }
+        });
     }
 
-    if (signoutBtn) {
-        signoutBtn.addEventListener('click', handleSignOut);
+    if (navSignoutBtn) {
+        navSignoutBtn.addEventListener('click', handleSignOut);
     }
 }
 

@@ -90,12 +90,14 @@ body {
 .nav-account {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
     margin-left: 1.25rem;
 }
 
 .nav-username {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     padding: 0.45rem 0.75rem;
     border-radius: 999px;
     border: 1px solid rgba(6, 182, 212, 0.45);
@@ -104,7 +106,10 @@ body {
     font-size: 0.85rem;
     font-weight: 700;
     letter-spacing: 0.03em;
-    text-transform: lowercase;
+    font-family: inherit;
+    line-height: 1;
+    cursor: default;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
 
 .nav-username.guest {
@@ -112,6 +117,30 @@ body {
     background: rgba(148, 163, 184, 0.12);
     color: var(--text-secondary);
     text-transform: none;
+    cursor: pointer;
+}
+
+.nav-username.guest:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.nav-signout {
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.nav-signout:hover {
+    border-color: #fb7185;
+    color: #fb7185;
 }
 
 .nav-link {
@@ -440,7 +469,7 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* Passkey Account Section */
+/* Shared Page Section Layout */
 .auth-section {
     padding: 6rem 0;
     background: linear-gradient(180deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
@@ -450,137 +479,6 @@ body {
     min-height: 100vh;
     padding-top: 80px;
     background: linear-gradient(180deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
-}
-
-.auth-shell {
-    max-width: 940px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 1.5rem;
-}
-
-.auth-status-card,
-.auth-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 18px;
-    box-shadow: var(--shadow);
-}
-
-.auth-status-card {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.auth-status-label {
-    font-size: 0.8rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-
-.auth-state-text {
-    font-size: 1rem;
-    color: var(--text-primary);
-    font-weight: 600;
-    line-height: 1.5;
-}
-
-.auth-signout {
-    width: 100%;
-    justify-content: center;
-}
-
-.auth-card {
-    padding: 1.5rem;
-}
-
-.auth-tabs {
-    display: inline-flex;
-    padding: 0.25rem;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-color);
-    margin-bottom: 1.25rem;
-}
-
-.auth-tab {
-    border: 0;
-    color: var(--text-secondary);
-    background: transparent;
-    font-weight: 700;
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.auth-tab.active {
-    color: var(--text-primary);
-    background: rgba(249, 115, 22, 0.2);
-}
-
-.auth-form {
-    display: none;
-}
-
-.auth-form.active {
-    display: block;
-}
-
-.auth-copy {
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-}
-
-.auth-label {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    margin: 0.9rem 0 0.4rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.auth-input {
-    width: 100%;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-primary);
-    padding: 0.85rem 0.95rem;
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.auth-input:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16);
-}
-
-.auth-submit {
-    width: 100%;
-    justify-content: center;
-    margin-top: 1.2rem;
-}
-
-.auth-message {
-    margin-top: 1rem;
-    min-height: 1.4rem;
-    color: var(--text-muted);
-}
-
-.auth-message.success {
-    color: #34d399;
-}
-
-.auth-message.error {
-    color: #fb7185;
 }
 
 /* About Section */
@@ -1035,6 +933,11 @@ body {
         padding: 0.35rem 0.65rem;
     }
 
+    .nav-signout {
+        font-size: 0.72rem;
+        padding: 0.35rem 0.55rem;
+    }
+
     .nav-menu.active {
         left: 0;
     }
@@ -1080,10 +983,6 @@ body {
     .hero-logo {
         width: 150px;
         height: 150px;
-    }
-
-    .auth-shell {
-        grid-template-columns: 1fr;
     }
 
     .community-highlight {

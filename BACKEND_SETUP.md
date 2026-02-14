@@ -26,10 +26,15 @@ In your Roblox OAuth app settings, ensure the redirect URI matches:
 - `https://your-domain.com/api/auth/callback` (production)
 - `http://localhost:3000/api/auth/callback` (local, if used)
 
+Recommended app links:
+- Entry link: `https://your-domain.com/`
+- Privacy Policy URL: `https://your-domain.com/privacy`
+- Terms of Service URL: `https://your-domain.com/terms`
+
 ## Deploy Steps
 1. Set environment variables in Vercel.
 2. Redeploy.
-3. Open `auth.html`, click `Continue With Roblox`, complete authorization.
+3. Open your site homepage and click `Sign in with Roblox` in the top-right account badge.
 
 ## Notes
 - Session is stored in HttpOnly cookie: `rd_session`.

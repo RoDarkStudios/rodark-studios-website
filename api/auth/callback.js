@@ -16,12 +16,12 @@ function readQuery(req) {
 }
 
 function buildRedirectPath(pathname, status, reason) {
-    const params = new URLSearchParams();
-    params.set('auth', status);
+    const target = new URL(pathname, 'http://localhost');
+    target.searchParams.set('auth', status);
     if (reason) {
-        params.set('reason', reason);
+        target.searchParams.set('reason', reason);
     }
-    return `${pathname}?${params.toString()}`;
+    return `${target.pathname}${target.search}`;
 }
 
 function redirect(res, destination) {
@@ -53,7 +53,7 @@ function setSessionCookie(res, sessionToken) {
 function sanitizeReturnTo(value) {
     const raw = String(value || '').trim();
     if (!raw.startsWith('/') || raw.startsWith('//')) {
-        return '/auth.html';
+        return '/';
     }
 
     return raw.split('#')[0];
@@ -72,16 +72,16 @@ module.exports = async (req, res) => {
 
         if (!cookieStateToken || !queryStateToken || cookieStateToken !== queryStateToken) {
             clearOAuthStateCookie(res);
-            return redirect(res, buildRedirectPath('/auth.html', 'error', 'state_mismatch'));
+            return redirect(res, buildRedirectPath('/', 'error', 'state_mismatch'));
         }
 
         const statePayload = verifySignedToken(cookieStateToken, getAuthSecret());
         if (!statePayload || statePayload.type !== 'oauth_state') {
             clearOAuthStateCookie(res);
-            return redirect(res, buildRedirectPath('/auth.html', 'error', 'invalid_state'));
+            return redirect(res, buildRedirectPath('/', 'error', 'invalid_state'));
         }
 
-        const returnTo = sanitizeReturnTo(statePayload.returnTo || '/auth.html');
+        const returnTo = sanitizeReturnTo(statePayload.returnTo || '/');
         clearOAuthStateCookie(res);
 
         if (query.error) {
@@ -122,6 +122,6 @@ module.exports = async (req, res) => {
         return redirect(res, buildRedirectPath(returnTo, 'success'));
     } catch (error) {
         clearOAuthStateCookie(res);
-        return redirect(res, buildRedirectPath('/auth.html', 'error', 'callback_failed'));
+        return redirect(res, buildRedirectPath('/', 'error', 'callback_failed'));
     }
 };
