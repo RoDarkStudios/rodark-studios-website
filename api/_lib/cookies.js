@@ -1,5 +1,7 @@
 const ACCESS_COOKIE = 'rd_access_token';
 const REFRESH_COOKIE = 'rd_refresh_token';
+const SESSION_COOKIE = 'rd_session';
+const WEBAUTHN_STATE_COOKIE = 'rd_webauthn_state';
 
 function parseCookies(req) {
     const header = req.headers.cookie;
@@ -51,6 +53,21 @@ function serializeCookie(name, value, options = {}) {
     return parts.join('; ');
 }
 
+function appendSetCookie(res, cookieValue) {
+    const current = res.getHeader('Set-Cookie');
+    if (!current) {
+        res.setHeader('Set-Cookie', [cookieValue]);
+        return;
+    }
+
+    if (Array.isArray(current)) {
+        res.setHeader('Set-Cookie', [...current, cookieValue]);
+        return;
+    }
+
+    res.setHeader('Set-Cookie', [current, cookieValue]);
+}
+
 function setAuthCookies(res, authData) {
     const expiresIn = Number(authData.expires_in) || 3600;
     const accessCookie = serializeCookie(ACCESS_COOKIE, authData.access_token, {
@@ -66,13 +83,19 @@ function clearAuthCookies(res) {
     const expired = 'Thu, 01 Jan 1970 00:00:00 GMT';
     const accessCookie = `${serializeCookie(ACCESS_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
     const refreshCookie = `${serializeCookie(REFRESH_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
-    res.setHeader('Set-Cookie', [accessCookie, refreshCookie]);
+    const sessionCookie = `${serializeCookie(SESSION_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
+    const webauthnStateCookie = `${serializeCookie(WEBAUTHN_STATE_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
+    res.setHeader('Set-Cookie', [accessCookie, refreshCookie, sessionCookie, webauthnStateCookie]);
 }
 
 module.exports = {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
+    SESSION_COOKIE,
+    WEBAUTHN_STATE_COOKIE,
     parseCookies,
+    serializeCookie,
+    appendSetCookie,
     setAuthCookies,
     clearAuthCookies
 };

@@ -17,7 +17,9 @@ module.exports = async (req, res) => {
                 id: user.id,
                 email: user.email,
                 created_at: user.created_at,
-                user_metadata: user.user_metadata || {}
+                user_metadata: {
+                    display_name: user.display_name
+                }
             }
         });
     } catch (error) {

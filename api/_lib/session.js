@@ -1,65 +1,42 @@
-const { ACCESS_COOKIE, REFRESH_COOKIE, parseCookies, setAuthCookies, clearAuthCookies } = require('./cookies');
-const { supabaseAuthRequest } = require('./supabase');
-
-async function getUserByAccessToken(accessToken) {
-    if (!accessToken) {
-        return null;
-    }
-
-    const { response, data } = await supabaseAuthRequest('/auth/v1/user', {
-        method: 'GET',
-        token: accessToken
-    });
-
-    if (!response.ok) {
-        return null;
-    }
-
-    return data;
-}
-
-async function refreshSession(refreshToken, res) {
-    if (!refreshToken) {
-        return null;
-    }
-
-    const { response, data } = await supabaseAuthRequest('/auth/v1/token?grant_type=refresh_token', {
-        method: 'POST',
-        body: { refresh_token: refreshToken }
-    });
-
-    if (!response.ok || !data.access_token || !data.refresh_token) {
-        return null;
-    }
-
-    setAuthCookies(res, data);
-    return data;
-}
+const { SESSION_COOKIE, parseCookies, clearAuthCookies } = require('./cookies');
+const { verifySignedToken } = require('./signed-token');
+const { getAuthSecret } = require('./auth-config');
+const { findUserById } = require('./passkey-store');
 
 async function requireUserFromSession(req, res) {
     const cookies = parseCookies(req);
-    let accessToken = cookies[ACCESS_COOKIE];
-    const refreshToken = cookies[REFRESH_COOKIE];
+    const sessionToken = cookies[SESSION_COOKIE];
 
-    let user = await getUserByAccessToken(accessToken);
-    if (user) {
-        return { user, accessToken };
+    if (!sessionToken) {
+        return { user: null, accessToken: null };
     }
 
-    const refreshed = await refreshSession(refreshToken, res);
-    if (!refreshed) {
+    let payload;
+    try {
+        payload = verifySignedToken(sessionToken, getAuthSecret());
+    } catch (error) {
         clearAuthCookies(res);
         return { user: null, accessToken: null };
     }
 
-    accessToken = refreshed.access_token;
-    user = await getUserByAccessToken(accessToken);
+    if (!payload || payload.type !== 'session' || !payload.sub) {
+        clearAuthCookies(res);
+        return { user: null, accessToken: null };
+    }
+
+    let user;
+    try {
+        user = await findUserById(payload.sub);
+    } catch (error) {
+        return { user: null, accessToken: null };
+    }
+
     if (!user) {
         clearAuthCookies(res);
         return { user: null, accessToken: null };
     }
 
-    return { user, accessToken };
+    return { user, accessToken: null };
 }
 
 module.exports = {

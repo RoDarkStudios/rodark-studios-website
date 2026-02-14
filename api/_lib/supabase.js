@@ -20,6 +20,17 @@ function getSupabaseConfig() {
     return { url, anonKey };
 }
 
+function getSupabaseAdminConfig() {
+    const { url } = getSupabaseConfig();
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!serviceRoleKey) {
+        throw new Error('SUPABASE_SERVICE_ROLE_KEY must be set');
+    }
+
+    return { url, serviceRoleKey };
+}
+
 async function supabaseAuthRequest(path, options = {}) {
     const { url, anonKey } = getSupabaseConfig();
     const response = await fetch(`${url}${path}`, {
@@ -74,7 +85,36 @@ async function supabaseRestRequest(path, options = {}) {
     return { response, data };
 }
 
+async function supabaseAdminRestRequest(path, options = {}) {
+    const { url, serviceRoleKey } = getSupabaseAdminConfig();
+    const response = await fetch(`${url}/rest/v1${path}`, {
+        method: options.method || 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+            ...(options.headers || {})
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined
+    });
+
+    const text = await response.text();
+    let data = {};
+
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch (error) {
+            data = { raw: text };
+        }
+    }
+
+    return { response, data };
+}
+
 module.exports = {
+    getSupabaseConfig,
     supabaseAuthRequest,
-    supabaseRestRequest
+    supabaseRestRequest,
+    supabaseAdminRestRequest
 };

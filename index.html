@@ -42,6 +42,9 @@
                 <li class="nav-item">
                     <a href="#contact" class="nav-link">Contact</a>
                 </li>
+                <li class="nav-item">
+                    <a href="#account" class="nav-link">Account</a>
+                </li>
             </ul>
             <div class="hamburger">
                 <span class="bar"></span>
@@ -122,6 +125,56 @@
                             Play on Roblox
                         </a>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Account Section -->
+    <section id="account" class="auth-section">
+        <div class="container">
+            <h2 class="section-title">Account Access</h2>
+            <div class="auth-shell">
+                <div class="auth-status-card">
+                    <p class="auth-status-label">Session Status</p>
+                    <p class="auth-state-text" id="auth-state-text">Checking session...</p>
+                    <button id="signout-btn" class="btn btn-secondary auth-signout hidden" type="button">
+                        <i class="fas fa-right-from-bracket"></i>
+                        Sign Out
+                    </button>
+                </div>
+                <div class="auth-card" id="auth-card">
+                    <div class="auth-tabs">
+                        <button type="button" class="auth-tab active" data-auth-tab="signup">Sign Up</button>
+                        <button type="button" class="auth-tab" data-auth-tab="login">Log In</button>
+                    </div>
+
+                    <form id="signup-form" class="auth-form active">
+                        <p class="auth-copy">Create your account with a passkey only. No passwords are used.</p>
+                        <label class="auth-label" for="signup-email">Email</label>
+                        <input id="signup-email" class="auth-input" type="email" autocomplete="email" required placeholder="you@example.com">
+
+                        <label class="auth-label" for="signup-display-name">Display Name</label>
+                        <input id="signup-display-name" class="auth-input" type="text" maxlength="50" required placeholder="RoDark Player">
+
+                        <button class="btn btn-primary auth-submit" type="submit">
+                            <i class="fas fa-fingerprint"></i>
+                            Create Account With Passkey
+                        </button>
+                    </form>
+
+                    <form id="login-form" class="auth-form">
+                        <p class="auth-copy">Sign in with your saved passkey and Touch ID/biometric prompt.</p>
+                        <label class="auth-label" for="login-email">Email</label>
+                        <input id="login-email" class="auth-input" type="email" autocomplete="email webauthn" required placeholder="you@example.com">
+
+                        <button class="btn btn-primary auth-submit" type="submit">
+                            <i class="fas fa-fingerprint"></i>
+                            Sign In With Passkey
+                        </button>
+                    </form>
+
+                    <p id="auth-message" class="auth-message" aria-live="polite"></p>
                 </div>
             </div>
         </div>

@@ -1,58 +1,43 @@
-# Supabase + Vercel Setup (Login System)
+# Supabase + Vercel Setup (Passkey Auth)
 
 This repo now includes:
-- Auth APIs: `/api/auth/signup`, `/api/auth/login`, `/api/auth/me`, `/api/auth/logout`
+- Passkey auth APIs:
+  - `/api/auth/signup` (`action: "options"` then `action: "verify"`)
+  - `/api/auth/login` (`action: "options"` then `action: "verify"`)
+  - `/api/auth/me`
+  - `/api/auth/logout`
 - Profile API: `/api/profile`
 - Health API: `/api/health`
-- SQL schema + RLS: `supabase/001_auth_schema.sql`
+- SQL schema files:
+  - `supabase/001_auth_schema.sql` (existing)
+  - `supabase/002_passkey_auth.sql` (new passkey tables)
 
-## What You Must Do Yourself
+## What You Must Do
 
 1. Create a Supabase project
 - Go to [https://supabase.com/dashboard](https://supabase.com/dashboard)
 - Click `New project`
-- Choose org, region, and set a DB password
 
-2. Apply schema in Supabase
-- In Supabase project, open `SQL Editor`
-- Run the SQL from `supabase/001_auth_schema.sql`
+2. Apply SQL in Supabase
+- In `SQL Editor`, run:
+  - `supabase/001_auth_schema.sql`
+  - `supabase/002_passkey_auth.sql`
 
-3. Configure Auth URLs in Supabase
-- Open `Authentication` -> `URL Configuration`
-- Set `Site URL` to your Vercel domain (example: `https://rodark-studios-website.vercel.app`)
-- Add Redirect URLs:
-  - `https://rodark-studios-website.vercel.app`
-  - `http://localhost:3000` (for local testing)
+3. Add env vars in Vercel
+- In `Settings` -> `Environment Variables`, add:
+  - `SUPABASE_URL`
+  - `SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `AUTH_SECRET` (long random value)
+- Optional if you want strict fixed origin/RP config:
+  - `AUTH_ORIGIN` (example: `https://rodarkstudios.com`)
+  - `AUTH_RP_ID` (example: `rodarkstudios.com`)
 
-4. Add env vars in Vercel
-- In Vercel project, open `Settings` -> `Environment Variables`
-- Add:
-  - `SUPABASE_URL` = your Supabase project URL
-  - `SUPABASE_ANON_KEY` = your Supabase anon key
-- Use scope: `Production`, `Preview`, and `Development`
+4. Redeploy
+- Trigger a new deploy after adding env vars
 
-5. Redeploy
-- Trigger a new deploy after env vars are set
-
-## Quick API Test
-
-Use your deployed domain in these examples:
-
-```bash
-curl -i -X POST https://YOUR_DOMAIN/api/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"ChangeMe123!","displayName":"Myron"}'
-```
-
-```bash
-curl -i -X POST https://YOUR_DOMAIN/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"ChangeMe123!"}'
-```
-
-Then call `/api/auth/me` with the returned cookies.
-
-## Notes
-- Session tokens are stored in HttpOnly cookies (`rd_access_token`, `rd_refresh_token`).
-- Password hashing/storage is handled by Supabase Auth.
-- Keep `SUPABASE_ANON_KEY` in env vars and never commit secrets.
+## Passkey Notes
+- Passkeys require HTTPS in production.
+- On macOS, users can save passkeys in iCloud Keychain and use Touch ID/biometrics to sign in.
+- Session is stored in an HttpOnly cookie (`rd_session`).
+- Login/signup challenge state is stored in an HttpOnly cookie (`rd_webauthn_state`).

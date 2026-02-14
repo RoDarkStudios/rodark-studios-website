@@ -1,3 +1,336 @@
+// Passkey auth helpers
+function base64UrlToUint8Array(value) {
+    const padded = value + '='.repeat((4 - (value.length % 4 || 4)) % 4);
+    const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    return bytes;
+}
+
+function bufferToBase64Url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function toPublicKeyCreationOptions(options) {
+    return {
+        ...options,
+        challenge: base64UrlToUint8Array(options.challenge),
+        user: {
+            ...options.user,
+            id: base64UrlToUint8Array(options.user.id)
+        },
+        excludeCredentials: (options.excludeCredentials || []).map((item) => ({
+            ...item,
+            id: base64UrlToUint8Array(item.id)
+        }))
+    };
+}
+
+function toPublicKeyRequestOptions(options) {
+    return {
+        ...options,
+        challenge: base64UrlToUint8Array(options.challenge),
+        allowCredentials: (options.allowCredentials || []).map((item) => ({
+            ...item,
+            id: base64UrlToUint8Array(item.id)
+        }))
+    };
+}
+
+function serializeRegistrationCredential(credential) {
+    const response = credential.response;
+    return {
+        id: credential.id,
+        rawId: bufferToBase64Url(credential.rawId),
+        type: credential.type,
+        response: {
+            clientDataJSON: bufferToBase64Url(response.clientDataJSON),
+            attestationObject: bufferToBase64Url(response.attestationObject),
+            transports: typeof response.getTransports === 'function' ? response.getTransports() : []
+        }
+    };
+}
+
+function serializeAuthenticationCredential(credential) {
+    const response = credential.response;
+    return {
+        id: credential.id,
+        rawId: bufferToBase64Url(credential.rawId),
+        type: credential.type,
+        response: {
+            clientDataJSON: bufferToBase64Url(response.clientDataJSON),
+            authenticatorData: bufferToBase64Url(response.authenticatorData),
+            signature: bufferToBase64Url(response.signature),
+            userHandle: response.userHandle ? bufferToBase64Url(response.userHandle) : null
+        }
+    };
+}
+
+async function postJson(url, payload) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload || {})
+    });
+
+    let data = {};
+    try {
+        data = await response.json();
+    } catch (error) {
+        data = {};
+    }
+
+    if (!response.ok) {
+        const errorMessage = data.error || `Request failed (${response.status})`;
+        throw new Error(errorMessage);
+    }
+
+    return data;
+}
+
+function setAuthMessage(message, type = '') {
+    const authMessage = document.getElementById('auth-message');
+    if (!authMessage) {
+        return;
+    }
+
+    authMessage.textContent = message || '';
+    authMessage.classList.remove('success', 'error');
+    if (type) {
+        authMessage.classList.add(type);
+    }
+}
+
+function setAuthUi(user) {
+    const authStateText = document.getElementById('auth-state-text');
+    const authCard = document.getElementById('auth-card');
+    const signoutBtn = document.getElementById('signout-btn');
+
+    if (!authStateText || !authCard || !signoutBtn) {
+        return;
+    }
+
+    if (user) {
+        const displayName = user.user_metadata && user.user_metadata.display_name
+            ? ` (${user.user_metadata.display_name})`
+            : '';
+
+        authStateText.textContent = `Signed in as ${user.email}${displayName}`;
+        authCard.classList.add('hidden');
+        signoutBtn.classList.remove('hidden');
+        return;
+    }
+
+    authStateText.textContent = 'Not signed in';
+    authCard.classList.remove('hidden');
+    signoutBtn.classList.add('hidden');
+}
+
+async function refreshAuthUi() {
+    try {
+        const response = await fetch('/api/auth/me', {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            setAuthUi(null);
+            return;
+        }
+
+        const data = await response.json();
+        setAuthUi(data.user || null);
+    } catch (error) {
+        setAuthUi(null);
+    }
+}
+
+function bindAuthTabs() {
+    const tabs = document.querySelectorAll('.auth-tab');
+    const forms = document.querySelectorAll('.auth-form');
+
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.getAttribute('data-auth-tab');
+
+            tabs.forEach((item) => item.classList.remove('active'));
+            forms.forEach((form) => form.classList.remove('active'));
+
+            tab.classList.add('active');
+            const activeForm = document.getElementById(`${tabName}-form`);
+            if (activeForm) {
+                activeForm.classList.add('active');
+            }
+
+            setAuthMessage('');
+        });
+    });
+}
+
+function ensurePasskeySupport() {
+    if (window.PublicKeyCredential) {
+        return true;
+    }
+
+    setAuthMessage('Passkeys are not supported in this browser.', 'error');
+    return false;
+}
+
+async function handleSignUpSubmit(event) {
+    event.preventDefault();
+    if (!ensurePasskeySupport()) {
+        return;
+    }
+
+    const emailInput = document.getElementById('signup-email');
+    const displayNameInput = document.getElementById('signup-display-name');
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+
+    const email = emailInput.value.trim().toLowerCase();
+    const displayName = displayNameInput.value.trim();
+
+    if (!email || !displayName) {
+        setAuthMessage('Email and display name are required.', 'error');
+        return;
+    }
+
+    submitButton.disabled = true;
+    setAuthMessage('Preparing passkey signup...');
+
+    try {
+        const optionsData = await postJson('/api/auth/signup', {
+            action: 'options',
+            email,
+            displayName
+        });
+
+        const credential = await navigator.credentials.create({
+            publicKey: toPublicKeyCreationOptions(optionsData.options)
+        });
+
+        if (!credential) {
+            throw new Error('Passkey creation failed');
+        }
+
+        await postJson('/api/auth/signup', {
+            action: 'verify',
+            credential: serializeRegistrationCredential(credential)
+        });
+
+        setAuthMessage('Account created and signed in.', 'success');
+        await refreshAuthUi();
+        event.currentTarget.reset();
+    } catch (error) {
+        if (error && error.name === 'NotAllowedError') {
+            setAuthMessage('Passkey signup was canceled.', 'error');
+        } else {
+            setAuthMessage(error.message || 'Passkey signup failed.', 'error');
+        }
+    } finally {
+        submitButton.disabled = false;
+    }
+}
+
+async function handleLoginSubmit(event) {
+    event.preventDefault();
+    if (!ensurePasskeySupport()) {
+        return;
+    }
+
+    const emailInput = document.getElementById('login-email');
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    const email = emailInput.value.trim().toLowerCase();
+
+    if (!email) {
+        setAuthMessage('Email is required.', 'error');
+        return;
+    }
+
+    submitButton.disabled = true;
+    setAuthMessage('Preparing passkey sign in...');
+
+    try {
+        const optionsData = await postJson('/api/auth/login', {
+            action: 'options',
+            email
+        });
+
+        const credential = await navigator.credentials.get({
+            publicKey: toPublicKeyRequestOptions(optionsData.options)
+        });
+
+        if (!credential) {
+            throw new Error('Passkey sign in failed');
+        }
+
+        await postJson('/api/auth/login', {
+            action: 'verify',
+            credential: serializeAuthenticationCredential(credential)
+        });
+
+        setAuthMessage('Signed in successfully.', 'success');
+        await refreshAuthUi();
+        event.currentTarget.reset();
+    } catch (error) {
+        if (error && error.name === 'NotAllowedError') {
+            setAuthMessage('Passkey sign in was canceled.', 'error');
+        } else {
+            setAuthMessage(error.message || 'Passkey sign in failed.', 'error');
+        }
+    } finally {
+        submitButton.disabled = false;
+    }
+}
+
+async function handleSignOut() {
+    const signoutBtn = document.getElementById('signout-btn');
+    if (!signoutBtn) {
+        return;
+    }
+
+    signoutBtn.disabled = true;
+
+    try {
+        await postJson('/api/auth/logout', {});
+        setAuthMessage('Signed out successfully.', 'success');
+    } catch (error) {
+        setAuthMessage('Failed to sign out cleanly, local session was still cleared.', 'error');
+    } finally {
+        await refreshAuthUi();
+        signoutBtn.disabled = false;
+    }
+}
+
+function initPasskeyAuth() {
+    const signupForm = document.getElementById('signup-form');
+    const loginForm = document.getElementById('login-form');
+    const signoutBtn = document.getElementById('signout-btn');
+
+    if (!signupForm || !loginForm || !signoutBtn) {
+        return;
+    }
+
+    bindAuthTabs();
+    signupForm.addEventListener('submit', handleSignUpSubmit);
+    loginForm.addEventListener('submit', handleLoginSubmit);
+    signoutBtn.addEventListener('click', handleSignOut);
+    refreshAuthUi();
+}
+
 // Age calculation function
 function calculateAge(birthDate) {
     const today = new Date();
@@ -286,6 +619,7 @@ async function fetchUserAvatars() {
 // Update ages when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 RoDark Studios website loaded!');
+    initPasskeyAuth();
 
     // Calculate and display ages
     const myronAge = calculateAge('2008-05-31');
