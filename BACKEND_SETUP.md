@@ -1,6 +1,6 @@
 # Roblox OAuth 2.0 + Vercel Setup
 
-This repo now uses Roblox OAuth 2.0 as the only login method.
+This repo uses Roblox OAuth 2.0 as the only login method.
 
 ## API Endpoints
 - `GET /api/auth/login` -> redirects to Roblox authorization
