@@ -1,51 +1,36 @@
-# Supabase + Vercel Setup (Passkey Auth)
+# Roblox OAuth 2.0 + Vercel Setup
 
-This repo now includes:
-- Passkey auth APIs:
-  - `/api/auth/signup` (`action: "options"` then `action: "verify"`)
-  - `/api/auth/login` (`action: "options"` then `action: "verify"`)
-  - `/api/auth/me`
-  - `/api/auth/logout`
-- Profile API: `/api/profile`
-- Health API: `/api/health`
-- SQL files:
-  - `supabase/schema.sql` (single source of truth)
-  - `supabase/reset.sql` (destructive pre-launch reset helper)
+This repo now uses Roblox OAuth 2.0 as the only login method.
 
-## What You Must Do
+## API Endpoints
+- `GET /api/auth/login` -> redirects to Roblox authorization
+- `GET /api/auth/callback` -> OAuth callback, creates app session cookie
+- `GET /api/auth/me` -> returns current signed-in user
+- `POST /api/auth/logout` -> clears session
+- `GET /api/profile` -> same user profile data from session
+- `GET /api/health`
 
-1. Create a Supabase project
-- Go to [https://supabase.com/dashboard](https://supabase.com/dashboard)
-- Click `New project`
+## Required Environment Variables
+- `AUTH_SECRET` (long random secret used to sign session/state tokens)
+- `ROBLOX_OAUTH_CLIENT_ID`
+- `ROBLOX_OAUTH_CLIENT_SECRET`
 
-2. Apply SQL in Supabase
-- In `SQL Editor`, run:
-  - `supabase/schema.sql`
+Optional:
+- `ROBLOX_OAUTH_REDIRECT_URI`
+  - If not set, app auto-uses `${origin}/api/auth/callback`
+- `ROBLOX_OAUTH_SCOPES` (default: `openid profile`)
+- `ROBLOX_OAUTH_BASE_URL` (default: `https://apis.roblox.com/oauth`)
 
-## Pre-Launch Workflow (No Migrations)
+## Roblox OAuth App Configuration
+In your Roblox OAuth app settings, ensure the redirect URI matches:
+- `https://your-domain.com/api/auth/callback` (production)
+- `http://localhost:3000/api/auth/callback` (local, if used)
 
-Since you have not launched yet, use this every time schema changes:
-1. Run `supabase/reset.sql` (this wipes auth tables in this repo).
-2. Run `supabase/schema.sql`.
-3. Redeploy if API behavior changed.
+## Deploy Steps
+1. Set environment variables in Vercel.
+2. Redeploy.
+3. Open `auth.html`, click `Continue With Roblox`, complete authorization.
 
-This keeps the repo migration-free while you iterate.
-
-3. Add env vars in Vercel
-- In `Settings` -> `Environment Variables`, add:
-  - `SUPABASE_URL`
-  - `SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `AUTH_SECRET` (long random value)
-- Optional if you want strict fixed origin/RP config:
-  - `AUTH_ORIGIN` (example: `https://rodarkstudios.com`)
-  - `AUTH_RP_ID` (example: `rodarkstudios.com`)
-
-4. Redeploy
-- Trigger a new deploy after adding env vars
-
-## Passkey Notes
-- Passkeys require HTTPS in production.
-- On macOS, users can save passkeys in iCloud Keychain and use Touch ID/biometrics to sign in.
-- Session is stored in an HttpOnly cookie (`rd_session`).
-- Login/signup challenge state is stored in an HttpOnly cookie (`rd_webauthn_state`).
+## Notes
+- Session is stored in HttpOnly cookie: `rd_session`.
+- OAuth state is stored in HttpOnly cookie: `rd_oauth_state`.

@@ -1,82 +1,3 @@
-// Passkey auth helpers
-function base64UrlToUint8Array(value) {
-    const padded = value + '='.repeat((4 - (value.length % 4 || 4)) % 4);
-    const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-
-    for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-
-    return bytes;
-}
-
-function bufferToBase64Url(buffer) {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i += 1) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function toPublicKeyCreationOptions(options) {
-    return {
-        ...options,
-        challenge: base64UrlToUint8Array(options.challenge),
-        user: {
-            ...options.user,
-            id: base64UrlToUint8Array(options.user.id)
-        },
-        excludeCredentials: (options.excludeCredentials || []).map((item) => ({
-            ...item,
-            id: base64UrlToUint8Array(item.id)
-        }))
-    };
-}
-
-function toPublicKeyRequestOptions(options) {
-    return {
-        ...options,
-        challenge: base64UrlToUint8Array(options.challenge),
-        allowCredentials: (options.allowCredentials || []).map((item) => ({
-            ...item,
-            id: base64UrlToUint8Array(item.id)
-        }))
-    };
-}
-
-function serializeRegistrationCredential(credential) {
-    const response = credential.response;
-    return {
-        id: credential.id,
-        rawId: bufferToBase64Url(credential.rawId),
-        type: credential.type,
-        response: {
-            clientDataJSON: bufferToBase64Url(response.clientDataJSON),
-            attestationObject: bufferToBase64Url(response.attestationObject),
-            transports: typeof response.getTransports === 'function' ? response.getTransports() : []
-        }
-    };
-}
-
-function serializeAuthenticationCredential(credential) {
-    const response = credential.response;
-    return {
-        id: credential.id,
-        rawId: bufferToBase64Url(credential.rawId),
-        type: credential.type,
-        response: {
-            clientDataJSON: bufferToBase64Url(response.clientDataJSON),
-            authenticatorData: bufferToBase64Url(response.authenticatorData),
-            signature: bufferToBase64Url(response.signature),
-            userHandle: response.userHandle ? bufferToBase64Url(response.userHandle) : null
-        }
-    };
-}
-
 async function postJson(url, payload) {
     const response = await fetch(url, {
         method: 'POST',
@@ -116,11 +37,36 @@ function setAuthMessage(message, type = '') {
 }
 
 function getUserUsername(user) {
+    if (user && typeof user.username === 'string' && user.username.trim()) {
+        return user.username.trim();
+    }
+
     if (!user || !user.user_metadata || typeof user.user_metadata.username !== 'string') {
         return '';
     }
 
     return user.user_metadata.username.trim();
+}
+
+function readAuthStatusFromQuery() {
+    const authMessage = document.getElementById('auth-message');
+    if (!authMessage) {
+        return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const authStatus = params.get('auth');
+    if (!authStatus) {
+        return;
+    }
+
+    if (authStatus === 'success') {
+        setAuthMessage('Signed in with Roblox successfully.', 'success');
+    } else if (authStatus === 'error') {
+        const reason = params.get('reason');
+        const detail = reason ? ` (${reason.replace(/_/g, ' ')})` : '';
+        setAuthMessage(`Roblox sign in failed${detail}.`, 'error');
+    }
 }
 
 function setNavbarUsername(user) {
@@ -184,150 +130,9 @@ async function refreshAuthUi() {
     }
 }
 
-function isValidUsername(username) {
-    return /^[a-z0-9_]{3,30}$/.test(username);
-}
-
-function bindAuthTabs() {
-    const tabs = document.querySelectorAll('.auth-tab');
-    const forms = document.querySelectorAll('.auth-form');
-
-    tabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.getAttribute('data-auth-tab');
-
-            tabs.forEach((item) => item.classList.remove('active'));
-            forms.forEach((form) => form.classList.remove('active'));
-
-            tab.classList.add('active');
-            const activeForm = document.getElementById(`${tabName}-form`);
-            if (activeForm) {
-                activeForm.classList.add('active');
-            }
-
-            setAuthMessage('');
-        });
-    });
-}
-
-function ensurePasskeySupport() {
-    if (window.PublicKeyCredential) {
-        return true;
-    }
-
-    setAuthMessage('Passkeys are not supported in this browser.', 'error');
-    return false;
-}
-
-async function handleSignUpSubmit(event) {
-    event.preventDefault();
-    if (!ensurePasskeySupport()) {
-        return;
-    }
-
-    const emailInput = document.getElementById('signup-email');
-    const usernameInput = document.getElementById('signup-username');
-    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
-
-    const email = emailInput.value.trim().toLowerCase();
-    const username = usernameInput.value.trim().toLowerCase();
-
-    if (!email || !username) {
-        setAuthMessage('Email and username are required.', 'error');
-        return;
-    }
-
-    if (!isValidUsername(username)) {
-        setAuthMessage('Username must be 3-30 characters: lowercase letters, numbers, or _.', 'error');
-        return;
-    }
-
-    submitButton.disabled = true;
-    setAuthMessage('Preparing passkey signup...');
-
-    try {
-        const optionsData = await postJson('/api/auth/signup', {
-            action: 'options',
-            email,
-            username
-        });
-
-        const credential = await navigator.credentials.create({
-            publicKey: toPublicKeyCreationOptions(optionsData.options)
-        });
-
-        if (!credential) {
-            throw new Error('Passkey creation failed');
-        }
-
-        await postJson('/api/auth/signup', {
-            action: 'verify',
-            credential: serializeRegistrationCredential(credential)
-        });
-
-        setAuthMessage('Account created and signed in.', 'success');
-        await refreshAuthUi();
-        event.currentTarget.reset();
-    } catch (error) {
-        if (error && error.name === 'NotAllowedError') {
-            setAuthMessage('Passkey signup was canceled.', 'error');
-        } else {
-            setAuthMessage(error.message || 'Passkey signup failed.', 'error');
-        }
-    } finally {
-        submitButton.disabled = false;
-    }
-}
-
-async function handleLoginSubmit(event) {
-    event.preventDefault();
-    if (!ensurePasskeySupport()) {
-        return;
-    }
-
-    const emailInput = document.getElementById('login-email');
-    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
-    const email = emailInput.value.trim().toLowerCase();
-
-    if (!email) {
-        setAuthMessage('Email is required.', 'error');
-        return;
-    }
-
-    submitButton.disabled = true;
-    setAuthMessage('Preparing passkey sign in...');
-
-    try {
-        const optionsData = await postJson('/api/auth/login', {
-            action: 'options',
-            email
-        });
-
-        const credential = await navigator.credentials.get({
-            publicKey: toPublicKeyRequestOptions(optionsData.options)
-        });
-
-        if (!credential) {
-            throw new Error('Passkey sign in failed');
-        }
-
-        await postJson('/api/auth/login', {
-            action: 'verify',
-            credential: serializeAuthenticationCredential(credential)
-        });
-
-        setAuthMessage('Signed in successfully.', 'success');
-        await refreshAuthUi();
-        event.currentTarget.reset();
-    } catch (error) {
-        if (error && error.name === 'NotAllowedError') {
-            setAuthMessage('Passkey sign in was canceled.', 'error');
-        } else {
-            setAuthMessage(error.message || 'Passkey sign in failed.', 'error');
-        }
-    } finally {
-        submitButton.disabled = false;
-    }
+function handleRobloxLogin() {
+    setAuthMessage('');
+    window.location.href = '/api/auth/login';
 }
 
 async function handleSignOut() {
@@ -349,21 +154,20 @@ async function handleSignOut() {
     }
 }
 
-function initPasskeyAuth() {
-    const signupForm = document.getElementById('signup-form');
-    const loginForm = document.getElementById('login-form');
+function initAuth() {
+    const loginButton = document.getElementById('roblox-login-btn');
     const signoutBtn = document.getElementById('signout-btn');
 
+    readAuthStatusFromQuery();
     refreshAuthUi();
 
-    if (!signupForm || !loginForm || !signoutBtn) {
-        return;
+    if (loginButton) {
+        loginButton.addEventListener('click', handleRobloxLogin);
     }
 
-    bindAuthTabs();
-    signupForm.addEventListener('submit', handleSignUpSubmit);
-    loginForm.addEventListener('submit', handleLoginSubmit);
-    signoutBtn.addEventListener('click', handleSignOut);
+    if (signoutBtn) {
+        signoutBtn.addEventListener('click', handleSignOut);
+    }
 }
 
 // Age calculation function
@@ -673,7 +477,7 @@ async function fetchUserAvatars() {
 // Update ages when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 RoDark Studios website loaded!');
-    initPasskeyAuth();
+    initAuth();
 
     // Calculate and display ages
     const myronAge = calculateAge('2008-05-31');

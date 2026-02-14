@@ -15,11 +15,13 @@ module.exports = async (req, res) => {
         return sendJson(res, 200, {
             user: {
                 id: user.id,
-                email: user.email,
                 created_at: user.created_at,
                 user_metadata: {
-                    username: user.username
-                }
+                    username: user.username,
+                    display_name: user.display_name,
+                    provider: user.provider
+                },
+                profile_url: user.profile_url
             }
         });
     } catch (error) {

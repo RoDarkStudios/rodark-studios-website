@@ -1,7 +1,5 @@
-const ACCESS_COOKIE = 'rd_access_token';
-const REFRESH_COOKIE = 'rd_refresh_token';
 const SESSION_COOKIE = 'rd_session';
-const WEBAUTHN_STATE_COOKIE = 'rd_webauthn_state';
+const OAUTH_STATE_COOKIE = 'rd_oauth_state';
 
 function parseCookies(req) {
     const header = req.headers.cookie;
@@ -68,34 +66,23 @@ function appendSetCookie(res, cookieValue) {
     res.setHeader('Set-Cookie', [current, cookieValue]);
 }
 
-function setAuthCookies(res, authData) {
-    const expiresIn = Number(authData.expires_in) || 3600;
-    const accessCookie = serializeCookie(ACCESS_COOKIE, authData.access_token, {
-        maxAge: expiresIn
-    });
-    const refreshCookie = serializeCookie(REFRESH_COOKIE, authData.refresh_token, {
-        maxAge: 60 * 60 * 24 * 30
-    });
-    res.setHeader('Set-Cookie', [accessCookie, refreshCookie]);
-}
-
 function clearAuthCookies(res) {
     const expired = 'Thu, 01 Jan 1970 00:00:00 GMT';
-    const accessCookie = `${serializeCookie(ACCESS_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
-    const refreshCookie = `${serializeCookie(REFRESH_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
     const sessionCookie = `${serializeCookie(SESSION_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
-    const webauthnStateCookie = `${serializeCookie(WEBAUTHN_STATE_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
-    res.setHeader('Set-Cookie', [accessCookie, refreshCookie, sessionCookie, webauthnStateCookie]);
+    const oauthStateCookie = `${serializeCookie(OAUTH_STATE_COOKIE, '', { maxAge: 0 })}; Expires=${expired}`;
+    // Legacy cleanup for previously used auth cookies.
+    const legacyStateCookie = `${serializeCookie('rd_webauthn_state', '', { maxAge: 0 })}; Expires=${expired}`;
+    const accessCookie = `${serializeCookie('rd_access_token', '', { maxAge: 0 })}; Expires=${expired}`;
+    const refreshCookie = `${serializeCookie('rd_refresh_token', '', { maxAge: 0 })}; Expires=${expired}`;
+
+    res.setHeader('Set-Cookie', [sessionCookie, oauthStateCookie, legacyStateCookie, accessCookie, refreshCookie]);
 }
 
 module.exports = {
-    ACCESS_COOKIE,
-    REFRESH_COOKIE,
     SESSION_COOKIE,
-    WEBAUTHN_STATE_COOKIE,
+    OAUTH_STATE_COOKIE,
     parseCookies,
     serializeCookie,
     appendSetCookie,
-    setAuthCookies,
     clearAuthCookies
 };
