@@ -1,9 +1,18 @@
 function getSupabaseConfig() {
-    const url = process.env.SUPABASE_URL;
-    const anonKey = process.env.SUPABASE_ANON_KEY;
+    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_ANON_KEY
+        || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        || process.env.SUPABASE_PUBLISHABLE_KEY;
 
     if (!url || !anonKey) {
-        throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY must be set');
+        const missing = [];
+        if (!url) {
+            missing.push('SUPABASE_URL');
+        }
+        if (!anonKey) {
+            missing.push('SUPABASE_ANON_KEY');
+        }
+        throw new Error(`${missing.join(' and ')} must be set`);
     }
 
     return { url, anonKey };
