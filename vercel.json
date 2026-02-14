@@ -9,6 +9,11 @@
       "source": "/terms.html",
       "destination": "/terms",
       "permanent": true
+    },
+    {
+      "source": "/admin.html",
+      "destination": "/admin",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -19,6 +24,10 @@
     {
       "source": "/terms",
       "destination": "/terms.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
     }
   ]
 }

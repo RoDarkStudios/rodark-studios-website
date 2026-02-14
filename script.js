@@ -35,6 +35,20 @@ function getUserUsername(user) {
     return user.user_metadata.username.trim();
 }
 
+function setAdminTabVisibility(isVisible) {
+    const navAdminItem = document.getElementById('nav-admin-item');
+    if (!navAdminItem) {
+        return;
+    }
+
+    if (isVisible) {
+        navAdminItem.classList.remove('hidden');
+        return;
+    }
+
+    navAdminItem.classList.add('hidden');
+}
+
 function readAuthStatusFromQuery() {
     const params = new URLSearchParams(window.location.search);
     const hasAuthParams = params.has('auth') || params.has('reason');
@@ -77,6 +91,27 @@ function setNavbarUsername(user) {
 
 function setAuthUi(user) {
     setNavbarUsername(user);
+    setAdminTabVisibility(false);
+}
+
+async function fetchAdminStatus() {
+    try {
+        const response = await fetch('/api/auth/admin', {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            return { isAdmin: false };
+        }
+
+        const data = await response.json();
+        return {
+            isAdmin: Boolean(data && data.isAdmin)
+        };
+    } catch (error) {
+        return { isAdmin: false };
+    }
 }
 
 async function refreshAuthUi() {
@@ -92,7 +127,15 @@ async function refreshAuthUi() {
         }
 
         const data = await response.json();
-        setAuthUi(data.user || null);
+        const user = data.user || null;
+        setAuthUi(user);
+
+        if (!user) {
+            return;
+        }
+
+        const adminStatus = await fetchAdminStatus();
+        setAdminTabVisibility(adminStatus.isAdmin);
     } catch (error) {
         setAuthUi(null);
     }

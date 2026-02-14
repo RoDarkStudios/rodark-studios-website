@@ -6,6 +6,7 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `GET /api/auth/login` -> redirects to Roblox authorization
 - `GET /api/auth/callback` -> OAuth callback, creates app session cookie
 - `GET /api/auth/me` -> returns current signed-in user
+- `GET /api/auth/admin` -> resolves Roblox group rank and admin eligibility (`rank >= 254`)
 - `POST /api/auth/logout` -> clears session
 - `GET /api/profile` -> same user profile data from session
 - `GET /api/health`
@@ -20,6 +21,7 @@ Optional:
   - If not set, app auto-uses `${origin}/api/auth/callback`
 - `ROBLOX_OAUTH_SCOPES` (default: `openid profile`)
 - `ROBLOX_OAUTH_BASE_URL` (default: `https://apis.roblox.com/oauth`)
+- `ROBLOX_GROUP_ID` (default: `5545660`, used for Admin tab visibility)
 
 ## Roblox OAuth App Configuration
 In your Roblox OAuth app settings, ensure the redirect URI matches:
