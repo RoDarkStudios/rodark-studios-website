@@ -4,7 +4,8 @@ module.exports = (req, res) => {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const supabaseUrlSet = Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+    const hasSupabaseUrlEnv = Boolean(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL);
+    const supabaseUrlSet = hasSupabaseUrlEnv;
     const supabaseAnonSet = Boolean(
         process.env.SUPABASE_ANON_KEY
         || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -17,7 +18,8 @@ module.exports = (req, res) => {
         environment: process.env.VERCEL_ENV || 'local',
         env: {
             supabaseUrlSet,
-            supabaseAnonSet
+            supabaseAnonSet,
+            usingSupabaseUrlFallback: !hasSupabaseUrlEnv
         },
         timestamp: new Date().toISOString()
     });
