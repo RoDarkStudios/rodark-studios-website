@@ -482,82 +482,32 @@ async function fetchGroupStats() {
         return;
     }
 
-    const groupId = 5545660; // RoDark Studios group ID
-
     try {
-        // Format numbers with commas
         function formatNumber(num) {
             return num.toLocaleString();
         }
 
         console.log('Fetching group statistics...');
 
-        // Try multiple API approaches
-        let groupData = null;
-
-        // Method 1: Try with AllOrigins proxy (most reliable for CORS)
-        try {
-            console.log('Trying AllOrigins proxy...');
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://groups.roblox.com/v1/groups/${groupId}`)}`;
-            const proxyResponse = await fetch(proxyUrl);
-
-            if (proxyResponse.ok) {
-                const proxyData = await proxyResponse.json();
-                if (proxyData.contents) {
-                    groupData = JSON.parse(proxyData.contents);
-                    console.log('✅ AllOrigins proxy successful:', groupData);
-                }
-            }
-        } catch (error) {
-            console.warn('AllOrigins proxy failed:', error);
+        const groupStatsResponse = await fetch('/api/roblox/group-stats', {
+            method: 'GET'
+        });
+        if (!groupStatsResponse.ok) {
+            throw new Error(`Group stats API failed (${groupStatsResponse.status})`);
         }
 
-        // Method 2: Try with cors-anywhere proxy if first method failed
-        if (!groupData) {
-            try {
-                console.log('Trying cors-anywhere proxy...');
-                const corsResponse = await fetch(`https://cors-anywhere.herokuapp.com/https://groups.roblox.com/v1/groups/${groupId}`);
-
-                if (corsResponse.ok) {
-                    groupData = await corsResponse.json();
-                    console.log('✅ CORS-anywhere proxy successful:', groupData);
-                }
-            } catch (error) {
-                console.warn('CORS-anywhere proxy failed:', error);
-            }
+        const groupStats = await groupStatsResponse.json();
+        const memberCount = Number(groupStats && groupStats.memberCount);
+        if (!Number.isFinite(memberCount) || memberCount < 0) {
+            throw new Error('Group stats API returned invalid memberCount');
         }
 
-        // Method 3: Try direct API call (usually fails due to CORS but worth trying)
-        if (!groupData) {
-            try {
-                console.log('Trying direct API call...');
-                const directResponse = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`);
-
-                if (directResponse.ok) {
-                    groupData = await directResponse.json();
-                    console.log('✅ Direct API call successful:', groupData);
-                }
-            } catch (error) {
-                console.warn('Direct API call failed:', error);
-            }
-        }
-
-        // If we got valid data, update the display
-        if (groupData && groupData.memberCount !== undefined) {
-            const memberCount = groupData.memberCount;
-            console.log(`Setting group members to: ${formatNumber(memberCount)}`);
-            groupMemberCountElement.textContent = formatNumber(memberCount);
-            console.log('✅ Group statistics updated successfully');
-            return;
-        }
-
-        // If all methods failed, show error
-        console.error('All API methods failed to fetch group data');
-        groupMemberCountElement.textContent = 'Failed to load';
+        groupMemberCountElement.textContent = formatNumber(Math.trunc(memberCount));
+        console.log('Group statistics updated successfully');
 
     } catch (error) {
         console.error('Failed to fetch group statistics:', error);
-        groupMemberCountElement.textContent = 'Failed to load';
+        groupMemberCountElement.textContent = 'Unavailable';
     }
 }
 
