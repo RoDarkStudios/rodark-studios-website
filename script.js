@@ -449,7 +449,8 @@ function renderListMonetizationResults(result) {
         return;
     }
 
-    const blobText = buildMonetizationBlobText(result);
+    const combinedText = String(result && result.combinedText ? result.combinedText : '').trim();
+    const blobText = combinedText || buildMonetizationBlobText(result);
 
     resultElement.innerHTML = `
         <article class="admin-target-result">

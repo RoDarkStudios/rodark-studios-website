@@ -85,6 +85,48 @@ async function fetchGameSection(label, universeId) {
     }
 }
 
+function formatRows(rows, emptyLabel) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+        return emptyLabel;
+    }
+
+    return rows.map((item) => {
+        const name = String(item && item.name ? item.name : '').trim() || '(Unnamed)';
+        const id = Number(item && item.id);
+        return `${name} - ${Number.isFinite(id) ? id : 'Unknown ID'}`;
+    }).join('\n');
+}
+
+function buildCombinedTextBlob(games) {
+    const list = Array.isArray(games) ? games : [];
+    if (list.length === 0) {
+        return 'No monetization data returned.';
+    }
+
+    return list.map((game) => {
+        const label = String(game && game.label ? game.label : 'Game');
+        const universeId = Number(game && game.universeId);
+        const error = String(game && game.error ? game.error : '').trim();
+        const gamePasses = Array.isArray(game && game.gamePasses) ? game.gamePasses : [];
+        const developerProducts = Array.isArray(game && game.developerProducts) ? game.developerProducts : [];
+
+        const lines = [
+            `${label} (Universe ${Number.isFinite(universeId) ? universeId : 'Unknown'})`,
+            'Gamepasses:',
+            formatRows(gamePasses, 'No gamepasses found'),
+            '',
+            'Products:',
+            formatRows(developerProducts, 'No products found')
+        ];
+
+        if (error) {
+            lines.push('', `Error: ${error}`);
+        }
+
+        return lines.join('\n');
+    }).join('\n\n------------------------------\n\n');
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return methodNotAllowed(req, res, ['POST']);
@@ -115,7 +157,8 @@ module.exports = async (req, res) => {
         ]);
 
         return sendJson(res, 200, {
-            games
+            games,
+            combinedText: buildCombinedTextBlob(games)
         });
     } catch (error) {
         return sendJson(res, 500, {
