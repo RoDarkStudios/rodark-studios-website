@@ -988,6 +988,28 @@ body {
     width: fit-content;
 }
 
+.admin-catalog-label {
+    margin-top: 0.7rem;
+}
+
+.admin-catalog-output {
+    width: 100%;
+    min-height: 180px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: rgba(10, 10, 10, 0.95);
+    color: var(--text-primary);
+    font-family: 'Consolas', 'Menlo', monospace;
+    font-size: 0.86rem;
+    line-height: 1.45;
+    padding: 0.75rem 0.85rem;
+    resize: vertical;
+}
+
+.admin-catalog-output-lg {
+    min-height: 240px;
+}
+
 .admin-status {
     margin-top: 1rem;
     font-weight: 600;

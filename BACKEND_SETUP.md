@@ -9,6 +9,7 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `GET /api/auth/admin` -> resolves Roblox group rank and admin eligibility (`rank >= 254`)
 - `POST /api/auth/logout` -> clears session
 - `POST /api/admin/roblox-copy-monetization` -> admin sync tool for game passes + developer products + badges
+- `POST /api/admin/roblox-list-monetization-items` -> admin listing tool for game pass + developer product IDs/names by universe ID
 - `GET /api/profile` -> same user profile data from session
 - `GET /api/health`
 
@@ -16,7 +17,7 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `AUTH_SECRET` (long random secret used to sign session/state tokens)
 - `ROBLOX_OAUTH_CLIENT_ID`
 - `ROBLOX_OAUTH_CLIENT_SECRET`
-- `ROBLOX_OPEN_CLOUD_API_KEY` (used by the admin monetization cloning tool)
+- `ROBLOX_OPEN_CLOUD_API_KEY` (used by the admin monetization tools)
 
 Optional:
 - `ROBLOX_OAUTH_REDIRECT_URI`

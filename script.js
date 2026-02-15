@@ -373,6 +373,199 @@ async function initAdminCopyTool() {
     }
 }
 
+function setListMonetizationStatus(message, type) {
+    const statusElement = document.getElementById('list-monetization-status');
+    if (!statusElement) {
+        return;
+    }
+
+    if (!message) {
+        statusElement.textContent = '';
+        statusElement.classList.add('hidden');
+        statusElement.classList.remove('success', 'error', 'info');
+        return;
+    }
+
+    statusElement.textContent = message;
+    statusElement.classList.remove('hidden');
+    statusElement.classList.remove('success', 'error', 'info');
+    statusElement.classList.add(type || 'info');
+}
+
+function setListMonetizationBusy(isBusy) {
+    const submitButton = document.getElementById('list-monetization-submit');
+    if (!submitButton) {
+        return;
+    }
+
+    submitButton.disabled = Boolean(isBusy);
+    submitButton.textContent = isBusy ? 'Fetching...' : 'Fetch IDs';
+}
+
+function buildMonetizationExportLines(universes) {
+    const lines = ['TYPE,UNIVERSE_ID,ITEM_ID,NAME'];
+    const universeRows = Array.isArray(universes) ? universes : [];
+
+    for (const universe of universeRows) {
+        const universeId = Number(universe && universe.universeId);
+        const universeIdValue = Number.isFinite(universeId) ? universeId : '';
+        const gamePasses = Array.isArray(universe && universe.gamePasses) ? universe.gamePasses : [];
+        const developerProducts = Array.isArray(universe && universe.developerProducts) ? universe.developerProducts : [];
+
+        for (const item of gamePasses) {
+            const itemId = Number(item && item.id);
+            const itemIdValue = Number.isFinite(itemId) ? itemId : '';
+            const name = String(item && item.name ? item.name : '').replace(/"/g, '""');
+            lines.push(`GAME_PASS,${universeIdValue},${itemIdValue},"${name}"`);
+        }
+
+        for (const item of developerProducts) {
+            const itemId = Number(item && item.id);
+            const itemIdValue = Number.isFinite(itemId) ? itemId : '';
+            const name = String(item && item.name ? item.name : '').replace(/"/g, '""');
+            lines.push(`DEVELOPER_PRODUCT,${universeIdValue},${itemIdValue},"${name}"`);
+        }
+    }
+
+    return lines;
+}
+
+function renderListMonetizationResults(result) {
+    const resultElement = document.getElementById('list-monetization-results');
+    if (!resultElement) {
+        return;
+    }
+
+    if (!result || typeof result !== 'object') {
+        resultElement.innerHTML = '';
+        resultElement.classList.add('hidden');
+        return;
+    }
+
+    const totals = result.totals || {};
+    const universes = Array.isArray(result.universes) ? result.universes : [];
+    const failures = Array.isArray(result.failures) ? result.failures : [];
+    const limitations = Array.isArray(result.limitations) ? result.limitations : [];
+    const exportLines = buildMonetizationExportLines(universes);
+
+    const universeMarkup = universes.map((universe) => {
+        const universeId = Number(universe && universe.universeId);
+        const gamePasses = Array.isArray(universe && universe.gamePasses) ? universe.gamePasses : [];
+        const developerProducts = Array.isArray(universe && universe.developerProducts) ? universe.developerProducts : [];
+
+        const gamePassLines = gamePasses.length > 0
+            ? gamePasses.map((item) => `${Number(item && item.id)} - ${String(item && item.name ? item.name : '')}`).join('\n')
+            : 'No game passes found';
+        const developerProductLines = developerProducts.length > 0
+            ? developerProducts.map((item) => `${Number(item && item.id)} - ${String(item && item.name ? item.name : '')}`).join('\n')
+            : 'No developer products found';
+
+        return `
+            <article class="admin-target-result">
+                <h4>Universe ${escapeHtml(universeId)}</h4>
+                <p>Game passes: ${escapeHtml(gamePasses.length)} | Developer products: ${escapeHtml(developerProducts.length)}</p>
+                <label class="admin-label admin-catalog-label">Game Passes</label>
+                <textarea class="admin-catalog-output" readonly>${escapeHtml(gamePassLines)}</textarea>
+                <label class="admin-label admin-catalog-label">Developer Products</label>
+                <textarea class="admin-catalog-output" readonly>${escapeHtml(developerProductLines)}</textarea>
+            </article>
+        `;
+    }).join('');
+
+    const failuresMarkup = failures.length > 0
+        ? `
+            <section class="admin-target-result">
+                <h4>Failures</h4>
+                <p class="admin-target-errors">${escapeHtml(failures.map((item) => `Universe ${item.universeId}: ${item.error}`).join('\n'))}</p>
+            </section>
+        `
+        : '';
+
+    resultElement.innerHTML = `
+        <section class="admin-result-summary">
+            <p>Universes requested: ${escapeHtml(totals.universesRequested)}</p>
+            <p>Universes processed: ${escapeHtml(totals.universesProcessed)} (failed: ${escapeHtml(totals.universesFailed)})</p>
+            <p>Total game passes: ${escapeHtml(totals.totalGamePasses)}</p>
+            <p>Total developer products: ${escapeHtml(totals.totalDeveloperProducts)}</p>
+            ${limitations.length > 0 ? `<p>${escapeHtml(limitations[0])}</p>` : ''}
+            <label class="admin-label admin-catalog-label">Combined Export (CSV-style)</label>
+            <textarea class="admin-catalog-output admin-catalog-output-lg" readonly>${escapeHtml(exportLines.join('\n'))}</textarea>
+        </section>
+        ${failuresMarkup}
+        ${universeMarkup}
+    `;
+
+    resultElement.classList.remove('hidden');
+}
+
+async function handleListMonetizationSubmit(event) {
+    event.preventDefault();
+
+    const universeInput = document.getElementById('list-universe-ids');
+    if (!universeInput) {
+        return;
+    }
+
+    const universeIds = parseUniverseIdsInput(universeInput.value);
+    if (universeIds.length === 0) {
+        setListMonetizationStatus('Please enter at least one universe ID.', 'error');
+        return;
+    }
+
+    setListMonetizationBusy(true);
+    renderListMonetizationResults(null);
+    setListMonetizationStatus('Fetching monetization items...', 'info');
+
+    try {
+        const result = await postJson('/api/admin/roblox-list-monetization-items', {
+            universeIds
+        });
+
+        renderListMonetizationResults(result);
+
+        const failed = Number(result && result.totals && result.totals.universesFailed) || 0;
+        setListMonetizationStatus(
+            failed > 0
+                ? 'Completed with some failures. See details below.'
+                : 'Completed successfully.',
+            failed > 0 ? 'error' : 'success'
+        );
+    } catch (error) {
+        setListMonetizationStatus(error.message || 'Failed to list monetization items.', 'error');
+    } finally {
+        setListMonetizationBusy(false);
+    }
+}
+
+async function initAdminListMonetizationTool() {
+    const toolElement = document.getElementById('admin-list-monetization-tool');
+    if (!toolElement) {
+        return;
+    }
+
+    const deniedElement = document.getElementById('admin-access-denied');
+    const form = document.getElementById('list-monetization-form');
+
+    const adminStatus = await fetchAdminStatus();
+    const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
+    if (!isAdmin) {
+        toolElement.classList.add('hidden');
+        if (deniedElement) {
+            deniedElement.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (deniedElement) {
+        deniedElement.classList.add('hidden');
+    }
+    toolElement.classList.remove('hidden');
+
+    if (form) {
+        form.addEventListener('submit', handleListMonetizationSubmit);
+    }
+}
+
 async function initAdminToolsDirectory() {
     const toolsList = document.getElementById('admin-tools-list');
     if (!toolsList) {
@@ -564,6 +757,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initAuth();
     initAdminToolsDirectory();
     initAdminCopyTool();
+    initAdminListMonetizationTool();
 
     // Calculate and display ages
     const myronAge = calculateAge('2008-05-31');

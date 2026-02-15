@@ -19,6 +19,11 @@
       "source": "/admin-copy-monetization.html",
       "destination": "/admin/tools/copy-monetization",
       "permanent": true
+    },
+    {
+      "source": "/admin-list-monetization-ids.html",
+      "destination": "/admin/tools/list-monetization-ids",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -37,6 +42,10 @@
     {
       "source": "/admin/tools/copy-monetization",
       "destination": "/admin-copy-monetization.html"
+    },
+    {
+      "source": "/admin/tools/list-monetization-ids",
+      "destination": "/admin-list-monetization-ids.html"
     }
   ]
 }
