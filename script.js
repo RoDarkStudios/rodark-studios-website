@@ -273,6 +273,7 @@ function renderAdminCopyResults(result) {
     resultElement.innerHTML = `
         <section class="admin-result-summary">
             <p>Source items: ${escapeHtml(sourceCounts.gamePasses)} game passes, ${escapeHtml(sourceCounts.developerProducts)} developer products</p>
+            <p>Pricing mode: ${escapeHtml(result && result.priceSyncMode ? result.priceSyncMode : 'Unknown')}</p>
             <p>Game passes: ${escapeHtml(summary.totalGamePassesCreated)} created, ${escapeHtml(summary.totalGamePassesUpdated)} updated, ${escapeHtml(summary.totalGamePassesArchived)} archived</p>
             <p>Developer products: ${escapeHtml(summary.totalDeveloperProductsCreated)} created, ${escapeHtml(summary.totalDeveloperProductsUpdated)} updated, ${escapeHtml(summary.totalDeveloperProductsArchived)} archived</p>
             <p>Failures: ${escapeHtml(summary.totalGamePassFailures)} game passes, ${escapeHtml(summary.totalDeveloperProductFailures)} developer products</p>
@@ -287,12 +288,14 @@ async function handleAdminCopySubmit(event) {
 
     const sourceInput = document.getElementById('source-universe-id');
     const targetInput = document.getElementById('target-universe-ids');
-    if (!sourceInput || !targetInput) {
+    const copyPricesCheckbox = document.getElementById('copy-prices-from-source');
+    if (!sourceInput || !targetInput || !copyPricesCheckbox) {
         return;
     }
 
     const sourceUniverseId = String(sourceInput.value || '').trim();
     const targetUniverseIds = parseUniverseIdsInput(targetInput.value);
+    const copyPricesFromSource = Boolean(copyPricesCheckbox.checked);
 
     if (!sourceUniverseId || targetUniverseIds.length === 0) {
         setAdminCopyStatus('Please enter a source universe ID and at least one target universe ID.', 'error');
@@ -306,7 +309,8 @@ async function handleAdminCopySubmit(event) {
     try {
         const result = await postJson('/api/admin/roblox-copy-monetization', {
             sourceUniverseId,
-            targetUniverseIds
+            targetUniverseIds,
+            copyPricesFromSource
         });
 
         renderAdminCopyResults(result);

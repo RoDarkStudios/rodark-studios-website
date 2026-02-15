@@ -18,6 +18,7 @@ const {
 } = require('../_lib/roblox-open-cloud');
 
 const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
+const FORCED_TARGET_PRICE = 1;
 
 async function requireAdmin(req, res) {
     const groupId = getAdminGroupId();
@@ -165,6 +166,23 @@ function buildArchivedName(name) {
     return `${ARCHIVED_NAME_PREFIX}${rawName}`;
 }
 
+function parseCopyPricesFromSource(rawValue) {
+    if (rawValue === undefined || rawValue === null) {
+        return true;
+    }
+
+    if (typeof rawValue === 'boolean') {
+        return rawValue;
+    }
+
+    const normalized = String(rawValue).trim().toLowerCase();
+    if (['false', '0', 'no', 'off'].includes(normalized)) {
+        return false;
+    }
+
+    return true;
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return methodNotAllowed(req, res, ['POST']);
@@ -182,12 +200,16 @@ module.exports = async (req, res) => {
         const body = await readJsonBody(req);
         let sourceUniverseId;
         let parsedTargetUniverseIds;
+        const copyPricesFromSource = parseCopyPricesFromSource(body && body.copyPricesFromSource);
         try {
             sourceUniverseId = parseUniverseId(body && body.sourceUniverseId, 'sourceUniverseId');
             parsedTargetUniverseIds = parseTargetUniverseIds(body && body.targetUniverseIds);
         } catch (error) {
             return sendJson(res, 400, { error: error.message || 'Invalid request body' });
         }
+
+        const forceOneRobuxPricing = !copyPricesFromSource;
+        const pricingOverrideOptions = forceOneRobuxPricing ? { fixedPrice: FORCED_TARGET_PRICE } : {};
 
         const targetUniverseIds = parsedTargetUniverseIds.filter((id) => id !== sourceUniverseId);
 
@@ -264,6 +286,7 @@ module.exports = async (req, res) => {
                 try {
                     if (matchedTargetPass) {
                         await updateGamePass(targetUniverseId, matchedTargetPass.id, sourcePass.config, sourcePass.imageBuffer, {
+                            ...pricingOverrideOptions,
                             forceForSale: true
                         });
                         matchedTargetGamePassIds.add(matchedTargetPass.id);
@@ -282,6 +305,7 @@ module.exports = async (req, res) => {
                         }
                     } else {
                         const created = await createGamePass(targetUniverseId, sourcePass.config, sourcePass.imageBuffer, {
+                            ...pricingOverrideOptions,
                             forceForSale: true
                         });
                         gamePasses.created += 1;
@@ -318,6 +342,7 @@ module.exports = async (req, res) => {
 
                 try {
                     await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, null, {
+                        ...pricingOverrideOptions,
                         nameOverride: buildArchivedName(targetPass.name),
                         forceForSale: false,
                         forceRegionalPricingEnabled: false
@@ -363,6 +388,7 @@ module.exports = async (req, res) => {
                             sourceProduct.config,
                             sourceProduct.imageBuffer,
                             {
+                                ...pricingOverrideOptions,
                                 forceForSale: true
                             }
                         );
@@ -386,6 +412,7 @@ module.exports = async (req, res) => {
                             sourceProduct.config,
                             sourceProduct.imageBuffer,
                             {
+                                ...pricingOverrideOptions,
                                 forceForSale: true
                             }
                         );
@@ -423,6 +450,7 @@ module.exports = async (req, res) => {
 
                 try {
                     await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, null, {
+                        ...pricingOverrideOptions,
                         nameOverride: buildArchivedName(targetProduct.name),
                         forceForSale: false,
                         forceRegionalPricingEnabled: false
@@ -464,6 +492,9 @@ module.exports = async (req, res) => {
 
         return sendJson(res, 200, {
             sourceUniverseId,
+            priceSyncMode: forceOneRobuxPricing
+                ? `Forced ${FORCED_TARGET_PRICE} Robux on target universes`
+                : 'Copied from source',
             sourceCounts: {
                 gamePasses: preparedGamePasses.length,
                 developerProducts: preparedDeveloperProducts.length

@@ -51,7 +51,7 @@
                         <div id="admin-copy-tool" class="admin-tool hidden">
                             <h2 class="admin-tool-title">Copy Game Passes + Developer Products</h2>
                             <p class="admin-tool-note">
-                                This syncs target universes to source names/descriptions/icons and source pricing.
+                                This syncs target universes to source names/descriptions/icons. Use the checkbox to choose source prices vs forcing target prices to 1 Robux.
                             </p>
 
                             <form id="copy-monetization-form" class="admin-form">
@@ -66,6 +66,11 @@
                                     placeholder="One per line or comma-separated"
                                     required
                                 ></textarea>
+
+                                <label for="copy-prices-from-source" class="admin-checkbox-row">
+                                    <input id="copy-prices-from-source" type="checkbox" checked>
+                                    <span>Copy prices from source (uncheck to force target prices to 1 Robux)</span>
+                                </label>
 
                                 <button id="copy-monetization-submit" type="submit" class="btn btn-primary admin-submit-btn">
                                     Start Copy
