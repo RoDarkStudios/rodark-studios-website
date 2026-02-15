@@ -16,6 +16,7 @@ const {
     updateDeveloperProduct,
     sleep
 } = require('../_lib/roblox-open-cloud');
+const { tryAcquireMonetizationLock, releaseMonetizationLock } = require('../_lib/monetization-sync-lock');
 
 const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
 const FORCED_TARGET_PRICE = 1;
@@ -188,6 +189,8 @@ module.exports = async (req, res) => {
         return methodNotAllowed(req, res, ['POST']);
     }
 
+    let lockOwnerId = null;
+
     try {
         const auth = await requireAdmin(req, res);
         if (!auth.user) {
@@ -216,6 +219,18 @@ module.exports = async (req, res) => {
         if (targetUniverseIds.length === 0) {
             return sendJson(res, 400, { error: 'At least one target universe ID is required (different from source)' });
         }
+
+        const lockAttempt = tryAcquireMonetizationLock(
+            [sourceUniverseId, ...targetUniverseIds],
+            auth.user && auth.user.username ? auth.user.username : auth.user.id
+        );
+        if (!lockAttempt.acquired) {
+            return sendJson(res, 409, {
+                error: 'Another admin is currently using this tool. Try again later.',
+                conflicts: lockAttempt.conflicts
+            });
+        }
+        lockOwnerId = lockAttempt.ownerId;
 
         const sourceGamePasses = await listAllGamePassConfigs(sourceUniverseId);
         const sourceDeveloperProducts = await listAllDeveloperProductConfigs(sourceUniverseId);
@@ -521,5 +536,7 @@ module.exports = async (req, res) => {
         return sendJson(res, 500, {
             error: error.message || 'Failed to copy monetization items'
         });
+    } finally {
+        releaseMonetizationLock(lockOwnerId);
     }
 };

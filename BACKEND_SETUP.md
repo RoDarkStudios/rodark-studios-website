@@ -37,6 +37,7 @@ Admin sync behavior notes:
 - `copyPricesFromSource=true` (default): prices are copied from source items.
 - `copyPricesFromSource=false`: target prices are forced to `1` Robux.
 - Regional pricing for synced/created items is copied from source items.
+- The endpoint has a concurrency lock: if another sync is already running for any of the same universes, a `409` is returned.
 - Open Cloud currently has no delete endpoints for these resources, so unmatched target items are renamed with `[ARCHIVED] ` and archived (`isForSale=false`) instead of deleted.
 
 ## Roblox OAuth App Configuration
