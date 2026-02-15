@@ -8,6 +8,7 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `GET /api/auth/me` -> returns current signed-in user
 - `GET /api/auth/admin` -> resolves Roblox group rank and admin eligibility (`rank >= 254`)
 - `POST /api/auth/logout` -> clears session
+- `POST /api/admin/roblox-copy-monetization` -> admin tool to clone game passes + developer products from source universe to targets
 - `GET /api/profile` -> same user profile data from session
 - `GET /api/health`
 
@@ -15,6 +16,7 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `AUTH_SECRET` (long random secret used to sign session/state tokens)
 - `ROBLOX_OAUTH_CLIENT_ID`
 - `ROBLOX_OAUTH_CLIENT_SECRET`
+- `ROBLOX_OPEN_CLOUD_API_KEY` (used by the admin monetization cloning tool)
 
 Optional:
 - `ROBLOX_OAUTH_REDIRECT_URI`
@@ -22,6 +24,12 @@ Optional:
 - `ROBLOX_OAUTH_SCOPES` (default: `openid profile`)
 - `ROBLOX_OAUTH_BASE_URL` (default: `https://apis.roblox.com/oauth`)
 - `ROBLOX_GROUP_ID` (default: `5545660`, used for Admin tab visibility)
+
+For `ROBLOX_OPEN_CLOUD_API_KEY`, include these Open Cloud scopes on all source/target universes used by the tool:
+- `game-pass:read`
+- `game-pass:write`
+- `developer-product:read`
+- `developer-product:write`
 
 ## Roblox OAuth App Configuration
 In your Roblox OAuth app settings, ensure the redirect URI matches:

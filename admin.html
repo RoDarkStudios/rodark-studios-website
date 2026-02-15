@@ -44,7 +44,41 @@
                 <h1 class="section-title">Admin</h1>
                 <div class="legal-shell">
                     <article class="legal-card">
-                        <p class="about-description">Admin features coming soon.</p>
+                        <p class="about-description admin-intro">
+                            Clone monetization settings from one Roblox experience to many targets.
+                        </p>
+
+                        <div id="admin-copy-tool" class="admin-tool hidden">
+                            <h2 class="admin-tool-title">Copy Game Passes + Developer Products</h2>
+                            <p class="admin-tool-note">
+                                This creates new items in each target universe with the same name, description, price, sale status, and icon.
+                            </p>
+
+                            <form id="copy-monetization-form" class="admin-form">
+                                <label for="source-universe-id" class="admin-label">Source Experience (Universe) ID</label>
+                                <input id="source-universe-id" class="admin-input" type="text" inputmode="numeric" required>
+
+                                <label for="target-universe-ids" class="admin-label">Target Experience (Universe) IDs</label>
+                                <textarea
+                                    id="target-universe-ids"
+                                    class="admin-textarea"
+                                    rows="6"
+                                    placeholder="One per line or comma-separated"
+                                    required
+                                ></textarea>
+
+                                <button id="copy-monetization-submit" type="submit" class="btn btn-primary admin-submit-btn">
+                                    Start Copy
+                                </button>
+                            </form>
+
+                            <p id="copy-monetization-status" class="admin-status hidden"></p>
+                            <div id="copy-monetization-results" class="admin-results hidden"></div>
+                        </div>
+
+                        <div id="admin-access-denied" class="admin-access-denied hidden">
+                            <p class="admin-denied-message">Admin access is required for this page.</p>
+                        </div>
                     </article>
                 </div>
             </div>

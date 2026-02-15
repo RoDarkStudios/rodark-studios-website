@@ -185,6 +185,177 @@ function initAuth() {
     }
 }
 
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function parseUniverseIdsInput(rawInput) {
+    return String(rawInput || '')
+        .split(/[\s,]+/g)
+        .map((value) => value.trim())
+        .filter(Boolean);
+}
+
+function setAdminCopyStatus(message, type) {
+    const statusElement = document.getElementById('copy-monetization-status');
+    if (!statusElement) {
+        return;
+    }
+
+    if (!message) {
+        statusElement.textContent = '';
+        statusElement.classList.add('hidden');
+        statusElement.classList.remove('success', 'error', 'info');
+        return;
+    }
+
+    statusElement.textContent = message;
+    statusElement.classList.remove('hidden');
+    statusElement.classList.remove('success', 'error', 'info');
+    statusElement.classList.add(type || 'info');
+}
+
+function setAdminCopyBusy(isBusy) {
+    const submitButton = document.getElementById('copy-monetization-submit');
+    if (submitButton) {
+        submitButton.disabled = Boolean(isBusy);
+        submitButton.textContent = isBusy ? 'Copying...' : 'Start Copy';
+    }
+}
+
+function renderAdminCopyResults(result) {
+    const resultElement = document.getElementById('copy-monetization-results');
+    if (!resultElement) {
+        return;
+    }
+
+    if (!result || typeof result !== 'object') {
+        resultElement.innerHTML = '';
+        resultElement.classList.add('hidden');
+        return;
+    }
+
+    const summary = result.totals || {};
+    const sourceCounts = result.sourceCounts || {};
+    const targetRows = Array.isArray(result.targets) ? result.targets : [];
+
+    const targetMarkup = targetRows.map((target) => {
+        const gamePasses = target && target.gamePasses ? target.gamePasses : {};
+        const developerProducts = target && target.developerProducts ? target.developerProducts : {};
+        const gamePassFailures = Array.isArray(gamePasses.failed)
+            ? gamePasses.failed
+            : [];
+        const developerProductFailures = Array.isArray(developerProducts.failed)
+            ? developerProducts.failed
+            : [];
+
+        const combinedFailures = []
+            .concat(gamePassFailures.map((item) => `Game pass ${item.sourceId}: ${item.error}`))
+            .concat(developerProductFailures.map((item) => `Product ${item.sourceId}: ${item.error}`));
+
+        const failurePreview = combinedFailures.slice(0, 5).map((line) => escapeHtml(line)).join('\n');
+
+        return `
+            <article class="admin-target-result">
+                <h4>Target Universe ${escapeHtml(target.targetUniverseId)}</h4>
+                <p>Game passes: ${escapeHtml(gamePasses.created)}/${escapeHtml(gamePasses.attempted)} created</p>
+                <p>Developer products: ${escapeHtml(developerProducts.created)}/${escapeHtml(developerProducts.attempted)} created</p>
+                ${failurePreview ? `<p class="admin-target-errors">${failurePreview}</p>` : ''}
+            </article>
+        `;
+    }).join('');
+
+    resultElement.innerHTML = `
+        <section class="admin-result-summary">
+            <p>Source items: ${escapeHtml(sourceCounts.gamePasses)} game passes, ${escapeHtml(sourceCounts.developerProducts)} developer products</p>
+            <p>Created: ${escapeHtml(summary.totalGamePassesCreated)} game passes, ${escapeHtml(summary.totalDeveloperProductsCreated)} developer products</p>
+            <p>Failures: ${escapeHtml(summary.totalGamePassFailures)} game passes, ${escapeHtml(summary.totalDeveloperProductFailures)} developer products</p>
+        </section>
+        ${targetMarkup}
+    `;
+    resultElement.classList.remove('hidden');
+}
+
+async function handleAdminCopySubmit(event) {
+    event.preventDefault();
+
+    const sourceInput = document.getElementById('source-universe-id');
+    const targetInput = document.getElementById('target-universe-ids');
+    if (!sourceInput || !targetInput) {
+        return;
+    }
+
+    const sourceUniverseId = String(sourceInput.value || '').trim();
+    const targetUniverseIds = parseUniverseIdsInput(targetInput.value);
+
+    if (!sourceUniverseId || targetUniverseIds.length === 0) {
+        setAdminCopyStatus('Please enter a source universe ID and at least one target universe ID.', 'error');
+        return;
+    }
+
+    setAdminCopyBusy(true);
+    renderAdminCopyResults(null);
+    setAdminCopyStatus('Copy job started. This may take a while for large catalogs.', 'info');
+
+    try {
+        const result = await postJson('/api/admin/roblox-copy-monetization', {
+            sourceUniverseId,
+            targetUniverseIds
+        });
+
+        renderAdminCopyResults(result);
+
+        const hasFailures = result
+            && result.totals
+            && ((Number(result.totals.totalGamePassFailures) || 0) + (Number(result.totals.totalDeveloperProductFailures) || 0) > 0);
+
+        setAdminCopyStatus(
+            hasFailures
+                ? 'Copy finished with some failures. See details below.'
+                : 'Copy completed successfully.',
+            hasFailures ? 'error' : 'success'
+        );
+    } catch (error) {
+        setAdminCopyStatus(error.message || 'Failed to copy monetization data.', 'error');
+    } finally {
+        setAdminCopyBusy(false);
+    }
+}
+
+async function initAdminCopyTool() {
+    const adminTool = document.getElementById('admin-copy-tool');
+    if (!adminTool) {
+        return;
+    }
+
+    const deniedElement = document.getElementById('admin-access-denied');
+    const form = document.getElementById('copy-monetization-form');
+
+    const adminStatus = await fetchAdminStatus();
+    const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
+    if (!isAdmin) {
+        adminTool.classList.add('hidden');
+        if (deniedElement) {
+            deniedElement.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (deniedElement) {
+        deniedElement.classList.add('hidden');
+    }
+    adminTool.classList.remove('hidden');
+
+    if (form) {
+        form.addEventListener('submit', handleAdminCopySubmit);
+    }
+}
+
 // Age calculation function
 function calculateAge(birthDate) {
     const today = new Date();
@@ -493,6 +664,7 @@ async function fetchUserAvatars() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 RoDark Studios website loaded!');
     initAuth();
+    initAdminCopyTool();
 
     // Calculate and display ages
     const myronAge = calculateAge('2008-05-31');
