@@ -81,6 +81,10 @@ function isRegionalPricingEnabled(config) {
     return features.includes('RegionalPricing');
 }
 
+function toBooleanString(value) {
+    return value ? 'true' : 'false';
+}
+
 async function robloxOpenCloudRequest({ method, path, query, body }) {
     const url = new URL(`${ROBLOX_OPEN_CLOUD_BASE_URL}${path}`);
     if (query && typeof query === 'object') {
@@ -233,35 +237,60 @@ async function downloadImageBuffer(url) {
     return Buffer.from(arrayBuffer);
 }
 
-function addCommonMonetizationFields(formData, sourceConfig, imageBuffer) {
-    const name = String((sourceConfig && sourceConfig.name) || '').trim();
-    if (!name) {
-        throw new Error('Source item is missing a name');
+function addMonetizationFormFields(formData, sourceConfig, imageBuffer, options) {
+    const config = sourceConfig || {};
+    const settings = options || {};
+
+    const includeName = settings.includeName !== false;
+    const requireName = settings.requireName !== false;
+    const includeDescription = settings.includeDescription !== false;
+
+    const nameSource = settings.nameOverride !== undefined ? settings.nameOverride : config.name;
+    const name = String(nameSource || '').trim();
+    if (includeName) {
+        if (!name && requireName) {
+            throw new Error('Source item is missing a name');
+        }
+        if (name) {
+            formData.append('name', name);
+        }
     }
 
-    formData.append('name', name);
-
-    if (typeof sourceConfig.description === 'string') {
-        formData.append('description', sourceConfig.description);
+    if (includeDescription && typeof config.description === 'string') {
+        formData.append('description', config.description);
     }
 
-    formData.append('isForSale', sourceConfig && sourceConfig.isForSale ? 'true' : 'false');
+    const resolvedForSale = typeof settings.forceForSale === 'boolean'
+        ? settings.forceForSale
+        : Boolean(config.isForSale);
+    formData.append('isForSale', toBooleanString(resolvedForSale));
 
-    const priceValue = asPriceValue(sourceConfig);
+    const forcedPrice = Number(settings.fixedPrice);
+    const priceValue = Number.isFinite(forcedPrice)
+        ? Math.max(0, Math.round(forcedPrice))
+        : asPriceValue(config);
     if (priceValue !== null) {
         formData.append('price', String(priceValue));
     }
 
-    formData.append('isRegionalPricingEnabled', isRegionalPricingEnabled(sourceConfig) ? 'true' : 'false');
+    const resolvedRegionalPricing = typeof settings.forceRegionalPricingEnabled === 'boolean'
+        ? settings.forceRegionalPricingEnabled
+        : isRegionalPricingEnabled(config);
+    formData.append('isRegionalPricingEnabled', toBooleanString(resolvedRegionalPricing));
 
     if (imageBuffer && imageBuffer.length > 0) {
-        formData.append('imageFile', new Blob([imageBuffer], { type: 'image/png' }), 'icon.png');
+        const imageFieldName = String(settings.imageFieldName || 'imageFile');
+        formData.append(imageFieldName, new Blob([imageBuffer], { type: 'image/png' }), 'icon.png');
     }
 }
 
-async function createGamePass(universeId, sourceConfig, imageBuffer) {
+async function createGamePass(universeId, sourceConfig, imageBuffer, options) {
     const formData = new FormData();
-    addCommonMonetizationFields(formData, sourceConfig, imageBuffer);
+    addMonetizationFormFields(formData, sourceConfig, imageBuffer, {
+        imageFieldName: 'imageFile',
+        requireName: true,
+        ...(options || {})
+    });
 
     const payload = await robloxOpenCloudRequest({
         method: 'POST',
@@ -272,9 +301,28 @@ async function createGamePass(universeId, sourceConfig, imageBuffer) {
     return payload || null;
 }
 
-async function createDeveloperProduct(universeId, sourceConfig, imageBuffer) {
+async function updateGamePass(universeId, gamePassId, sourceConfig, imageBuffer, options) {
     const formData = new FormData();
-    addCommonMonetizationFields(formData, sourceConfig, imageBuffer);
+    addMonetizationFormFields(formData, sourceConfig, imageBuffer, {
+        imageFieldName: 'file',
+        requireName: false,
+        ...(options || {})
+    });
+
+    await robloxOpenCloudRequest({
+        method: 'PATCH',
+        path: `/game-passes/v1/universes/${universeId}/game-passes/${gamePassId}`,
+        body: formData
+    });
+}
+
+async function createDeveloperProduct(universeId, sourceConfig, imageBuffer, options) {
+    const formData = new FormData();
+    addMonetizationFormFields(formData, sourceConfig, imageBuffer, {
+        imageFieldName: 'imageFile',
+        requireName: true,
+        ...(options || {})
+    });
 
     const payload = await robloxOpenCloudRequest({
         method: 'POST',
@@ -283,6 +331,21 @@ async function createDeveloperProduct(universeId, sourceConfig, imageBuffer) {
     });
 
     return payload || null;
+}
+
+async function updateDeveloperProduct(universeId, productId, sourceConfig, imageBuffer, options) {
+    const formData = new FormData();
+    addMonetizationFormFields(formData, sourceConfig, imageBuffer, {
+        imageFieldName: 'imageFile',
+        requireName: false,
+        ...(options || {})
+    });
+
+    await robloxOpenCloudRequest({
+        method: 'PATCH',
+        path: `/developer-products/v2/universes/${universeId}/developer-products/${productId}`,
+        body: formData
+    });
 }
 
 function sleep(ms) {
@@ -299,6 +362,8 @@ module.exports = {
     getAssetThumbnailUrlMap,
     downloadImageBuffer,
     createGamePass,
+    updateGamePass,
     createDeveloperProduct,
+    updateDeveloperProduct,
     sleep
 };

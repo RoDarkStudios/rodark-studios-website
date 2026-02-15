@@ -263,8 +263,8 @@ function renderAdminCopyResults(result) {
         return `
             <article class="admin-target-result">
                 <h4>Target Universe ${escapeHtml(target.targetUniverseId)}</h4>
-                <p>Game passes: ${escapeHtml(gamePasses.created)}/${escapeHtml(gamePasses.attempted)} created</p>
-                <p>Developer products: ${escapeHtml(developerProducts.created)}/${escapeHtml(developerProducts.attempted)} created</p>
+                <p>Game passes: ${escapeHtml(gamePasses.created)} created, ${escapeHtml(gamePasses.updated)} updated, ${escapeHtml(gamePasses.archived)} archived</p>
+                <p>Developer products: ${escapeHtml(developerProducts.created)} created, ${escapeHtml(developerProducts.updated)} updated, ${escapeHtml(developerProducts.archived)} archived</p>
                 ${failurePreview ? `<p class="admin-target-errors">${failurePreview}</p>` : ''}
             </article>
         `;
@@ -273,7 +273,9 @@ function renderAdminCopyResults(result) {
     resultElement.innerHTML = `
         <section class="admin-result-summary">
             <p>Source items: ${escapeHtml(sourceCounts.gamePasses)} game passes, ${escapeHtml(sourceCounts.developerProducts)} developer products</p>
-            <p>Created: ${escapeHtml(summary.totalGamePassesCreated)} game passes, ${escapeHtml(summary.totalDeveloperProductsCreated)} developer products</p>
+            <p>Target price: ${escapeHtml(result.targetPriceRobux)} Robux</p>
+            <p>Game passes: ${escapeHtml(summary.totalGamePassesCreated)} created, ${escapeHtml(summary.totalGamePassesUpdated)} updated, ${escapeHtml(summary.totalGamePassesArchived)} archived</p>
+            <p>Developer products: ${escapeHtml(summary.totalDeveloperProductsCreated)} created, ${escapeHtml(summary.totalDeveloperProductsUpdated)} updated, ${escapeHtml(summary.totalDeveloperProductsArchived)} archived</p>
             <p>Failures: ${escapeHtml(summary.totalGamePassFailures)} game passes, ${escapeHtml(summary.totalDeveloperProductFailures)} developer products</p>
         </section>
         ${targetMarkup}

@@ -8,7 +8,7 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `GET /api/auth/me` -> returns current signed-in user
 - `GET /api/auth/admin` -> resolves Roblox group rank and admin eligibility (`rank >= 254`)
 - `POST /api/auth/logout` -> clears session
-- `POST /api/admin/roblox-copy-monetization` -> admin tool to clone game passes + developer products from source universe to targets
+- `POST /api/admin/roblox-copy-monetization` -> admin sync tool for game passes + developer products (forces target prices to `1` Robux)
 - `GET /api/profile` -> same user profile data from session
 - `GET /api/health`
 
@@ -30,6 +30,12 @@ For `ROBLOX_OPEN_CLOUD_API_KEY`, include these Open Cloud scopes on all source/t
 - `game-pass:write`
 - `developer-product:read`
 - `developer-product:write`
+
+Admin sync behavior notes:
+- Target items are matched by name (case-insensitive), then updated to source name/description/icon.
+- Missing target items are created.
+- Prices for synced/created items are forced to `1` Robux.
+- Open Cloud currently has no delete endpoints for these resources, so unmatched target items are renamed with `[ARCHIVED] ` and archived (`isForSale=false`) instead of deleted.
 
 ## Roblox OAuth App Configuration
 In your Roblox OAuth app settings, ensure the redirect URI matches:
