@@ -50,7 +50,7 @@ function extractApiErrorMessage(data, fallback) {
         return fallback;
     }
 
-    const detail = [
+    const directDetail = [
         data.errorMessage,
         data.error,
         data.message,
@@ -58,11 +58,49 @@ function extractApiErrorMessage(data, fallback) {
         data.title
     ].find((value) => typeof value === 'string' && value.trim());
 
-    if (!detail) {
-        return fallback;
+    if (directDetail) {
+        return directDetail.trim();
     }
 
-    return detail.trim();
+    const errorArrays = [data.errors, data.errorDetails, data.details];
+    for (const errors of errorArrays) {
+        if (!Array.isArray(errors)) {
+            continue;
+        }
+
+        for (const item of errors) {
+            if (typeof item === 'string' && item.trim()) {
+                return item.trim();
+            }
+
+            if (!item || typeof item !== 'object') {
+                continue;
+            }
+
+            const code = item.code !== undefined && item.code !== null
+                ? String(item.code).trim()
+                : '';
+            const message = [
+                item.userFacingMessage,
+                item.message,
+                item.errorMessage,
+                item.detail,
+                item.title
+            ].find((value) => typeof value === 'string' && value.trim());
+
+            if (message && code) {
+                return `Error ${code}: ${message.trim()}`;
+            }
+            if (message) {
+                return message.trim();
+            }
+            if (code) {
+                return `Error ${code}`;
+            }
+        }
+    }
+
+    return fallback;
 }
 
 function asPriceValue(config) {
@@ -226,6 +264,27 @@ async function listAllBadges(universeId) {
     } while (cursor);
 
     return results;
+}
+
+let cachedBadgeMetadata = null;
+let cachedBadgeMetadataAt = 0;
+const BADGE_METADATA_TTL_MS = 5 * 60 * 1000;
+
+async function getBadgeMetadata() {
+    const now = Date.now();
+    if (cachedBadgeMetadata && (now - cachedBadgeMetadataAt) < BADGE_METADATA_TTL_MS) {
+        return cachedBadgeMetadata;
+    }
+
+    const payload = await robloxPublicRequest({
+        baseUrl: ROBLOX_BADGES_BASE_URL,
+        method: 'GET',
+        path: '/v1/badges/metadata'
+    });
+
+    cachedBadgeMetadata = payload || null;
+    cachedBadgeMetadataAt = now;
+    return cachedBadgeMetadata;
 }
 
 async function getThumbnailUrlMap({ endpointPath, idParamName, ids, size }) {
@@ -441,22 +500,59 @@ function addBadgeCreateFormFields(formData, sourceBadge, imageBuffer, options) {
         : Boolean(config.enabled);
     formData.append('isActive', toBooleanString(enabled));
 
+    const paymentSourceType = Number.isFinite(Number(settings.paymentSourceType))
+        ? Math.round(Number(settings.paymentSourceType))
+        : 1;
+    const expectedCost = Number(settings.expectedCost);
+    formData.append('paymentSourceType', String(paymentSourceType));
+    if (Number.isFinite(expectedCost) && expectedCost >= 0) {
+        formData.append('expectedCost', String(Math.round(expectedCost)));
+    }
+
     if (imageBuffer && imageBuffer.length > 0) {
         formData.append('files', new Blob([imageBuffer], { type: 'image/png' }), 'icon.png');
     }
 }
 
 async function createBadge(universeId, sourceBadge, imageBuffer, options) {
-    const formData = new FormData();
-    addBadgeCreateFormFields(formData, sourceBadge, imageBuffer, options);
+    const settings = options || {};
+    const metadata = await getBadgeMetadata().catch(() => null);
+    const expectedCost = Number(metadata && metadata.badgeCreationPrice);
+    const requestSettings = {
+        ...settings,
+        expectedCost: Number.isFinite(expectedCost) ? expectedCost : settings.expectedCost
+    };
 
-    const payload = await robloxOpenCloudRequest({
-        method: 'POST',
-        path: `/legacy-badges/v1/universes/${universeId}/badges`,
-        body: formData
-    });
+    const attemptCreate = async (paymentSourceType) => {
+        const formData = new FormData();
+        addBadgeCreateFormFields(formData, sourceBadge, imageBuffer, {
+            ...requestSettings,
+            paymentSourceType
+        });
 
-    return payload || null;
+        return robloxOpenCloudRequest({
+            method: 'POST',
+            path: `/legacy-badges/v1/universes/${universeId}/badges`,
+            body: formData
+        });
+    };
+
+    try {
+        const payload = await attemptCreate(1);
+        return payload || null;
+    } catch (firstError) {
+        const message = String(firstError && firstError.message ? firstError.message : '').toLowerCase();
+        const likelyPaymentProblem = message.includes('payment')
+            || message.includes('expected')
+            || message.includes('cost')
+            || message.includes('insufficient funds');
+        if (!likelyPaymentProblem) {
+            throw firstError;
+        }
+
+        const payload = await attemptCreate(2);
+        return payload || null;
+    }
 }
 
 async function updateBadge(badgeId, sourceBadge, options) {
