@@ -264,8 +264,7 @@ module.exports = async (req, res) => {
                 try {
                     if (matchedTargetPass) {
                         await updateGamePass(targetUniverseId, matchedTargetPass.id, sourcePass.config, sourcePass.imageBuffer, {
-                            forceForSale: true,
-                            forceRegionalPricingEnabled: false
+                            forceForSale: true
                         });
                         matchedTargetGamePassIds.add(matchedTargetPass.id);
                         gamePasses.updated += 1;
@@ -283,8 +282,7 @@ module.exports = async (req, res) => {
                         }
                     } else {
                         const created = await createGamePass(targetUniverseId, sourcePass.config, sourcePass.imageBuffer, {
-                            forceForSale: true,
-                            forceRegionalPricingEnabled: false
+                            forceForSale: true
                         });
                         gamePasses.created += 1;
                         gamePasses.createdItems.push({
@@ -365,8 +363,7 @@ module.exports = async (req, res) => {
                             sourceProduct.config,
                             sourceProduct.imageBuffer,
                             {
-                                forceForSale: true,
-                                forceRegionalPricingEnabled: false
+                                forceForSale: true
                             }
                         );
                         matchedTargetDeveloperProductIds.add(matchedTargetProduct.id);
@@ -389,8 +386,7 @@ module.exports = async (req, res) => {
                             sourceProduct.config,
                             sourceProduct.imageBuffer,
                             {
-                                forceForSale: true,
-                                forceRegionalPricingEnabled: false
+                                forceForSale: true
                             }
                         );
                         developerProducts.created += 1;
