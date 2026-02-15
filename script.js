@@ -511,120 +511,28 @@ async function fetchGroupStats() {
     }
 }
 
-// Function to fetch Roblox user avatars
-async function fetchUserAvatars() {
-    const users = [
-        { id: 2735760162, elementId: 'myron-avatar' },    // Myron
-        { id: 175190407, elementId: 'kasper-avatar' },   // Kasper
-        { id: 290031319, elementId: 'tristan-avatar' }   // Tristan
-    ];
-
-    const hasAvatarTargets = users.some((user) => document.getElementById(user.elementId));
-    if (!hasAvatarTargets) {
+// Bind fallback behavior for team avatar images rendered in HTML
+function fetchUserAvatars() {
+    const avatarElements = document.querySelectorAll('.member-avatar .avatar-image');
+    if (!avatarElements.length) {
         return;
     }
 
-    console.log('Fetching user avatars...');
-
-    for (const user of users) {
-        try {
-            // Set loading state
-            const avatarElement = document.getElementById(user.elementId);
-            if (avatarElement) {
-                avatarElement.innerHTML = '<i class="fas fa-spinner fa-spin" style="color: rgba(255,255,255,0.6);"></i>';
-                console.log(`Loading avatar for user ${user.id}...`);
-            }
-
-            // Try multiple methods to get avatar
-            let avatarUrl = null;
-
-            // Method 1: Try with AllOrigins proxy (most reliable)
-            try {
-                console.log(`Fetching avatar for user ${user.id} with AllOrigins proxy...`);
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=false`)}`;
-                const proxyResponse = await fetch(proxyUrl);
-
-                if (proxyResponse.ok) {
-                    const proxyData = await proxyResponse.json();
-                    if (proxyData.contents) {
-                        const avatarData = JSON.parse(proxyData.contents);
-                        if (avatarData.data && avatarData.data.length > 0) {
-                            avatarUrl = avatarData.data[0].imageUrl;
-                            console.log(`✅ AllOrigins proxy successful for user ${user.id}:`, avatarUrl);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.warn(`AllOrigins proxy failed for user ${user.id}:`, error);
-            }            // Method 2: Try direct API call (usually fails due to CORS)
-            if (!avatarUrl) {
-                try {
-                    console.log(`Trying direct API call for user ${user.id}...`);
-                    const directResponse = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=false`);
-
-                    if (directResponse.ok) {
-                        const avatarData = await directResponse.json();
-                        if (avatarData.data && avatarData.data.length > 0) {
-                            avatarUrl = avatarData.data[0].imageUrl;
-                            console.log(`✅ Direct API call successful for user ${user.id}:`, avatarUrl);
-                        }
-                    }
-                } catch (error) {
-                    console.warn(`Direct API call failed for user ${user.id}:`, error);
-                }
-            }
-
-            // Method 3: Try fallback avatar URL format (last resort)
-            if (!avatarUrl) {
-                try {
-                    console.log(`Trying fallback avatar URL for user ${user.id}...`);
-                    // Use a standard Roblox avatar URL format as fallback
-                    const fallbackUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${user.id}&width=150&height=150&format=png`;
-
-                    // Test if the fallback URL is accessible
-                    const fallbackImg = new Image();
-                    fallbackImg.onload = function() {
-                        avatarUrl = fallbackUrl;
-                        console.log(`✅ Fallback avatar URL works for user ${user.id}:`, avatarUrl);
-                    };
-                    fallbackImg.onerror = function() {
-                        console.warn(`Fallback avatar URL failed for user ${user.id}`);
-                    };
-                    fallbackImg.src = fallbackUrl;
-                } catch (error) {
-                    console.warn(`Fallback method failed for user ${user.id}:`, error);
-                }
-            }// Update avatar if we got a valid URL
-            if (avatarUrl && avatarElement) {
-                // Create image element with error handling
-                const img = new Image();
-                img.onload = function() {
-                    avatarElement.innerHTML = `<img src="${avatarUrl}" alt="Roblox Avatar" class="avatar-image">`;
-                    console.log(`✅ Avatar updated for user ${user.id}`);
-                };
-                img.onerror = function() {
-                    console.warn(`Avatar image failed to load for user ${user.id}, keeping default icon`);
-                    avatarElement.innerHTML = '<i class="fas fa-user"></i>';
-                };
-                img.src = avatarUrl;
-            } else {
-                console.warn(`Failed to fetch avatar for user ${user.id}, keeping default icon`);
-                if (avatarElement) {
-                    avatarElement.innerHTML = '<i class="fas fa-user"></i>';
-                }
-            }
-
-        } catch (error) {
-            console.error(`Error fetching avatar for user ${user.id}:`, error);
-            // Reset to default icon on error
-            const avatarElement = document.getElementById(user.elementId);
-            if (avatarElement) {
-                avatarElement.innerHTML = '<i class="fas fa-user"></i>';
-            }
+    avatarElements.forEach((img) => {
+        if (img.dataset.fallbackBound === '1') {
+            return;
         }
-    }
 
-    console.log('Avatar fetching completed');
+        img.dataset.fallbackBound = '1';
+        img.addEventListener('error', () => {
+            const avatarElement = img.closest('.member-avatar');
+            if (!avatarElement) {
+                return;
+            }
+
+            avatarElement.innerHTML = '<i class="fas fa-user"></i>';
+        }, { once: true });
+    });
 }
 
 // Update ages when page loads
@@ -664,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fetch and display group statistics
     fetchGroupStats();
-    // Fetch and display user avatars
+    // Bind fallback handlers for user avatars
     fetchUserAvatars();
 
     console.log('✅ All initialization functions called');
@@ -795,3 +703,4 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+

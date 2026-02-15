@@ -17,6 +17,11 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="official_company_logo.png">
+
+    <!-- Preload team avatars for faster first paint -->
+    <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=175190407&size=150x150">
+    <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=290031319&size=150x150">
+    <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=2735760162&size=150x150">
 </head>
 <body>
     <!-- Navigation -->
@@ -183,9 +188,7 @@
     <section id="team" class="team">
         <div class="container">
             <h2 class="section-title">Meet Our Team</h2>            <div class="team-grid" id="team-grid">                <div class="team-member" id="kasper-member">
-                    <div class="member-avatar" id="kasper-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>                    <h3 class="member-name">Kasper</h3>
+                    <div class="member-avatar" id="kasper-avatar"><img src="/api/roblox/avatar-headshot?userId=175190407&size=150x150" alt="Kasper Roblox avatar" class="avatar-image" loading="eager" decoding="async" fetchpriority="high"></div>                    <h3 class="member-name">Kasper</h3>
                     <p class="member-role">Owner, Founder & Programmer</p>
                     <p class="member-age">Age: <span id="kasper-age">20</span></p>
                     <p class="member-bio">Lead programmer specializing in core development, while also contributing to game design and user experience.</p>
@@ -204,9 +207,7 @@
                         </a>
                     </div>
                 </div>                <div class="team-member" id="tristan-member">
-                    <div class="member-avatar" id="tristan-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>                    <h3 class="member-name">Tristan</h3>
+                    <div class="member-avatar" id="tristan-avatar"><img src="/api/roblox/avatar-headshot?userId=290031319&size=150x150" alt="Tristan Roblox avatar" class="avatar-image" loading="eager" decoding="async" fetchpriority="high"></div>                    <h3 class="member-name">Tristan</h3>
                     <p class="member-role">Owner, Founder & Designer</p>
                     <p class="member-age">Age: <span id="tristan-age">20</span></p>
                     <p class="member-bio">Lead designer focused on creating visually stunning UI, maps and engaging user experiences for our games.</p>
@@ -225,9 +226,7 @@
                         </a>
                     </div>
                 </div>                <div class="team-member" id="myron-member">
-                    <div class="member-avatar" id="myron-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>                    <h3 class="member-name">Myron</h3>
+                    <div class="member-avatar" id="myron-avatar"><img src="/api/roblox/avatar-headshot?userId=2735760162&size=150x150" alt="Myron Roblox avatar" class="avatar-image" loading="eager" decoding="async" fetchpriority="high"></div>                    <h3 class="member-name">Myron</h3>
                     <p class="member-role">Owner, Founder & Programmer</p>
                     <p class="member-age">Age: <span id="myron-age">16</span></p>
                     <p class="member-bio">Lead programmer specializing in core development, while also contributing to game design and user experience.</p>
@@ -304,3 +303,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+

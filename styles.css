@@ -591,15 +591,9 @@ body {
     to { transform: rotate(360deg); }
 }
 
-/* Ensure avatar images load smoothly */
+/* Render avatar images immediately once loaded */
 .avatar-image {
-    opacity: 0;
-    animation: fadeInAvatar 0.5s ease forwards;
-}
-
-@keyframes fadeInAvatar {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    opacity: 1;
 }
 
 .member-name {
@@ -1216,3 +1210,4 @@ body {
         font-size: 2rem;
     }
 }
+
