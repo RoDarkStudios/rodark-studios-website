@@ -54,18 +54,18 @@
                         <div id="admin-list-monetization-tool" class="admin-tool hidden">
                             <h2 class="admin-tool-title">List Game Pass + Developer Product IDs</h2>
                             <p class="admin-tool-note">
-                                Enter your Development, Test, and Production universe IDs to get one combined text blob with all game passes and products for all three games.
+                                Enter your Production, Test, and Development universe IDs to get one combined text blob with all game passes and products for all three games.
                             </p>
 
                             <form id="list-monetization-form" class="admin-form">
-                                <label for="development-universe-id" class="admin-label">Development Game (Universe ID)</label>
-                                <input id="development-universe-id" class="admin-input" type="text" inputmode="numeric" required>
+                                <label for="production-universe-id" class="admin-label">Production Game (Universe ID)</label>
+                                <input id="production-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
                                 <label for="test-universe-id" class="admin-label">Test Game (Universe ID)</label>
                                 <input id="test-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
-                                <label for="production-universe-id" class="admin-label">Production Game (Universe ID)</label>
-                                <input id="production-universe-id" class="admin-input" type="text" inputmode="numeric" required>
+                                <label for="development-universe-id" class="admin-label">Development Game (Universe ID)</label>
+                                <input id="development-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
                                 <button id="list-monetization-submit" type="submit" class="btn btn-primary admin-submit-btn">
                                     Fetch IDs

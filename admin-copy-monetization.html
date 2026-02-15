@@ -54,18 +54,18 @@
                         <div id="admin-copy-tool" class="admin-tool hidden">
                             <h2 class="admin-tool-title">Copy Game Passes + Developer Products + Badges</h2>
                             <p class="admin-tool-note">
-                                Production is always the source. Development and Test are always targets and are forced to 1 Robux for game pass and developer product prices. Badge sync ignores pricing.
+                                Production is always the source. Test and Development are always targets and are forced to 1 Robux for game pass and developer product prices. Badge sync ignores pricing.
                             </p>
 
                             <form id="copy-monetization-form" class="admin-form">
                                 <label for="production-universe-id" class="admin-label">Production Game (Universe ID)</label>
                                 <input id="production-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
-                                <label for="development-universe-id" class="admin-label">Development Game (Universe ID)</label>
-                                <input id="development-universe-id" class="admin-input" type="text" inputmode="numeric" required>
-
                                 <label for="test-universe-id" class="admin-label">Test Game (Universe ID)</label>
                                 <input id="test-universe-id" class="admin-input" type="text" inputmode="numeric" required>
+
+                                <label for="development-universe-id" class="admin-label">Development Game (Universe ID)</label>
+                                <input id="development-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
                                 <button id="copy-monetization-submit" type="submit" class="btn btn-primary admin-submit-btn">
                                     Start Copy

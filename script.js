@@ -287,18 +287,18 @@ async function handleAdminCopySubmit(event) {
     event.preventDefault();
 
     const productionInput = document.getElementById('production-universe-id');
-    const developmentInput = document.getElementById('development-universe-id');
     const testInput = document.getElementById('test-universe-id');
-    if (!productionInput || !developmentInput || !testInput) {
+    const developmentInput = document.getElementById('development-universe-id');
+    if (!productionInput || !testInput || !developmentInput) {
         return;
     }
 
     const productionUniverseId = String(productionInput.value || '').trim();
-    const developmentUniverseId = String(developmentInput.value || '').trim();
     const testUniverseId = String(testInput.value || '').trim();
+    const developmentUniverseId = String(developmentInput.value || '').trim();
 
-    if (!productionUniverseId || !developmentUniverseId || !testUniverseId) {
-        setAdminCopyStatus('Please enter Production, Development, and Test universe IDs.', 'error');
+    if (!productionUniverseId || !testUniverseId || !developmentUniverseId) {
+        setAdminCopyStatus('Please enter Production, Test, and Development universe IDs.', 'error');
         return;
     }
 
@@ -309,8 +309,8 @@ async function handleAdminCopySubmit(event) {
     try {
         const result = await postJson('/api/admin/roblox-copy-monetization', {
             productionUniverseId,
-            developmentUniverseId,
-            testUniverseId
+            testUniverseId,
+            developmentUniverseId
         });
 
         renderAdminCopyResults(result);
@@ -465,19 +465,19 @@ function renderListMonetizationResults(result) {
 async function handleListMonetizationSubmit(event) {
     event.preventDefault();
 
-    const developmentInput = document.getElementById('development-universe-id');
-    const testInput = document.getElementById('test-universe-id');
     const productionInput = document.getElementById('production-universe-id');
-    if (!developmentInput || !testInput || !productionInput) {
+    const testInput = document.getElementById('test-universe-id');
+    const developmentInput = document.getElementById('development-universe-id');
+    if (!productionInput || !testInput || !developmentInput) {
         return;
     }
 
-    const developmentUniverseId = String(developmentInput.value || '').trim();
-    const testUniverseId = String(testInput.value || '').trim();
     const productionUniverseId = String(productionInput.value || '').trim();
+    const testUniverseId = String(testInput.value || '').trim();
+    const developmentUniverseId = String(developmentInput.value || '').trim();
 
-    if (!developmentUniverseId || !testUniverseId || !productionUniverseId) {
-        setListMonetizationStatus('Please enter Development, Test, and Production universe IDs.', 'error');
+    if (!productionUniverseId || !testUniverseId || !developmentUniverseId) {
+        setListMonetizationStatus('Please enter Production, Test, and Development universe IDs.', 'error');
         return;
     }
 
@@ -487,9 +487,9 @@ async function handleListMonetizationSubmit(event) {
 
     try {
         const result = await postJson('/api/admin/roblox-list-monetization-items', {
-            developmentUniverseId,
+            productionUniverseId,
             testUniverseId,
-            productionUniverseId
+            developmentUniverseId
         });
 
         renderListMonetizationResults(result);

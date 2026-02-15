@@ -151,9 +151,9 @@ module.exports = async (req, res) => {
         }
 
         const games = await Promise.all([
-            fetchGameSection('Development Game', ids.developmentUniverseId),
+            fetchGameSection('Production Game', ids.productionUniverseId),
             fetchGameSection('Test Game', ids.testUniverseId),
-            fetchGameSection('Production Game', ids.productionUniverseId)
+            fetchGameSection('Development Game', ids.developmentUniverseId)
         ]);
 
         return sendJson(res, 200, {

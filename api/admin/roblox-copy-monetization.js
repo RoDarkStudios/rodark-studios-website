@@ -205,10 +205,10 @@ module.exports = async (req, res) => {
             || developmentUniverseId === testUniverseId
         ) {
             return sendJson(res, 400, {
-                error: 'Production, Development, and Test universe IDs must be different'
+                error: 'Production, Test, and Development universe IDs must be different'
             });
         }
-        const targetUniverseIds = [developmentUniverseId, testUniverseId];
+        const targetUniverseIds = [testUniverseId, developmentUniverseId];
         const forceOneRobuxPricing = true;
         const pricingOverrideOptions = { fixedPrice: FORCED_TARGET_PRICE };
 
