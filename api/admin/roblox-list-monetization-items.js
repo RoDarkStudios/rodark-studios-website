@@ -3,8 +3,6 @@ const { requireUserFromSession } = require('../_lib/session');
 const { getAdminGroupId, fetchUserGroupRole, getRoleRank } = require('../_lib/roblox-groups');
 const { parseUniverseId, listAllGamePassConfigs, listAllDeveloperProductConfigs } = require('../_lib/roblox-open-cloud');
 
-const MAX_UNIVERSES_PER_REQUEST = 50;
-
 async function requireAdmin(req, res) {
     const groupId = getAdminGroupId();
     const { user } = await requireUserFromSession(req, res);
@@ -20,29 +18,12 @@ async function requireAdmin(req, res) {
     };
 }
 
-function parseUniverseIds(rawUniverseIds) {
-    const values = Array.isArray(rawUniverseIds) ? rawUniverseIds : [];
-    const ids = [];
-    const seen = new Set();
-
-    for (const value of values) {
-        const id = parseUniverseId(value, 'universeIds[]');
-        if (seen.has(id)) {
-            continue;
-        }
-        seen.add(id);
-        ids.push(id);
-    }
-
-    if (ids.length === 0) {
-        throw new Error('At least one universe ID is required');
-    }
-
-    if (ids.length > MAX_UNIVERSES_PER_REQUEST) {
-        throw new Error(`A maximum of ${MAX_UNIVERSES_PER_REQUEST} universe IDs is allowed per request`);
-    }
-
-    return ids;
+function parseGameUniverseIds(body) {
+    return {
+        developmentUniverseId: parseUniverseId(body && body.developmentUniverseId, 'developmentUniverseId'),
+        testUniverseId: parseUniverseId(body && body.testUniverseId, 'testUniverseId'),
+        productionUniverseId: parseUniverseId(body && body.productionUniverseId, 'productionUniverseId')
+    };
 }
 
 function toGamePassRow(config) {
@@ -69,6 +50,41 @@ function toDeveloperProductRow(config) {
     };
 }
 
+async function fetchGameSection(label, universeId) {
+    try {
+        const [gamePassConfigs, developerProductConfigs] = await Promise.all([
+            listAllGamePassConfigs(universeId),
+            listAllDeveloperProductConfigs(universeId)
+        ]);
+
+        const gamePasses = gamePassConfigs
+            .map(toGamePassRow)
+            .filter(Boolean)
+            .sort((a, b) => a.id - b.id);
+
+        const developerProducts = developerProductConfigs
+            .map(toDeveloperProductRow)
+            .filter(Boolean)
+            .sort((a, b) => a.id - b.id);
+
+        return {
+            label,
+            universeId,
+            gamePasses,
+            developerProducts,
+            error: null
+        };
+    } catch (error) {
+        return {
+            label,
+            universeId,
+            gamePasses: [],
+            developerProducts: [],
+            error: error.message || 'Failed to list monetization items'
+        };
+    }
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return methodNotAllowed(req, res, ['POST']);
@@ -85,66 +101,21 @@ module.exports = async (req, res) => {
 
         const body = await readJsonBody(req);
 
-        let universeIds;
+        let ids;
         try {
-            universeIds = parseUniverseIds(body && body.universeIds);
+            ids = parseGameUniverseIds(body);
         } catch (error) {
-            return sendJson(res, 400, { error: error.message || 'Invalid universe IDs' });
+            return sendJson(res, 400, { error: error.message || 'Invalid game universe IDs' });
         }
 
-        const universes = [];
-        const failures = [];
-        let totalGamePasses = 0;
-        let totalDeveloperProducts = 0;
-
-        for (const universeId of universeIds) {
-            try {
-                const [gamePassConfigs, developerProductConfigs] = await Promise.all([
-                    listAllGamePassConfigs(universeId),
-                    listAllDeveloperProductConfigs(universeId)
-                ]);
-
-                const gamePasses = gamePassConfigs
-                    .map(toGamePassRow)
-                    .filter(Boolean)
-                    .sort((a, b) => a.id - b.id);
-
-                const developerProducts = developerProductConfigs
-                    .map(toDeveloperProductRow)
-                    .filter(Boolean)
-                    .sort((a, b) => a.id - b.id);
-
-                totalGamePasses += gamePasses.length;
-                totalDeveloperProducts += developerProducts.length;
-
-                universes.push({
-                    universeId,
-                    gamePasses,
-                    developerProducts
-                });
-            } catch (error) {
-                failures.push({
-                    universeId,
-                    error: error.message || 'Failed to list monetization items'
-                });
-            }
-        }
+        const games = await Promise.all([
+            fetchGameSection('Development Game', ids.developmentUniverseId),
+            fetchGameSection('Test Game', ids.testUniverseId),
+            fetchGameSection('Production Game', ids.productionUniverseId)
+        ]);
 
         return sendJson(res, 200, {
-            requestedUniverseIds: universeIds,
-            totals: {
-                universesRequested: universeIds.length,
-                universesProcessed: universes.length,
-                universesFailed: failures.length,
-                totalGamePasses,
-                totalDeveloperProducts
-            },
-            limitations: [
-                'Roblox APIs do not provide a single global endpoint for every game pass and developer product across all of Roblox.',
-                'This tool lists all game passes and developer products for the universe IDs you provide (limited to what your API key can access).'
-            ],
-            universes,
-            failures
+            games
         });
     } catch (error) {
         return sendJson(res, 500, {
