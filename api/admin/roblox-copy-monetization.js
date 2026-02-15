@@ -53,15 +53,15 @@ async function hydrateItemsWithImages(configs, idFieldName, thumbnailUrlMap, kin
         }
 
         let imageBuffer = null;
-        let imageError = null;
+        let imageWarning = null;
 
         if (!thumbnailUrl) {
-            imageError = `${kindLabel} thumbnail URL was not available`;
+            imageWarning = `${kindLabel} thumbnail URL was not available`;
         } else {
             try {
                 imageBuffer = await downloadImageBuffer(thumbnailUrl);
             } catch (error) {
-                imageError = error.message || 'Failed to download icon image';
+                imageWarning = error.message || 'Failed to download icon image';
             }
         }
 
@@ -69,7 +69,7 @@ async function hydrateItemsWithImages(configs, idFieldName, thumbnailUrlMap, kin
             sourceId,
             config,
             imageBuffer,
-            imageError
+            imageWarning
         });
     }
 
@@ -83,6 +83,7 @@ function buildResultBucket() {
         updated: 0,
         archived: 0,
         failed: [],
+        warnings: [],
         createdItems: [],
         updatedItems: [],
         archivedItems: []
@@ -251,15 +252,9 @@ module.exports = async (req, res) => {
                 gamePasses.attempted += 1;
                 const sourceName = String(sourcePass && sourcePass.config && sourcePass.config.name ? sourcePass.config.name : '').trim();
                 const sourceNameKey = normalizeNameKey(sourceName);
-
-                if (sourcePass.imageError || !sourcePass.imageBuffer) {
-                    gamePasses.failed.push({
-                        sourceId: sourcePass.sourceId,
-                        name: sourceName,
-                        error: sourcePass.imageError || 'Image data unavailable'
-                    });
-                    continue;
-                }
+                const iconWarning = sourcePass.imageWarning
+                    ? `${sourcePass.imageWarning}. Synced without icon.`
+                    : null;
 
                 const matchedTargetPass = consumeMatchByName(
                     indexedTargetGamePasses.byName,
@@ -281,6 +276,13 @@ module.exports = async (req, res) => {
                             targetId: matchedTargetPass.id,
                             name: sourceName
                         });
+                        if (iconWarning) {
+                            gamePasses.warnings.push({
+                                sourceId: sourcePass.sourceId,
+                                name: sourceName,
+                                warning: iconWarning
+                            });
+                        }
                     } else {
                         const created = await createGamePass(targetUniverseId, sourcePass.config, sourcePass.imageBuffer, {
                             fixedPrice: FORCED_TARGET_PRICE,
@@ -293,6 +295,13 @@ module.exports = async (req, res) => {
                             createdId: Number(created && created.gamePassId) || null,
                             name: sourceName
                         });
+                        if (iconWarning) {
+                            gamePasses.warnings.push({
+                                sourceId: sourcePass.sourceId,
+                                name: sourceName,
+                                warning: iconWarning
+                            });
+                        }
                     }
                 } catch (error) {
                     gamePasses.failed.push({
@@ -342,15 +351,9 @@ module.exports = async (req, res) => {
                     sourceProduct && sourceProduct.config && sourceProduct.config.name ? sourceProduct.config.name : ''
                 ).trim();
                 const sourceNameKey = normalizeNameKey(sourceName);
-
-                if (sourceProduct.imageError || !sourceProduct.imageBuffer) {
-                    developerProducts.failed.push({
-                        sourceId: sourceProduct.sourceId,
-                        name: sourceName,
-                        error: sourceProduct.imageError || 'Image data unavailable'
-                    });
-                    continue;
-                }
+                const iconWarning = sourceProduct.imageWarning
+                    ? `${sourceProduct.imageWarning}. Synced without icon.`
+                    : null;
 
                 const matchedTargetProduct = consumeMatchByName(
                     indexedTargetDeveloperProducts.byName,
@@ -378,6 +381,13 @@ module.exports = async (req, res) => {
                             targetId: matchedTargetProduct.id,
                             name: sourceName
                         });
+                        if (iconWarning) {
+                            developerProducts.warnings.push({
+                                sourceId: sourceProduct.sourceId,
+                                name: sourceName,
+                                warning: iconWarning
+                            });
+                        }
                     } else {
                         const created = await createDeveloperProduct(
                             targetUniverseId,
@@ -395,6 +405,13 @@ module.exports = async (req, res) => {
                             createdId: Number(created && created.productId) || null,
                             name: sourceName
                         });
+                        if (iconWarning) {
+                            developerProducts.warnings.push({
+                                sourceId: sourceProduct.sourceId,
+                                name: sourceName,
+                                warning: iconWarning
+                            });
+                        }
                     }
                 } catch (error) {
                     developerProducts.failed.push({
@@ -453,6 +470,8 @@ module.exports = async (req, res) => {
         const totalDeveloperProductsArchived = targets.reduce((sum, item) => sum + item.developerProducts.archived, 0);
         const totalGamePassFailures = targets.reduce((sum, item) => sum + item.gamePasses.failed.length, 0);
         const totalDeveloperProductFailures = targets.reduce((sum, item) => sum + item.developerProducts.failed.length, 0);
+        const totalGamePassWarnings = targets.reduce((sum, item) => sum + item.gamePasses.warnings.length, 0);
+        const totalDeveloperProductWarnings = targets.reduce((sum, item) => sum + item.developerProducts.warnings.length, 0);
 
         return sendJson(res, 200, {
             sourceUniverseId,
@@ -470,7 +489,9 @@ module.exports = async (req, res) => {
                 totalDeveloperProductsUpdated,
                 totalDeveloperProductsArchived,
                 totalGamePassFailures,
-                totalDeveloperProductFailures
+                totalDeveloperProductFailures,
+                totalGamePassWarnings,
+                totalDeveloperProductWarnings
             },
             limitations: [
                 'Roblox Open Cloud does not currently provide delete endpoints for game passes or developer products. Unmatched target items are renamed with an [ARCHIVED] prefix and archived (isForSale=false) instead of deleted.'
