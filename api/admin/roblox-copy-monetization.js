@@ -6,14 +6,19 @@ const {
     parseTargetUniverseIds,
     listAllGamePassConfigs,
     listAllDeveloperProductConfigs,
+    listAllBadges,
     getGamePassThumbnailUrlMap,
     getDeveloperProductThumbnailUrlMap,
+    getBadgeThumbnailUrlMap,
     getAssetThumbnailUrlMap,
     downloadImageBuffer,
     createGamePass,
     updateGamePass,
     createDeveloperProduct,
     updateDeveloperProduct,
+    createBadge,
+    updateBadge,
+    updateBadgeIcon,
     sleep
 } = require('../_lib/roblox-open-cloud');
 const { tryAcquireMonetizationLock, releaseMonetizationLock } = require('../_lib/monetization-sync-lock');
@@ -234,12 +239,16 @@ module.exports = async (req, res) => {
 
         const sourceGamePasses = await listAllGamePassConfigs(sourceUniverseId);
         const sourceDeveloperProducts = await listAllDeveloperProductConfigs(sourceUniverseId);
+        const sourceBadges = await listAllBadges(sourceUniverseId);
 
         const gamePassThumbnailMap = await getGamePassThumbnailUrlMap(
             sourceGamePasses.map((item) => Number(item && item.gamePassId)).filter((id) => Number.isFinite(id))
         );
         const developerProductThumbnailMap = await getDeveloperProductThumbnailUrlMap(
             sourceDeveloperProducts.map((item) => Number(item && item.productId)).filter((id) => Number.isFinite(id))
+        );
+        const badgeThumbnailMap = await getBadgeThumbnailUrlMap(
+            sourceBadges.map((item) => Number(item && item.id)).filter((id) => Number.isFinite(id))
         );
         const gamePassAssetThumbnailMap = await getAssetThumbnailUrlMap(
             sourceGamePasses.map((item) => Number(item && item.iconAssetId)).filter((id) => Number.isFinite(id)),
@@ -270,19 +279,29 @@ module.exports = async (req, res) => {
                 assetThumbnailMap: developerProductAssetThumbnailMap
             }
         );
+        const preparedBadges = await hydrateItemsWithImages(
+            sourceBadges,
+            'id',
+            badgeThumbnailMap,
+            'Badge'
+        );
 
         const targets = [];
 
         for (const targetUniverseId of targetUniverseIds) {
             const gamePasses = buildResultBucket();
             const developerProducts = buildResultBucket();
+            const badges = buildResultBucket();
 
             const existingTargetGamePasses = await listAllGamePassConfigs(targetUniverseId);
             const existingTargetDeveloperProducts = await listAllDeveloperProductConfigs(targetUniverseId);
+            const existingTargetBadges = await listAllBadges(targetUniverseId);
             const indexedTargetGamePasses = buildTargetNameIndex(existingTargetGamePasses, 'gamePassId');
             const indexedTargetDeveloperProducts = buildTargetNameIndex(existingTargetDeveloperProducts, 'productId');
+            const indexedTargetBadges = buildTargetNameIndex(existingTargetBadges, 'id');
             const matchedTargetGamePassIds = new Set();
             const matchedTargetDeveloperProductIds = new Set();
+            const matchedTargetBadgeIds = new Set();
 
             for (const sourcePass of preparedGamePasses) {
                 gamePasses.attempted += 1;
@@ -487,10 +506,112 @@ module.exports = async (req, res) => {
                 await sleep(250);
             }
 
+            for (const sourceBadge of preparedBadges) {
+                badges.attempted += 1;
+                const sourceName = String(sourceBadge && sourceBadge.config && sourceBadge.config.name ? sourceBadge.config.name : '').trim();
+                const sourceNameKey = normalizeNameKey(sourceName);
+                const iconWarning = sourceBadge.imageWarning
+                    ? `${sourceBadge.imageWarning}. Synced without icon.`
+                    : null;
+
+                const matchedTargetBadge = consumeMatchByName(
+                    indexedTargetBadges.byName,
+                    sourceNameKey,
+                    matchedTargetBadgeIds
+                );
+
+                try {
+                    if (matchedTargetBadge) {
+                        await updateBadge(matchedTargetBadge.id, sourceBadge.config, {
+                            forceEnabled: Boolean(sourceBadge && sourceBadge.config && sourceBadge.config.enabled)
+                        });
+
+                        if (sourceBadge.imageBuffer && sourceBadge.imageBuffer.length > 0) {
+                            await updateBadgeIcon(matchedTargetBadge.id, sourceBadge.imageBuffer);
+                        }
+
+                        matchedTargetBadgeIds.add(matchedTargetBadge.id);
+                        badges.updated += 1;
+                        badges.updatedItems.push({
+                            sourceId: sourceBadge.sourceId,
+                            targetId: matchedTargetBadge.id,
+                            name: sourceName
+                        });
+                        if (iconWarning) {
+                            badges.warnings.push({
+                                sourceId: sourceBadge.sourceId,
+                                name: sourceName,
+                                warning: iconWarning
+                            });
+                        }
+                    } else {
+                        const created = await createBadge(
+                            targetUniverseId,
+                            sourceBadge.config,
+                            sourceBadge.imageBuffer,
+                            {
+                                forceEnabled: Boolean(sourceBadge && sourceBadge.config && sourceBadge.config.enabled)
+                            }
+                        );
+                        badges.created += 1;
+                        badges.createdItems.push({
+                            sourceId: sourceBadge.sourceId,
+                            createdId: Number(created && created.id) || null,
+                            name: sourceName
+                        });
+                        if (iconWarning) {
+                            badges.warnings.push({
+                                sourceId: sourceBadge.sourceId,
+                                name: sourceName,
+                                warning: iconWarning
+                            });
+                        }
+                    }
+                } catch (error) {
+                    badges.failed.push({
+                        sourceId: sourceBadge.sourceId,
+                        name: sourceName,
+                        error: error.message || 'Unknown error'
+                    });
+                }
+
+                await sleep(300);
+            }
+
+            for (const targetBadge of indexedTargetBadges.allEntries) {
+                if (matchedTargetBadgeIds.has(targetBadge.id)) {
+                    continue;
+                }
+
+                badges.attempted += 1;
+
+                try {
+                    await updateBadge(targetBadge.id, targetBadge.config, {
+                        nameOverride: buildArchivedName(targetBadge.name),
+                        forceEnabled: false
+                    });
+                    badges.archived += 1;
+                    badges.archivedItems.push({
+                        targetId: targetBadge.id,
+                        name: targetBadge.name
+                    });
+                } catch (error) {
+                    badges.failed.push({
+                        sourceId: null,
+                        targetId: targetBadge.id,
+                        name: targetBadge.name,
+                        error: error.message || 'Unknown error'
+                    });
+                }
+
+                await sleep(150);
+            }
+
             targets.push({
                 targetUniverseId,
                 gamePasses,
-                developerProducts
+                developerProducts,
+                badges
             });
         }
 
@@ -500,10 +621,15 @@ module.exports = async (req, res) => {
         const totalDeveloperProductsCreated = targets.reduce((sum, item) => sum + item.developerProducts.created, 0);
         const totalDeveloperProductsUpdated = targets.reduce((sum, item) => sum + item.developerProducts.updated, 0);
         const totalDeveloperProductsArchived = targets.reduce((sum, item) => sum + item.developerProducts.archived, 0);
+        const totalBadgesCreated = targets.reduce((sum, item) => sum + item.badges.created, 0);
+        const totalBadgesUpdated = targets.reduce((sum, item) => sum + item.badges.updated, 0);
+        const totalBadgesArchived = targets.reduce((sum, item) => sum + item.badges.archived, 0);
         const totalGamePassFailures = targets.reduce((sum, item) => sum + item.gamePasses.failed.length, 0);
         const totalDeveloperProductFailures = targets.reduce((sum, item) => sum + item.developerProducts.failed.length, 0);
+        const totalBadgeFailures = targets.reduce((sum, item) => sum + item.badges.failed.length, 0);
         const totalGamePassWarnings = targets.reduce((sum, item) => sum + item.gamePasses.warnings.length, 0);
         const totalDeveloperProductWarnings = targets.reduce((sum, item) => sum + item.developerProducts.warnings.length, 0);
+        const totalBadgeWarnings = targets.reduce((sum, item) => sum + item.badges.warnings.length, 0);
 
         return sendJson(res, 200, {
             sourceUniverseId,
@@ -512,7 +638,8 @@ module.exports = async (req, res) => {
                 : 'Copied from source',
             sourceCounts: {
                 gamePasses: preparedGamePasses.length,
-                developerProducts: preparedDeveloperProducts.length
+                developerProducts: preparedDeveloperProducts.length,
+                badges: preparedBadges.length
             },
             totals: {
                 targetsProcessed: targets.length,
@@ -522,13 +649,18 @@ module.exports = async (req, res) => {
                 totalDeveloperProductsCreated,
                 totalDeveloperProductsUpdated,
                 totalDeveloperProductsArchived,
+                totalBadgesCreated,
+                totalBadgesUpdated,
+                totalBadgesArchived,
                 totalGamePassFailures,
                 totalDeveloperProductFailures,
+                totalBadgeFailures,
                 totalGamePassWarnings,
-                totalDeveloperProductWarnings
+                totalDeveloperProductWarnings,
+                totalBadgeWarnings
             },
             limitations: [
-                'Roblox Open Cloud does not currently provide delete endpoints for game passes or developer products. Unmatched target items are renamed with an [ARCHIVED] prefix and archived (isForSale=false) instead of deleted.'
+                'Roblox Open Cloud does not currently provide delete endpoints for game passes, developer products, or badges. Unmatched target items are renamed with an [ARCHIVED] prefix and archived instead of deleted.'
             ],
             targets
         });

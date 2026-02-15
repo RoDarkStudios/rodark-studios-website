@@ -247,16 +247,21 @@ function renderAdminCopyResults(result) {
     const targetMarkup = targetRows.map((target) => {
         const gamePasses = target && target.gamePasses ? target.gamePasses : {};
         const developerProducts = target && target.developerProducts ? target.developerProducts : {};
+        const badges = target && target.badges ? target.badges : {};
         const gamePassFailures = Array.isArray(gamePasses.failed)
             ? gamePasses.failed
             : [];
         const developerProductFailures = Array.isArray(developerProducts.failed)
             ? developerProducts.failed
             : [];
+        const badgeFailures = Array.isArray(badges.failed)
+            ? badges.failed
+            : [];
 
         const combinedFailures = []
             .concat(gamePassFailures.map((item) => `Game pass ${item.sourceId}: ${item.error}`))
-            .concat(developerProductFailures.map((item) => `Product ${item.sourceId}: ${item.error}`));
+            .concat(developerProductFailures.map((item) => `Product ${item.sourceId}: ${item.error}`))
+            .concat(badgeFailures.map((item) => `Badge ${item.sourceId || item.targetId}: ${item.error}`));
 
         const failurePreview = combinedFailures.slice(0, 5).map((line) => escapeHtml(line)).join('\n');
 
@@ -265,6 +270,7 @@ function renderAdminCopyResults(result) {
                 <h4>Target Universe ${escapeHtml(target.targetUniverseId)}</h4>
                 <p>Game passes: ${escapeHtml(gamePasses.created)} created, ${escapeHtml(gamePasses.updated)} updated, ${escapeHtml(gamePasses.archived)} archived</p>
                 <p>Developer products: ${escapeHtml(developerProducts.created)} created, ${escapeHtml(developerProducts.updated)} updated, ${escapeHtml(developerProducts.archived)} archived</p>
+                <p>Badges: ${escapeHtml(badges.created)} created, ${escapeHtml(badges.updated)} updated, ${escapeHtml(badges.archived)} archived</p>
                 ${failurePreview ? `<p class="admin-target-errors">${failurePreview}</p>` : ''}
             </article>
         `;
@@ -272,11 +278,12 @@ function renderAdminCopyResults(result) {
 
     resultElement.innerHTML = `
         <section class="admin-result-summary">
-            <p>Source items: ${escapeHtml(sourceCounts.gamePasses)} game passes, ${escapeHtml(sourceCounts.developerProducts)} developer products</p>
+            <p>Source items: ${escapeHtml(sourceCounts.gamePasses)} game passes, ${escapeHtml(sourceCounts.developerProducts)} developer products, ${escapeHtml(sourceCounts.badges)} badges</p>
             <p>Pricing mode: ${escapeHtml(result && result.priceSyncMode ? result.priceSyncMode : 'Unknown')}</p>
             <p>Game passes: ${escapeHtml(summary.totalGamePassesCreated)} created, ${escapeHtml(summary.totalGamePassesUpdated)} updated, ${escapeHtml(summary.totalGamePassesArchived)} archived</p>
             <p>Developer products: ${escapeHtml(summary.totalDeveloperProductsCreated)} created, ${escapeHtml(summary.totalDeveloperProductsUpdated)} updated, ${escapeHtml(summary.totalDeveloperProductsArchived)} archived</p>
-            <p>Failures: ${escapeHtml(summary.totalGamePassFailures)} game passes, ${escapeHtml(summary.totalDeveloperProductFailures)} developer products</p>
+            <p>Badges: ${escapeHtml(summary.totalBadgesCreated)} created, ${escapeHtml(summary.totalBadgesUpdated)} updated, ${escapeHtml(summary.totalBadgesArchived)} archived</p>
+            <p>Failures: ${escapeHtml(summary.totalGamePassFailures)} game passes, ${escapeHtml(summary.totalDeveloperProductFailures)} developer products, ${escapeHtml(summary.totalBadgeFailures)} badges</p>
         </section>
         ${targetMarkup}
     `;
@@ -317,7 +324,12 @@ async function handleAdminCopySubmit(event) {
 
         const hasFailures = result
             && result.totals
-            && ((Number(result.totals.totalGamePassFailures) || 0) + (Number(result.totals.totalDeveloperProductFailures) || 0) > 0);
+            && (
+                (Number(result.totals.totalGamePassFailures) || 0)
+                + (Number(result.totals.totalDeveloperProductFailures) || 0)
+                + (Number(result.totals.totalBadgeFailures) || 0)
+                > 0
+            );
 
         setAdminCopyStatus(
             hasFailures

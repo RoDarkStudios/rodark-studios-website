@@ -1,5 +1,6 @@
 const ROBLOX_OPEN_CLOUD_BASE_URL = 'https://apis.roblox.com';
 const ROBLOX_THUMBNAILS_BASE_URL = 'https://thumbnails.roblox.com';
+const ROBLOX_BADGES_BASE_URL = 'https://badges.roblox.com';
 
 function getRobloxOpenCloudApiKey() {
     const apiKey = String(process.env.ROBLOX_OPEN_CLOUD_API_KEY || '').trim();
@@ -85,7 +86,7 @@ function toBooleanString(value) {
     return value ? 'true' : 'false';
 }
 
-async function robloxOpenCloudRequest({ method, path, query, body }) {
+async function robloxOpenCloudRequest({ method, path, query, body, headers: extraHeaders }) {
     const url = new URL(`${ROBLOX_OPEN_CLOUD_BASE_URL}${path}`);
     if (query && typeof query === 'object') {
         for (const [key, value] of Object.entries(query)) {
@@ -99,6 +100,14 @@ async function robloxOpenCloudRequest({ method, path, query, body }) {
     const headers = {
         'x-api-key': getRobloxOpenCloudApiKey()
     };
+    if (extraHeaders && typeof extraHeaders === 'object') {
+        for (const [key, value] of Object.entries(extraHeaders)) {
+            if (value === undefined || value === null || value === '') {
+                continue;
+            }
+            headers[key] = value;
+        }
+    }
 
     const options = {
         method,
@@ -114,6 +123,37 @@ async function robloxOpenCloudRequest({ method, path, query, body }) {
 
     if (!response.ok) {
         const fallback = `Roblox Open Cloud request failed (${response.status})`;
+        throw new Error(extractApiErrorMessage(data, fallback));
+    }
+
+    return data;
+}
+
+async function robloxPublicRequest({ baseUrl, method, path, query, body, headers }) {
+    const url = new URL(`${baseUrl}${path}`);
+    if (query && typeof query === 'object') {
+        for (const [key, value] of Object.entries(query)) {
+            if (value === undefined || value === null || value === '') {
+                continue;
+            }
+            url.searchParams.set(key, String(value));
+        }
+    }
+
+    const options = {
+        method,
+        headers: headers && typeof headers === 'object' ? headers : {}
+    };
+
+    if (body) {
+        options.body = body;
+    }
+
+    const response = await fetch(url, options);
+    const data = await parseJsonSafely(response);
+
+    if (!response.ok) {
+        const fallback = `Roblox request failed (${response.status})`;
         throw new Error(extractApiErrorMessage(data, fallback));
     }
 
@@ -160,6 +200,30 @@ async function listAllDeveloperProductConfigs(universeId) {
         results.push(...rows);
         pageToken = payload && payload.nextPageToken ? String(payload.nextPageToken) : '';
     } while (pageToken);
+
+    return results;
+}
+
+async function listAllBadges(universeId) {
+    const results = [];
+    let cursor = '';
+
+    do {
+        const payload = await robloxPublicRequest({
+            baseUrl: ROBLOX_BADGES_BASE_URL,
+            method: 'GET',
+            path: `/v1/universes/${universeId}/badges`,
+            query: {
+                limit: 100,
+                sortOrder: 'Asc',
+                cursor: cursor || undefined
+            }
+        });
+
+        const rows = Array.isArray(payload && payload.data) ? payload.data : [];
+        results.push(...rows);
+        cursor = payload && payload.nextPageCursor ? String(payload.nextPageCursor) : '';
+    } while (cursor);
 
     return results;
 }
@@ -215,6 +279,15 @@ async function getDeveloperProductThumbnailUrlMap(productIds) {
         idParamName: 'developerProductIds',
         ids: productIds,
         size: '420x420'
+    });
+}
+
+async function getBadgeThumbnailUrlMap(badgeIds) {
+    return getThumbnailUrlMap({
+        endpointPath: '/v1/badges/icons',
+        idParamName: 'badgeIds',
+        ids: badgeIds,
+        size: '150x150'
     });
 }
 
@@ -348,6 +421,86 @@ async function updateDeveloperProduct(universeId, productId, sourceConfig, image
     });
 }
 
+function addBadgeCreateFormFields(formData, sourceBadge, imageBuffer, options) {
+    const config = sourceBadge || {};
+    const settings = options || {};
+    const nameSource = settings.nameOverride !== undefined ? settings.nameOverride : config.name;
+    const name = String(nameSource || '').trim();
+    if (!name) {
+        throw new Error('Source badge is missing a name');
+    }
+
+    formData.append('name', name);
+
+    if (typeof config.description === 'string') {
+        formData.append('description', config.description);
+    }
+
+    const enabled = typeof settings.forceEnabled === 'boolean'
+        ? settings.forceEnabled
+        : Boolean(config.enabled);
+    formData.append('isActive', toBooleanString(enabled));
+
+    if (imageBuffer && imageBuffer.length > 0) {
+        formData.append('files', new Blob([imageBuffer], { type: 'image/png' }), 'icon.png');
+    }
+}
+
+async function createBadge(universeId, sourceBadge, imageBuffer, options) {
+    const formData = new FormData();
+    addBadgeCreateFormFields(formData, sourceBadge, imageBuffer, options);
+
+    const payload = await robloxOpenCloudRequest({
+        method: 'POST',
+        path: `/legacy-badges/v1/universes/${universeId}/badges`,
+        body: formData
+    });
+
+    return payload || null;
+}
+
+async function updateBadge(badgeId, sourceBadge, options) {
+    const config = sourceBadge || {};
+    const settings = options || {};
+    const nameSource = settings.nameOverride !== undefined ? settings.nameOverride : config.name;
+    const name = String(nameSource || '').trim();
+    if (!name) {
+        throw new Error('Badge name is required');
+    }
+
+    const body = {
+        name,
+        description: typeof config.description === 'string' ? config.description : '',
+        enabled: typeof settings.forceEnabled === 'boolean'
+            ? settings.forceEnabled
+            : Boolean(config.enabled)
+    };
+
+    await robloxOpenCloudRequest({
+        method: 'PATCH',
+        path: `/legacy-badges/v1/badges/${badgeId}`,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+}
+
+async function updateBadgeIcon(badgeId, imageBuffer) {
+    if (!imageBuffer || imageBuffer.length === 0) {
+        throw new Error('Badge icon image is required');
+    }
+
+    const formData = new FormData();
+    formData.append('Files', new Blob([imageBuffer], { type: 'image/png' }), 'icon.png');
+
+    await robloxOpenCloudRequest({
+        method: 'POST',
+        path: `/legacy-publish/v1/badges/${badgeId}/icon`,
+        body: formData
+    });
+}
+
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -357,13 +510,18 @@ module.exports = {
     parseTargetUniverseIds,
     listAllGamePassConfigs,
     listAllDeveloperProductConfigs,
+    listAllBadges,
     getGamePassThumbnailUrlMap,
     getDeveloperProductThumbnailUrlMap,
+    getBadgeThumbnailUrlMap,
     getAssetThumbnailUrlMap,
     downloadImageBuffer,
     createGamePass,
     updateGamePass,
     createDeveloperProduct,
     updateDeveloperProduct,
+    createBadge,
+    updateBadge,
+    updateBadgeIcon,
     sleep
 };
