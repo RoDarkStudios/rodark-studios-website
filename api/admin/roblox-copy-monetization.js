@@ -17,7 +17,6 @@ const {
     sleep
 } = require('../_lib/roblox-open-cloud');
 
-const FORCED_TARGET_PRICE = 1;
 const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
 
 async function requireAdmin(req, res) {
@@ -265,7 +264,6 @@ module.exports = async (req, res) => {
                 try {
                     if (matchedTargetPass) {
                         await updateGamePass(targetUniverseId, matchedTargetPass.id, sourcePass.config, sourcePass.imageBuffer, {
-                            fixedPrice: FORCED_TARGET_PRICE,
                             forceForSale: true,
                             forceRegionalPricingEnabled: false
                         });
@@ -285,7 +283,6 @@ module.exports = async (req, res) => {
                         }
                     } else {
                         const created = await createGamePass(targetUniverseId, sourcePass.config, sourcePass.imageBuffer, {
-                            fixedPrice: FORCED_TARGET_PRICE,
                             forceForSale: true,
                             forceRegionalPricingEnabled: false
                         });
@@ -324,7 +321,6 @@ module.exports = async (req, res) => {
                 try {
                     await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, null, {
                         nameOverride: buildArchivedName(targetPass.name),
-                        fixedPrice: FORCED_TARGET_PRICE,
                         forceForSale: false,
                         forceRegionalPricingEnabled: false
                     });
@@ -369,7 +365,6 @@ module.exports = async (req, res) => {
                             sourceProduct.config,
                             sourceProduct.imageBuffer,
                             {
-                                fixedPrice: FORCED_TARGET_PRICE,
                                 forceForSale: true,
                                 forceRegionalPricingEnabled: false
                             }
@@ -394,7 +389,6 @@ module.exports = async (req, res) => {
                             sourceProduct.config,
                             sourceProduct.imageBuffer,
                             {
-                                fixedPrice: FORCED_TARGET_PRICE,
                                 forceForSale: true,
                                 forceRegionalPricingEnabled: false
                             }
@@ -434,7 +428,6 @@ module.exports = async (req, res) => {
                 try {
                     await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, null, {
                         nameOverride: buildArchivedName(targetProduct.name),
-                        fixedPrice: FORCED_TARGET_PRICE,
                         forceForSale: false,
                         forceRegionalPricingEnabled: false
                     });
@@ -475,7 +468,6 @@ module.exports = async (req, res) => {
 
         return sendJson(res, 200, {
             sourceUniverseId,
-            targetPriceRobux: FORCED_TARGET_PRICE,
             sourceCounts: {
                 gamePasses: preparedGamePasses.length,
                 developerProducts: preparedDeveloperProducts.length
