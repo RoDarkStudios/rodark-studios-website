@@ -287,6 +287,21 @@ async function getBadgeMetadata() {
     return cachedBadgeMetadata;
 }
 
+async function getUniverseFreeBadgesQuota(universeId) {
+    const payload = await robloxPublicRequest({
+        baseUrl: ROBLOX_BADGES_BASE_URL,
+        method: 'GET',
+        path: `/v1/universes/${universeId}/free-badges-quota`
+    });
+
+    const quota = Number(payload);
+    if (!Number.isFinite(quota) || quota < 0) {
+        return null;
+    }
+
+    return Math.floor(quota);
+}
+
 async function getThumbnailUrlMap({ endpointPath, idParamName, ids, size }) {
     const map = new Map();
     const cleanIds = Array.isArray(ids) ? ids.filter((id) => Number.isFinite(Number(id))) : [];
@@ -517,17 +532,40 @@ function addBadgeCreateFormFields(formData, sourceBadge, imageBuffer, options) {
 async function createBadge(universeId, sourceBadge, imageBuffer, options) {
     const settings = options || {};
     const metadata = await getBadgeMetadata().catch(() => null);
-    const expectedCost = Number(metadata && metadata.badgeCreationPrice);
-    const requestSettings = {
-        ...settings,
-        expectedCost: Number.isFinite(expectedCost) ? expectedCost : settings.expectedCost
-    };
+    const freeBadgeQuota = await getUniverseFreeBadgesQuota(universeId).catch(() => null);
 
-    const attemptCreate = async (paymentSourceType) => {
+    const paymentSourceCandidates = [];
+    if (Number.isFinite(Number(settings.paymentSourceType))) {
+        paymentSourceCandidates.push(Math.round(Number(settings.paymentSourceType)));
+    } else {
+        paymentSourceCandidates.push(1, 2);
+    }
+
+    const expectedCostCandidates = [];
+    const settingsExpectedCost = Number(settings.expectedCost);
+    const metadataExpectedCost = Number(metadata && metadata.badgeCreationPrice);
+    if (Number.isFinite(settingsExpectedCost) && settingsExpectedCost >= 0) {
+        expectedCostCandidates.push(Math.round(settingsExpectedCost));
+    }
+    if (Number.isFinite(freeBadgeQuota) && freeBadgeQuota > 0) {
+        expectedCostCandidates.push(0);
+    }
+    if (Number.isFinite(metadataExpectedCost) && metadataExpectedCost >= 0) {
+        expectedCostCandidates.push(Math.round(metadataExpectedCost));
+    }
+
+    const uniquePaymentCandidates = [...new Set(paymentSourceCandidates)];
+    const uniqueExpectedCostCandidates = [...new Set(expectedCostCandidates)];
+    if (uniqueExpectedCostCandidates.length === 0) {
+        uniqueExpectedCostCandidates.push(undefined);
+    }
+
+    const attemptCreate = async (paymentSourceType, expectedCost) => {
         const formData = new FormData();
         addBadgeCreateFormFields(formData, sourceBadge, imageBuffer, {
-            ...requestSettings,
-            paymentSourceType
+            ...settings,
+            paymentSourceType,
+            expectedCost
         });
 
         return robloxOpenCloudRequest({
@@ -537,22 +575,36 @@ async function createBadge(universeId, sourceBadge, imageBuffer, options) {
         });
     };
 
-    try {
-        const payload = await attemptCreate(1);
-        return payload || null;
-    } catch (firstError) {
-        const message = String(firstError && firstError.message ? firstError.message : '').toLowerCase();
-        const likelyPaymentProblem = message.includes('payment')
-            || message.includes('expected')
-            || message.includes('cost')
-            || message.includes('insufficient funds');
-        if (!likelyPaymentProblem) {
-            throw firstError;
-        }
+    let lastPaymentError = null;
+    for (const paymentSourceType of uniquePaymentCandidates) {
+        for (const expectedCost of uniqueExpectedCostCandidates) {
+            try {
+                const payload = await attemptCreate(paymentSourceType, expectedCost);
+                return payload || null;
+            } catch (error) {
+                const message = String(error && error.message ? error.message : '').toLowerCase();
+                const likelyPaymentProblem = message.includes('payment')
+                    || message.includes('expected')
+                    || message.includes('cost')
+                    || message.includes('insufficient funds')
+                    || message.includes('error 16')
+                    || message.includes('error 17')
+                    || message.includes('error 18');
 
-        const payload = await attemptCreate(2);
-        return payload || null;
+                if (!likelyPaymentProblem) {
+                    throw error;
+                }
+
+                lastPaymentError = error;
+            }
+        }
     }
+
+    if (lastPaymentError) {
+        throw lastPaymentError;
+    }
+
+    throw new Error('Badge creation failed');
 }
 
 async function updateBadge(badgeId, sourceBadge, options) {
