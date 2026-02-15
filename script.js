@@ -373,6 +373,29 @@ async function initAdminCopyTool() {
     }
 }
 
+async function initAdminToolsDirectory() {
+    const toolsList = document.getElementById('admin-tools-list');
+    if (!toolsList) {
+        return;
+    }
+
+    const deniedElement = document.getElementById('admin-access-denied');
+    const adminStatus = await fetchAdminStatus();
+    const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
+    if (!isAdmin) {
+        toolsList.classList.add('hidden');
+        if (deniedElement) {
+            deniedElement.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (deniedElement) {
+        deniedElement.classList.add('hidden');
+    }
+    toolsList.classList.remove('hidden');
+}
+
 // Age calculation function
 function calculateAge(birthDate) {
     const today = new Date();
@@ -539,6 +562,7 @@ function fetchUserAvatars() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 RoDark Studios website loaded!');
     initAuth();
+    initAdminToolsDirectory();
     initAdminCopyTool();
 
     // Calculate and display ages
