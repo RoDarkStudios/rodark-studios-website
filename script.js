@@ -194,13 +194,6 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-function parseUniverseIdsInput(rawInput) {
-    return String(rawInput || '')
-        .split(/[\s,]+/g)
-        .map((value) => value.trim())
-        .filter(Boolean);
-}
-
 function setAdminCopyStatus(message, type) {
     const statusElement = document.getElementById('copy-monetization-status');
     if (!statusElement) {
@@ -293,19 +286,19 @@ function renderAdminCopyResults(result) {
 async function handleAdminCopySubmit(event) {
     event.preventDefault();
 
-    const sourceInput = document.getElementById('source-universe-id');
-    const targetInput = document.getElementById('target-universe-ids');
-    const copyPricesCheckbox = document.getElementById('copy-prices-from-source');
-    if (!sourceInput || !targetInput || !copyPricesCheckbox) {
+    const productionInput = document.getElementById('production-universe-id');
+    const developmentInput = document.getElementById('development-universe-id');
+    const testInput = document.getElementById('test-universe-id');
+    if (!productionInput || !developmentInput || !testInput) {
         return;
     }
 
-    const sourceUniverseId = String(sourceInput.value || '').trim();
-    const targetUniverseIds = parseUniverseIdsInput(targetInput.value);
-    const copyPricesFromSource = Boolean(copyPricesCheckbox.checked);
+    const productionUniverseId = String(productionInput.value || '').trim();
+    const developmentUniverseId = String(developmentInput.value || '').trim();
+    const testUniverseId = String(testInput.value || '').trim();
 
-    if (!sourceUniverseId || targetUniverseIds.length === 0) {
-        setAdminCopyStatus('Please enter a source universe ID and at least one target universe ID.', 'error');
+    if (!productionUniverseId || !developmentUniverseId || !testUniverseId) {
+        setAdminCopyStatus('Please enter Production, Development, and Test universe IDs.', 'error');
         return;
     }
 
@@ -315,9 +308,9 @@ async function handleAdminCopySubmit(event) {
 
     try {
         const result = await postJson('/api/admin/roblox-copy-monetization', {
-            sourceUniverseId,
-            targetUniverseIds,
-            copyPricesFromSource
+            productionUniverseId,
+            developmentUniverseId,
+            testUniverseId
         });
 
         renderAdminCopyResults(result);
@@ -402,6 +395,48 @@ function setListMonetizationBusy(isBusy) {
     submitButton.textContent = isBusy ? 'Fetching...' : 'Fetch IDs';
 }
 
+function formatMonetizationRows(items, emptyLabel) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return emptyLabel;
+    }
+
+    return items.map((item) => {
+        const name = String(item && item.name ? item.name : '').trim() || '(Unnamed)';
+        const id = Number(item && item.id);
+        return `${name} - ${Number.isFinite(id) ? id : 'Unknown ID'}`;
+    }).join('\n');
+}
+
+function buildMonetizationBlobText(result) {
+    const games = Array.isArray(result && result.games) ? result.games : [];
+    if (games.length === 0) {
+        return 'No monetization data returned.';
+    }
+
+    return games.map((game) => {
+        const label = String(game && game.label ? game.label : 'Game');
+        const universeId = Number(game && game.universeId);
+        const errorMessage = String(game && game.error ? game.error : '').trim();
+        const gamePasses = Array.isArray(game && game.gamePasses) ? game.gamePasses : [];
+        const developerProducts = Array.isArray(game && game.developerProducts) ? game.developerProducts : [];
+
+        const lines = [
+            `${label} (Universe ${Number.isFinite(universeId) ? universeId : 'Unknown'})`,
+            'Gamepasses:',
+            formatMonetizationRows(gamePasses, 'No gamepasses found'),
+            '',
+            'Products:',
+            formatMonetizationRows(developerProducts, 'No products found')
+        ];
+
+        if (errorMessage) {
+            lines.push('', `Error: ${errorMessage}`);
+        }
+
+        return lines.join('\n');
+    }).join('\n\n------------------------------\n\n');
+}
+
 function renderListMonetizationResults(result) {
     const resultElement = document.getElementById('list-monetization-results');
     if (!resultElement) {
@@ -414,35 +449,14 @@ function renderListMonetizationResults(result) {
         return;
     }
 
-    const games = Array.isArray(result.games) ? result.games : [];
+    const blobText = buildMonetizationBlobText(result);
 
-    const sectionsMarkup = games.map((game) => {
-        const label = String(game && game.label ? game.label : 'Game');
-        const universeId = Number(game && game.universeId);
-        const gamePasses = Array.isArray(game && game.gamePasses) ? game.gamePasses : [];
-        const developerProducts = Array.isArray(game && game.developerProducts) ? game.developerProducts : [];
-        const errorMessage = String(game && game.error ? game.error : '').trim();
-
-        const gamePassLines = gamePasses.length > 0
-            ? gamePasses.map((item) => `${String(item && item.name ? item.name : '')} - ${Number(item && item.id)}`).join('\n')
-            : 'No gamepasses found';
-        const productLines = developerProducts.length > 0
-            ? developerProducts.map((item) => `${String(item && item.name ? item.name : '')} - ${Number(item && item.id)}`).join('\n')
-            : 'No products found';
-
-        return `
-            <article class="admin-target-result">
-                <h4>${escapeHtml(label)} (Universe ${escapeHtml(universeId)})</h4>
-                ${errorMessage ? `<p class="admin-target-errors">${escapeHtml(errorMessage)}</p>` : ''}
-                <label class="admin-label admin-catalog-label">Gamepasses</label>
-                <textarea class="admin-catalog-output" readonly>${escapeHtml(gamePassLines)}</textarea>
-                <label class="admin-label admin-catalog-label">Products</label>
-                <textarea class="admin-catalog-output" readonly>${escapeHtml(productLines)}</textarea>
-            </article>
-        `;
-    }).join('');
-
-    resultElement.innerHTML = sectionsMarkup;
+    resultElement.innerHTML = `
+        <article class="admin-target-result">
+            <label class="admin-label admin-catalog-label">All Games Monetization IDs</label>
+            <textarea class="admin-catalog-output admin-catalog-output-lg" readonly>${escapeHtml(blobText)}</textarea>
+        </article>
+    `;
 
     resultElement.classList.remove('hidden');
 }

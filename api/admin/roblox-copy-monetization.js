@@ -3,7 +3,6 @@ const { requireUserFromSession } = require('../_lib/session');
 const { getAdminGroupId, fetchUserGroupRole, getRoleRank } = require('../_lib/roblox-groups');
 const {
     parseUniverseId,
-    parseTargetUniverseIds,
     listAllGamePassConfigs,
     listAllDeveloperProductConfigs,
     listAllBadges,
@@ -172,23 +171,6 @@ function buildArchivedName(name) {
     return `${ARCHIVED_NAME_PREFIX}${rawName}`;
 }
 
-function parseCopyPricesFromSource(rawValue) {
-    if (rawValue === undefined || rawValue === null) {
-        return true;
-    }
-
-    if (typeof rawValue === 'boolean') {
-        return rawValue;
-    }
-
-    const normalized = String(rawValue).trim().toLowerCase();
-    if (['false', '0', 'no', 'off'].includes(normalized)) {
-        return false;
-    }
-
-    return true;
-}
-
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return methodNotAllowed(req, res, ['POST']);
@@ -207,23 +189,28 @@ module.exports = async (req, res) => {
 
         const body = await readJsonBody(req);
         let sourceUniverseId;
-        let parsedTargetUniverseIds;
-        const copyPricesFromSource = parseCopyPricesFromSource(body && body.copyPricesFromSource);
+        let developmentUniverseId;
+        let testUniverseId;
         try {
-            sourceUniverseId = parseUniverseId(body && body.sourceUniverseId, 'sourceUniverseId');
-            parsedTargetUniverseIds = parseTargetUniverseIds(body && body.targetUniverseIds);
+            sourceUniverseId = parseUniverseId(body && body.productionUniverseId, 'productionUniverseId');
+            developmentUniverseId = parseUniverseId(body && body.developmentUniverseId, 'developmentUniverseId');
+            testUniverseId = parseUniverseId(body && body.testUniverseId, 'testUniverseId');
         } catch (error) {
             return sendJson(res, 400, { error: error.message || 'Invalid request body' });
         }
 
-        const forceOneRobuxPricing = !copyPricesFromSource;
-        const pricingOverrideOptions = forceOneRobuxPricing ? { fixedPrice: FORCED_TARGET_PRICE } : {};
-
-        const targetUniverseIds = parsedTargetUniverseIds.filter((id) => id !== sourceUniverseId);
-
-        if (targetUniverseIds.length === 0) {
-            return sendJson(res, 400, { error: 'At least one target universe ID is required (different from source)' });
+        if (
+            sourceUniverseId === developmentUniverseId
+            || sourceUniverseId === testUniverseId
+            || developmentUniverseId === testUniverseId
+        ) {
+            return sendJson(res, 400, {
+                error: 'Production, Development, and Test universe IDs must be different'
+            });
         }
+        const targetUniverseIds = [developmentUniverseId, testUniverseId];
+        const forceOneRobuxPricing = true;
+        const pricingOverrideOptions = { fixedPrice: FORCED_TARGET_PRICE };
 
         const lockAttempt = tryAcquireMonetizationLock(
             [sourceUniverseId, ...targetUniverseIds],
@@ -633,9 +620,8 @@ module.exports = async (req, res) => {
 
         return sendJson(res, 200, {
             sourceUniverseId,
-            priceSyncMode: forceOneRobuxPricing
-                ? `Forced ${FORCED_TARGET_PRICE} Robux on target universes`
-                : 'Copied from source',
+            targetUniverseIds,
+            priceSyncMode: `Forced ${FORCED_TARGET_PRICE} Robux on Development and Test target universes`,
             sourceCounts: {
                 gamePasses: preparedGamePasses.length,
                 developerProducts: preparedDeveloperProducts.length,

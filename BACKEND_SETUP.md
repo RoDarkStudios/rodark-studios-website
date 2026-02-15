@@ -36,11 +36,11 @@ For `ROBLOX_OPEN_CLOUD_API_KEY`, include these Open Cloud scopes on all source/t
 - `legacy-badge:manage`
 
 Admin sync behavior notes:
+- Request body now uses fixed fields: `productionUniverseId` (source), `developmentUniverseId` (target), `testUniverseId` (target).
 - Target items are matched by name (case-insensitive), then updated to source name/description/icon.
 - Missing target items are created.
-- `copyPricesFromSource=true` (default): prices are copied from source items.
-- `copyPricesFromSource=false`: target prices are forced to `1` Robux.
-- Price mode only applies to game passes and developer products. Badges always copy as-is (name/description/enabled/icon).
+- Development/Test target prices are always forced to `1` Robux for game passes and developer products.
+- Badges always copy as-is (name/description/enabled/icon).
 - Regional pricing for synced/created items is copied from source items.
 - The endpoint has a concurrency lock: if another sync is already running for any of the same universes, a `409` is returned.
 - Open Cloud currently has no delete endpoints for these resources, so unmatched target items are renamed with `[ARCHIVED] ` and archived (`isForSale=false` for game passes/developer products, `enabled=false` for badges) instead of deleted.
