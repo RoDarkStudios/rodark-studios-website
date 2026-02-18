@@ -1,0 +1,1 @@
+Set-Location 'd:\GitHub-Repos\rodark-studios-website'; if (-not (Test-Path '.env.local')) { Copy-Item '.env.example' '.env.local' }; npx vercel@latest dev --listen 3000 --yes
