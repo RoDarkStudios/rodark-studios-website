@@ -335,7 +335,7 @@ body {
 /* Featured Game Section */
 .featured-game {
     padding: 6rem 0;
-    background: var(--darker-bg);
+    background: var(--dark-bg);
 }
 
 .game-carousel {
@@ -561,12 +561,7 @@ body {
     background: linear-gradient(180deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
 }
 
-/* About Section */
-.about {
-    padding: 6rem 0;
-    background: var(--dark-bg);
-}
-
+/* Shared lead paragraph */
 .about-description {
     font-size: 1.25rem;
     color: var(--text-secondary);
@@ -574,44 +569,6 @@ body {
     max-width: 800px;
     margin: 0 auto 3rem;
     line-height: 1.7;
-}
-
-.about-features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    margin-top: 3rem;
-}
-
-.feature {
-    background: var(--card-bg);
-    padding: 2rem;
-    border-radius: 16px;
-    text-align: center;
-    border: 1px solid var(--border-color);
-    transition: transform 0.3s ease;
-}
-
-.feature:hover {
-    transform: translateY(-5px);
-}
-
-.feature i {
-    font-size: 3rem;
-    color: var(--primary-color);
-    margin-bottom: 1rem;
-}
-
-.feature h4 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    color: var(--text-primary);
-}
-
-.feature p {
-    color: var(--text-muted);
-    line-height: 1.6;
 }
 
 /* Team Section */
