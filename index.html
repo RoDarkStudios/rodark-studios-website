@@ -23,6 +23,7 @@
     <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=290031319&size=150x150">
     <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=2735760162&size=150x150">
     <link rel="preload" as="image" href="/api/roblox/game-icon?universeId=5602610435&size=512x512">
+    <link rel="preload" as="image" href="/api/roblox/game-icon?universeId=6751015115&size=512x512">
 </head>
 <body>
     <!-- Navigation -->
@@ -116,38 +117,63 @@
     <!-- Featured Game Section -->
     <section id="games" class="featured-game">
         <div class="container">
-            <h2 class="section-title">Our Flagship Game</h2>
-            <div class="game-showcase">                <div class="game-card featured">
-                    <div class="game-thumbnail">
-                        <img src="/api/roblox/game-icon?universeId=5602610435&size=512x512"
-                             alt="Coding Simulator" class="game-image">
-                        <div class="play-overlay">
+            <h2 class="section-title">Our Games</h2>
+            <div class="game-carousel" id="games-carousel" tabindex="0" aria-label="Game carousel">
+                <button id="games-prev" class="game-nav game-nav-prev" type="button" aria-label="Show previous game">
+                    <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                </button>
+                <div class="game-showcase">
+                    <div class="game-card featured is-active" data-game-index="0" aria-hidden="false">
+                        <div class="game-thumbnail">
+                            <img src="/api/roblox/game-icon?universeId=5602610435&size=512x512"
+                                 alt="Coding Simulator" class="game-image">
+                            <div class="play-overlay">
+                                <a href="https://www.roblox.com/games/16230991879/Coding-Simulator"
+                                   target="_blank" class="play-btn">
+                                    <i class="fas fa-play"></i>
+                                    Play Now
+                                </a>
+                            </div>
+                        </div>
+                        <div class="game-info">
+                            <h3 class="game-title">Coding Simulator</h3>
+                            <p class="game-description">
+                                Experience the world of programming in this innovative simulation game.
+                                Learn coding concepts while having fun in an immersive Roblox environment.
+                            </p>
+                            <div class="game-stats">
+                                <div class="stat">
+                                    <i class="fas fa-eye"></i>
+                                    <span id="visit-count">Loading...</span>
+                                    <small>Total Visits</small>
+                                </div>
+                            </div>
                             <a href="https://www.roblox.com/games/16230991879/Coding-Simulator"
-                               target="_blank" class="play-btn">
-                                <i class="fas fa-play"></i>
-                                Play Now
+                               target="_blank" class="btn btn-primary">
+                                <i class="fab fa-roblox"></i>
+                                Play on Roblox
                             </a>
                         </div>
                     </div>
-                    <div class="game-info">
-                        <h3 class="game-title">Coding Simulator</h3>
-                        <p class="game-description">
-                            Experience the world of programming in this innovative simulation game.
-                            Learn coding concepts while having fun in an immersive Roblox environment.
-                        </p>                        <div class="game-stats">
-                            <div class="stat">
-                                <i class="fas fa-eye"></i>
-                                <span id="visit-count">Loading...</span>
-                                <small>Total Visits</small>
+                    <div class="game-card featured" data-game-index="1" aria-hidden="true">
+                        <div class="game-thumbnail">
+                            <img src="/api/roblox/game-icon?universeId=6751015115&size=512x512"
+                                 alt="Tech Life" class="game-image">
+                        </div>
+                        <div class="game-info">
+                            <h3 class="game-title">Tech Life</h3>
+                            <p class="game-description">
+                                Build, upgrade, and expand your own tech empire in a fast-paced Roblox experience.
+                            </p>
+                            <div class="game-stats">
+                                <div class="coming-soon-banner">COMING SOON</div>
                             </div>
                         </div>
-                        <a href="https://www.roblox.com/games/16230991879/Coding-Simulator"
-                           target="_blank" class="btn btn-primary">
-                            <i class="fab fa-roblox"></i>
-                            Play on Roblox
-                        </a>
                     </div>
                 </div>
+                <button id="games-next" class="game-nav game-nav-next" type="button" aria-label="Show next game">
+                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
     </section>

@@ -338,19 +338,35 @@ body {
     background: var(--darker-bg);
 }
 
+.game-carousel {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "prev showcase next";
+    align-items: center;
+    gap: 1rem;
+}
+
 .game-showcase {
-    display: flex;
-    justify-content: center;
+    grid-area: showcase;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
 }
 
 .game-card {
+    display: none;
     background: var(--card-bg);
     border-radius: 24px;
     overflow: hidden;
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
-    max-width: 800px;
+    width: 100%;
     transition: transform 0.3s ease;
+}
+
+.game-card.is-active {
+    display: grid;
+    animation: game-card-fade 0.22s ease-out;
 }
 
 .game-card:hover {
@@ -358,8 +374,56 @@ body {
 }
 
 .game-card.featured {
-    display: grid;
     grid-template-columns: 1fr 1fr;
+}
+
+.game-nav {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 999px;
+    border: 1px solid rgba(6, 182, 212, 0.45);
+    background: rgba(6, 182, 212, 0.12);
+    color: #67e8f9;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.25s ease, border-color 0.25s ease, color 0.25s ease, background 0.25s ease;
+}
+
+.game-nav:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background: rgba(249, 115, 22, 0.12);
+}
+
+.game-nav:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.game-nav:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.game-nav-prev {
+    grid-area: prev;
+}
+
+.game-nav-next {
+    grid-area: next;
+}
+
+@keyframes game-card-fade {
+    from {
+        opacity: 0.45;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .game-thumbnail {
@@ -467,6 +531,22 @@ body {
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.coming-soon-banner {
+    width: 100%;
+    text-align: center;
+    padding: 0.9rem 1rem;
+    border: 2px solid var(--primary-color);
+    border-radius: 14px;
+    background: rgba(249, 115, 22, 0.14);
+    color: var(--primary-color);
+    font-size: 2.2rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.05;
+    text-shadow: 0 0 18px rgba(249, 115, 22, 0.35);
 }
 
 /* Shared Page Section Layout */
@@ -1212,6 +1292,18 @@ body {
 
     .hero-buttons {
         justify-content: center;
+    }
+
+    .game-carousel {
+        grid-template-columns: 1fr auto auto 1fr;
+        grid-template-areas:
+            "showcase showcase showcase showcase"
+            ". prev next .";
+    }
+
+    .game-nav {
+        width: 2.75rem;
+        height: 2.75rem;
     }
 
     .game-card.featured {

@@ -663,6 +663,70 @@ async function fetchGameStats() {
     }
 }
 
+async function fetchAllGameStats() {
+    const gameConfigs = [
+        {
+            elementId: 'visit-count',
+            universeId: 5602610435,
+            fallbackVisits: 4354515
+        }
+    ];
+
+    const targets = gameConfigs
+        .map((config) => ({
+            ...config,
+            element: document.getElementById(config.elementId)
+        }))
+        .filter((target) => target.element);
+
+    if (!targets.length) {
+        return;
+    }
+
+    function formatNumber(num) {
+        return num.toLocaleString();
+    }
+
+    async function fetchVisitsForUniverse(universeId) {
+        const gameResponse = await fetch(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
+        if (!gameResponse.ok) {
+            throw new Error(`Games API failed (${gameResponse.status})`);
+        }
+
+        const gameData = await gameResponse.json();
+        const games = Array.isArray(gameData && gameData.data) ? gameData.data : [];
+        if (!games.length) {
+            throw new Error('Games API returned no game data');
+        }
+
+        const matchingGame = games.find((game) => (
+            Number(game && game.id) === universeId
+            || Number(game && game.universeId) === universeId
+        )) || games[0];
+
+        const visits = Number(matchingGame && matchingGame.visits);
+        if (!Number.isFinite(visits) || visits < 0) {
+            throw new Error('Games API returned invalid visits');
+        }
+
+        return Math.trunc(visits);
+    }
+
+    await Promise.all(targets.map(async (target) => {
+        try {
+            const visits = await fetchVisitsForUniverse(target.universeId);
+            target.element.textContent = formatNumber(visits);
+        } catch (error) {
+            if (Number.isFinite(target.fallbackVisits)) {
+                target.element.textContent = formatNumber(target.fallbackVisits);
+                return;
+            }
+
+            target.element.textContent = 'N/A';
+        }
+    }));
+}
+
 // Function to fetch group member count from Roblox
 async function fetchGroupStats() {
     const groupMemberCountElement = document.getElementById('group-member-count');
@@ -723,6 +787,61 @@ function fetchUserAvatars() {
     });
 }
 
+function initGamesCarousel() {
+    const carousel = document.getElementById('games-carousel');
+    const prevButton = document.getElementById('games-prev');
+    const nextButton = document.getElementById('games-next');
+    if (!carousel || !prevButton || !nextButton) {
+        return;
+    }
+
+    const gameCards = Array.from(carousel.querySelectorAll('.game-card'));
+    if (gameCards.length === 0) {
+        return;
+    }
+
+    let activeIndex = gameCards.findIndex((card) => card.classList.contains('is-active'));
+    if (activeIndex < 0) {
+        activeIndex = 0;
+    }
+
+    function setActiveCard(nextIndex) {
+        activeIndex = (nextIndex + gameCards.length) % gameCards.length;
+
+        gameCards.forEach((card, index) => {
+            const isActive = index === activeIndex;
+            card.classList.toggle('is-active', isActive);
+            card.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+        });
+    }
+
+    function cycle(direction) {
+        setActiveCard(activeIndex + direction);
+    }
+
+    const disableNav = gameCards.length <= 1;
+    prevButton.disabled = disableNav;
+    nextButton.disabled = disableNav;
+
+    prevButton.addEventListener('click', () => cycle(-1));
+    nextButton.addEventListener('click', () => cycle(1));
+
+    carousel.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            cycle(-1);
+            return;
+        }
+
+        if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            cycle(1);
+        }
+    });
+
+    setActiveCard(activeIndex);
+}
+
 // Update ages when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 RoDark Studios website loaded!');
@@ -757,8 +876,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Shuffle team members randomly each time the page loads
     shuffleTeamMembers();
+    initGamesCarousel();
     // Fetch and display game statistics
-    fetchGameStats();
+    fetchAllGameStats();
 
     // Fetch and display group statistics
     fetchGroupStats();
