@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Sync Game Description - RoDark Studios</title>
-    <meta name="description" content="RoDark Studios admin tool to sync game descriptions">
+    <title>Admin - Game Configuration - RoDark Studios</title>
+    <meta name="description" content="RoDark Studios admin game configuration tool">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -40,7 +40,7 @@
     <main class="auth-page-main">
         <section class="auth-section">
             <div class="container">
-                <h1 class="section-title">Sync Game Description</h1>
+                <h1 class="section-title">Game Configuration</h1>
                 <div class="legal-shell">
                     <article class="legal-card">
                         <p class="admin-tool-back-link-wrap">
@@ -50,33 +50,29 @@
                             </a>
                         </p>
 
-                        <div id="admin-description-sync-tool" class="admin-tool hidden">
-                            <h2 class="admin-tool-title">Sync Production Description to Production, Test, and Development</h2>
+                        <div id="admin-game-config-tool" class="admin-tool hidden">
+                            <h2 class="admin-tool-title">Shared Production, Test, and Development IDs</h2>
                             <p class="admin-tool-note">
-                                Uses shared Game Configuration IDs. Load the current Production description, edit it, then save to all three games. Test and Development warnings are automatically prepended when saving.
+                                Save once here. All admin tools automatically use these IDs.
                             </p>
-                            <p id="description-sync-config" class="admin-shared-config hidden"></p>
 
-                            <form id="description-sync-form" class="admin-form">
-                                <button id="load-production-description-btn" type="button" class="btn btn-secondary admin-submit-btn">
-                                    Load Production Description
-                                </button>
+                            <form id="game-config-form" class="admin-form">
+                                <label for="config-production-universe-id" class="admin-label">Production Game (Universe ID)</label>
+                                <input id="config-production-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
-                                <label for="game-description-text" class="admin-label">Editable Description (Base Content)</label>
-                                <textarea
-                                    id="game-description-text"
-                                    class="admin-textarea admin-catalog-output-lg"
-                                    placeholder="Production description will load here."
-                                    required
-                                ></textarea>
+                                <label for="config-test-universe-id" class="admin-label">Test Game (Universe ID)</label>
+                                <input id="config-test-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
-                                <button id="save-description-sync-btn" type="submit" class="btn btn-primary admin-submit-btn">
-                                    Save to All 3 Games
+                                <label for="config-development-universe-id" class="admin-label">Development Game (Universe ID)</label>
+                                <input id="config-development-universe-id" class="admin-input" type="text" inputmode="numeric" required>
+
+                                <button id="game-config-save-btn" type="submit" class="btn btn-primary admin-submit-btn">
+                                    Save Game Configuration
                                 </button>
                             </form>
 
-                            <p id="description-sync-status" class="admin-status hidden"></p>
-                            <div id="description-sync-results" class="admin-results hidden"></div>
+                            <p id="game-config-status" class="admin-status hidden"></p>
+                            <div id="game-config-results" class="admin-results hidden"></div>
                         </div>
 
                         <div id="admin-access-denied" class="admin-access-denied hidden">

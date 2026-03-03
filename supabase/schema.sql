@@ -1,2 +1,9 @@
--- No database schema required for authentication.
--- Auth now uses Roblox OAuth 2.0 with signed HttpOnly session cookies.
+create table if not exists public.admin_game_config (
+    id smallint primary key check (id = 1),
+    production_universe_id bigint not null,
+    test_universe_id bigint not null,
+    development_universe_id bigint not null,
+    updated_by_user_id text,
+    updated_by_username text,
+    updated_at timestamptz not null default now()
+);

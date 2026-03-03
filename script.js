@@ -194,6 +194,107 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+let cachedAdminGameConfig = null;
+let cachedAdminGameConfigAt = 0;
+const ADMIN_GAME_CONFIG_CACHE_TTL_MS = 10 * 1000;
+const MISSING_GAME_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
+
+function toPositiveIntegerOrNull(value) {
+    const parsed = Number.parseInt(String(value || '').trim(), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return null;
+    }
+
+    return parsed;
+}
+
+function normalizeAdminGameConfig(config) {
+    if (!config || typeof config !== 'object') {
+        return null;
+    }
+
+    const productionUniverseId = toPositiveIntegerOrNull(config.productionUniverseId);
+    const testUniverseId = toPositiveIntegerOrNull(config.testUniverseId);
+    const developmentUniverseId = toPositiveIntegerOrNull(config.developmentUniverseId);
+    if (!productionUniverseId || !testUniverseId || !developmentUniverseId) {
+        return null;
+    }
+
+    return {
+        productionUniverseId,
+        testUniverseId,
+        developmentUniverseId,
+        updatedAt: config.updatedAt ? String(config.updatedAt) : null,
+        updatedByUserId: config.updatedByUserId ? String(config.updatedByUserId) : null,
+        updatedByUsername: config.updatedByUsername ? String(config.updatedByUsername) : null
+    };
+}
+
+function formatAdminGameConfigLabel(config) {
+    if (!config) {
+        return MISSING_GAME_CONFIG_MESSAGE;
+    }
+
+    return `Shared IDs -> Production: ${config.productionUniverseId} | Test: ${config.testUniverseId} | Development: ${config.developmentUniverseId}`;
+}
+
+function setAdminGameConfigBanner(elementId, config) {
+    const element = document.getElementById(elementId);
+    if (!element) {
+        return;
+    }
+
+    element.textContent = formatAdminGameConfigLabel(config);
+    element.classList.remove('hidden');
+}
+
+async function fetchAdminGameConfig(options) {
+    const settings = options || {};
+    const force = Boolean(settings.force);
+    const now = Date.now();
+
+    if (!force && cachedAdminGameConfigAt > 0 && (now - cachedAdminGameConfigAt) < ADMIN_GAME_CONFIG_CACHE_TTL_MS) {
+        return cachedAdminGameConfig;
+    }
+
+    const result = await postJson('/api/admin/roblox-list-monetization-items', {
+        operation: 'game-config:get'
+    });
+    const config = normalizeAdminGameConfig(result && result.config ? result.config : null);
+
+    cachedAdminGameConfig = config;
+    cachedAdminGameConfigAt = now;
+    return config;
+}
+
+async function saveAdminGameConfig(configInput) {
+    const payload = {
+        operation: 'game-config:save',
+        productionUniverseId: String(configInput && configInput.productionUniverseId ? configInput.productionUniverseId : '').trim(),
+        testUniverseId: String(configInput && configInput.testUniverseId ? configInput.testUniverseId : '').trim(),
+        developmentUniverseId: String(configInput && configInput.developmentUniverseId ? configInput.developmentUniverseId : '').trim()
+    };
+
+    const result = await postJson('/api/admin/roblox-list-monetization-items', payload);
+    const config = normalizeAdminGameConfig(result && result.config ? result.config : null);
+    cachedAdminGameConfig = config;
+    cachedAdminGameConfigAt = Date.now();
+    return config;
+}
+
+async function requireAdminGameConfig(setStatus) {
+    const config = await fetchAdminGameConfig({ force: true });
+    if (config) {
+        return config;
+    }
+
+    if (typeof setStatus === 'function') {
+        setStatus(MISSING_GAME_CONFIG_MESSAGE, 'error');
+    }
+
+    throw new Error(MISSING_GAME_CONFIG_MESSAGE);
+}
+
 function setAdminCopyStatus(message, type) {
     const statusElement = document.getElementById('copy-monetization-status');
     if (!statusElement) {
@@ -286,31 +387,18 @@ function renderAdminCopyResults(result) {
 async function handleAdminCopySubmit(event) {
     event.preventDefault();
 
-    const productionInput = document.getElementById('production-universe-id');
-    const testInput = document.getElementById('test-universe-id');
-    const developmentInput = document.getElementById('development-universe-id');
-    if (!productionInput || !testInput || !developmentInput) {
-        return;
-    }
-
-    const productionUniverseId = String(productionInput.value || '').trim();
-    const testUniverseId = String(testInput.value || '').trim();
-    const developmentUniverseId = String(developmentInput.value || '').trim();
-
-    if (!productionUniverseId || !testUniverseId || !developmentUniverseId) {
-        setAdminCopyStatus('Please enter Production, Test, and Development universe IDs.', 'error');
-        return;
-    }
-
     setAdminCopyBusy(true);
     renderAdminCopyResults(null);
     setAdminCopyStatus('Copy job started. This may take a while for large catalogs.', 'info');
 
     try {
+        const gameConfig = await requireAdminGameConfig(setAdminCopyStatus);
+        setAdminGameConfigBanner('copy-monetization-config', gameConfig);
+
         const result = await postJson('/api/admin/roblox-copy-monetization', {
-            productionUniverseId,
-            testUniverseId,
-            developmentUniverseId
+            productionUniverseId: gameConfig.productionUniverseId,
+            testUniverseId: gameConfig.testUniverseId,
+            developmentUniverseId: gameConfig.developmentUniverseId
         });
 
         renderAdminCopyResults(result);
@@ -360,6 +448,15 @@ async function initAdminCopyTool() {
         deniedElement.classList.add('hidden');
     }
     adminTool.classList.remove('hidden');
+    try {
+        const gameConfig = await fetchAdminGameConfig({ force: true });
+        setAdminGameConfigBanner('copy-monetization-config', gameConfig);
+        if (!gameConfig) {
+            setAdminCopyStatus(MISSING_GAME_CONFIG_MESSAGE, 'error');
+        }
+    } catch (error) {
+        setAdminCopyStatus(error.message || 'Failed to load shared game IDs.', 'error');
+    }
 
     if (form) {
         form.addEventListener('submit', handleAdminCopySubmit);
@@ -465,31 +562,18 @@ function renderListMonetizationResults(result) {
 async function handleListMonetizationSubmit(event) {
     event.preventDefault();
 
-    const productionInput = document.getElementById('production-universe-id');
-    const testInput = document.getElementById('test-universe-id');
-    const developmentInput = document.getElementById('development-universe-id');
-    if (!productionInput || !testInput || !developmentInput) {
-        return;
-    }
-
-    const productionUniverseId = String(productionInput.value || '').trim();
-    const testUniverseId = String(testInput.value || '').trim();
-    const developmentUniverseId = String(developmentInput.value || '').trim();
-
-    if (!productionUniverseId || !testUniverseId || !developmentUniverseId) {
-        setListMonetizationStatus('Please enter Production, Test, and Development universe IDs.', 'error');
-        return;
-    }
-
     setListMonetizationBusy(true);
     renderListMonetizationResults(null);
     setListMonetizationStatus('Fetching monetization items...', 'info');
 
     try {
+        const gameConfig = await requireAdminGameConfig(setListMonetizationStatus);
+        setAdminGameConfigBanner('list-monetization-config', gameConfig);
+
         const result = await postJson('/api/admin/roblox-list-monetization-items', {
-            productionUniverseId,
-            testUniverseId,
-            developmentUniverseId
+            productionUniverseId: gameConfig.productionUniverseId,
+            testUniverseId: gameConfig.testUniverseId,
+            developmentUniverseId: gameConfig.developmentUniverseId
         });
 
         renderListMonetizationResults(result);
@@ -532,6 +616,15 @@ async function initAdminListMonetizationTool() {
         deniedElement.classList.add('hidden');
     }
     toolElement.classList.remove('hidden');
+    try {
+        const gameConfig = await fetchAdminGameConfig({ force: true });
+        setAdminGameConfigBanner('list-monetization-config', gameConfig);
+        if (!gameConfig) {
+            setListMonetizationStatus(MISSING_GAME_CONFIG_MESSAGE, 'error');
+        }
+    } catch (error) {
+        setListMonetizationStatus(error.message || 'Failed to load shared game IDs.', 'error');
+    }
 
     if (form) {
         form.addEventListener('submit', handleListMonetizationSubmit);
@@ -622,40 +715,31 @@ function renderDescriptionSyncResults(result) {
 }
 
 function getDescriptionSyncFormValues() {
-    const productionInput = document.getElementById('production-description-universe-id');
-    const testInput = document.getElementById('test-description-universe-id');
-    const developmentInput = document.getElementById('development-description-universe-id');
     const descriptionInput = document.getElementById('game-description-text');
 
     return {
-        productionUniverseId: String(productionInput && productionInput.value ? productionInput.value : '').trim(),
-        testUniverseId: String(testInput && testInput.value ? testInput.value : '').trim(),
-        developmentUniverseId: String(developmentInput && developmentInput.value ? developmentInput.value : '').trim(),
         description: String(descriptionInput && descriptionInput.value ? descriptionInput.value : '')
     };
 }
 
 async function handleLoadProductionDescriptionClick() {
-    const values = getDescriptionSyncFormValues();
-    if (!values.productionUniverseId) {
-        setDescriptionSyncStatus('Enter the Production universe ID first.', 'error');
-        return;
-    }
-
     setDescriptionLoadBusy(true);
     setDescriptionSyncStatus('Loading current Production description...', 'info');
     renderDescriptionSyncResults(null);
 
     try {
+        const gameConfig = await requireAdminGameConfig(setDescriptionSyncStatus);
+        setAdminGameConfigBanner('description-sync-config', gameConfig);
+
         const result = await postJson('/api/admin/roblox-list-monetization-items', {
             operation: 'load',
-            productionUniverseId: values.productionUniverseId
+            productionUniverseId: gameConfig.productionUniverseId
         });
 
         const descriptionInput = document.getElementById('game-description-text');
         if (descriptionInput) {
             descriptionInput.value = String(result && result.productionDescription ? result.productionDescription : '');
-            descriptionInput.dataset.loadedProductionUniverseId = values.productionUniverseId;
+            descriptionInput.dataset.loadedProductionUniverseId = String(gameConfig.productionUniverseId);
         }
 
         setDescriptionSyncStatus('Production description loaded. Edit and save when ready.', 'success');
@@ -670,28 +754,26 @@ async function handleDescriptionSyncSubmit(event) {
     event.preventDefault();
 
     const values = getDescriptionSyncFormValues();
-    if (!values.productionUniverseId || !values.testUniverseId || !values.developmentUniverseId) {
-        setDescriptionSyncStatus('Please enter Production, Test, and Development universe IDs.', 'error');
-        return;
-    }
-
     setDescriptionSaveBusy(true);
     setDescriptionSyncStatus('Saving descriptions to Production, Test, and Development...', 'info');
     renderDescriptionSyncResults(null);
 
     try {
+        const gameConfig = await requireAdminGameConfig(setDescriptionSyncStatus);
+        setAdminGameConfigBanner('description-sync-config', gameConfig);
+
         const result = await postJson('/api/admin/roblox-list-monetization-items', {
             operation: 'save',
-            productionUniverseId: values.productionUniverseId,
-            testUniverseId: values.testUniverseId,
-            developmentUniverseId: values.developmentUniverseId,
+            productionUniverseId: gameConfig.productionUniverseId,
+            testUniverseId: gameConfig.testUniverseId,
+            developmentUniverseId: gameConfig.developmentUniverseId,
             description: values.description
         });
 
         const descriptionInput = document.getElementById('game-description-text');
         if (descriptionInput) {
             descriptionInput.value = String(result && result.productionDescription ? result.productionDescription : '');
-            descriptionInput.dataset.loadedProductionUniverseId = values.productionUniverseId;
+            descriptionInput.dataset.loadedProductionUniverseId = String(gameConfig.productionUniverseId);
         }
 
         renderDescriptionSyncResults(result);
@@ -712,7 +794,7 @@ async function initAdminDescriptionSyncTool() {
     const deniedElement = document.getElementById('admin-access-denied');
     const form = document.getElementById('description-sync-form');
     const loadButton = document.getElementById('load-production-description-btn');
-    const productionInput = document.getElementById('production-description-universe-id');
+    const descriptionInput = document.getElementById('game-description-text');
 
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
@@ -733,37 +815,178 @@ async function initAdminDescriptionSyncTool() {
         loadButton.addEventListener('click', handleLoadProductionDescriptionClick);
     }
 
-    if (productionInput) {
-        productionInput.addEventListener('change', async () => {
-            const descriptionInput = document.getElementById('game-description-text');
-            const productionUniverseId = String(productionInput.value || '').trim();
-            if (!productionUniverseId) {
-                return;
-            }
-
-            const loadedId = String(
-                descriptionInput && descriptionInput.dataset && descriptionInput.dataset.loadedProductionUniverseId
-                    ? descriptionInput.dataset.loadedProductionUniverseId
-                    : ''
-            ).trim();
-
-            if (loadedId === productionUniverseId) {
-                return;
-            }
-
-            const hasExistingDescription = Boolean(
-                descriptionInput && String(descriptionInput.value || '').trim()
-            );
-            if (hasExistingDescription && loadedId && loadedId !== productionUniverseId) {
-                return;
-            }
-
+    try {
+        const gameConfig = await fetchAdminGameConfig({ force: true });
+        setAdminGameConfigBanner('description-sync-config', gameConfig);
+        if (!gameConfig) {
+            setDescriptionSyncStatus(MISSING_GAME_CONFIG_MESSAGE, 'error');
+        } else if (descriptionInput && !String(descriptionInput.value || '').trim()) {
             await handleLoadProductionDescriptionClick();
-        });
+        }
+    } catch (error) {
+        setDescriptionSyncStatus(error.message || 'Failed to load shared game IDs.', 'error');
     }
 
     if (form) {
         form.addEventListener('submit', handleDescriptionSyncSubmit);
+    }
+}
+
+function setGameConfigStatus(message, type) {
+    const statusElement = document.getElementById('game-config-status');
+    if (!statusElement) {
+        return;
+    }
+
+    if (!message) {
+        statusElement.textContent = '';
+        statusElement.classList.add('hidden');
+        statusElement.classList.remove('success', 'error', 'info');
+        return;
+    }
+
+    statusElement.textContent = message;
+    statusElement.classList.remove('hidden');
+    statusElement.classList.remove('success', 'error', 'info');
+    statusElement.classList.add(type || 'info');
+}
+
+function setGameConfigBusy(isBusy) {
+    const button = document.getElementById('game-config-save-btn');
+    if (!button) {
+        return;
+    }
+
+    button.disabled = Boolean(isBusy);
+    button.textContent = isBusy ? 'Saving...' : 'Save Game Configuration';
+}
+
+function renderGameConfigResults(config) {
+    const resultElement = document.getElementById('game-config-results');
+    if (!resultElement) {
+        return;
+    }
+
+    if (!config) {
+        resultElement.innerHTML = '';
+        resultElement.classList.add('hidden');
+        return;
+    }
+
+    const updatedAtValue = config.updatedAt ? new Date(config.updatedAt) : null;
+    const updatedAt = updatedAtValue && !Number.isNaN(updatedAtValue.getTime())
+        ? updatedAtValue.toLocaleString()
+        : 'Unknown';
+    const updatedBy = config.updatedByUsername
+        ? `@${config.updatedByUsername}`
+        : (config.updatedByUserId ? `User ${config.updatedByUserId}` : 'Unknown');
+
+    resultElement.innerHTML = `
+        <article class="admin-target-result">
+            <p>Production Universe: ${escapeHtml(config.productionUniverseId)}</p>
+            <p>Test Universe: ${escapeHtml(config.testUniverseId)}</p>
+            <p>Development Universe: ${escapeHtml(config.developmentUniverseId)}</p>
+            <p>Last updated: ${escapeHtml(updatedAt)} by ${escapeHtml(updatedBy)}</p>
+        </article>
+    `;
+    resultElement.classList.remove('hidden');
+}
+
+function readGameConfigFormValues() {
+    const productionInput = document.getElementById('config-production-universe-id');
+    const testInput = document.getElementById('config-test-universe-id');
+    const developmentInput = document.getElementById('config-development-universe-id');
+
+    return {
+        productionUniverseId: String(productionInput && productionInput.value ? productionInput.value : '').trim(),
+        testUniverseId: String(testInput && testInput.value ? testInput.value : '').trim(),
+        developmentUniverseId: String(developmentInput && developmentInput.value ? developmentInput.value : '').trim()
+    };
+}
+
+function writeGameConfigFormValues(config) {
+    const productionInput = document.getElementById('config-production-universe-id');
+    const testInput = document.getElementById('config-test-universe-id');
+    const developmentInput = document.getElementById('config-development-universe-id');
+
+    if (productionInput) {
+        productionInput.value = config && config.productionUniverseId ? String(config.productionUniverseId) : '';
+    }
+    if (testInput) {
+        testInput.value = config && config.testUniverseId ? String(config.testUniverseId) : '';
+    }
+    if (developmentInput) {
+        developmentInput.value = config && config.developmentUniverseId ? String(config.developmentUniverseId) : '';
+    }
+}
+
+async function handleGameConfigSubmit(event) {
+    event.preventDefault();
+
+    const values = readGameConfigFormValues();
+    if (!values.productionUniverseId || !values.testUniverseId || !values.developmentUniverseId) {
+        setGameConfigStatus('Please enter Production, Test, and Development universe IDs.', 'error');
+        return;
+    }
+
+    setGameConfigBusy(true);
+    setGameConfigStatus('Saving shared game IDs...', 'info');
+
+    try {
+        const config = await saveAdminGameConfig(values);
+        if (!config) {
+            throw new Error('Game configuration save returned no IDs');
+        }
+
+        writeGameConfigFormValues(config);
+        renderGameConfigResults(config);
+        setGameConfigStatus('Game configuration saved successfully.', 'success');
+    } catch (error) {
+        setGameConfigStatus(error.message || 'Failed to save game configuration.', 'error');
+    } finally {
+        setGameConfigBusy(false);
+    }
+}
+
+async function initAdminGameConfigTool() {
+    const toolElement = document.getElementById('admin-game-config-tool');
+    if (!toolElement) {
+        return;
+    }
+
+    const deniedElement = document.getElementById('admin-access-denied');
+    const form = document.getElementById('game-config-form');
+
+    const adminStatus = await fetchAdminStatus();
+    const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
+    if (!isAdmin) {
+        toolElement.classList.add('hidden');
+        if (deniedElement) {
+            deniedElement.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (deniedElement) {
+        deniedElement.classList.add('hidden');
+    }
+    toolElement.classList.remove('hidden');
+
+    try {
+        const config = await fetchAdminGameConfig({ force: true });
+        if (config) {
+            writeGameConfigFormValues(config);
+            renderGameConfigResults(config);
+        } else {
+            setGameConfigStatus('No shared game IDs saved yet. Enter IDs and save.', 'info');
+            renderGameConfigResults(null);
+        }
+    } catch (error) {
+        setGameConfigStatus(error.message || 'Failed to load game configuration.', 'error');
+    }
+
+    if (form) {
+        form.addEventListener('submit', handleGameConfigSubmit);
     }
 }
 
@@ -1079,6 +1302,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initAdminCopyTool();
     initAdminListMonetizationTool();
     initAdminDescriptionSyncTool();
+    initAdminGameConfigTool();
 
     // Calculate and display ages
     const myronAge = calculateAge('2008-05-31');

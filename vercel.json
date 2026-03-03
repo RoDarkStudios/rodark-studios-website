@@ -29,6 +29,11 @@
       "source": "/admin-sync-game-description.html",
       "destination": "/admin/tools/sync-game-description",
       "permanent": true
+    },
+    {
+      "source": "/admin-game-configuration.html",
+      "destination": "/admin/tools/game-configuration",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -55,6 +60,10 @@
     {
       "source": "/admin/tools/sync-game-description",
       "destination": "/admin-sync-game-description.html"
+    },
+    {
+      "source": "/admin/tools/game-configuration",
+      "destination": "/admin-game-configuration.html"
     }
   ]
 }

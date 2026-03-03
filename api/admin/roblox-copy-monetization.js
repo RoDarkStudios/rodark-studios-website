@@ -21,9 +21,11 @@ const {
     sleep
 } = require('../_lib/roblox-open-cloud');
 const { tryAcquireMonetizationLock, releaseMonetizationLock } = require('../_lib/monetization-sync-lock');
+const { getStoredGameConfig } = require('../_lib/admin-game-config-store');
 
 const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
 const FORCED_TARGET_PRICE = 1;
+const MISSING_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
 
 async function requireAdmin(req, res) {
     const groupId = getAdminGroupId();
@@ -171,6 +173,69 @@ function buildArchivedName(name) {
     return `${ARCHIVED_NAME_PREFIX}${rawName}`;
 }
 
+function parseGameUniverseIdsFromBody(body) {
+    return {
+        productionUniverseId: parseUniverseId(body && body.productionUniverseId, 'productionUniverseId'),
+        testUniverseId: parseUniverseId(body && body.testUniverseId, 'testUniverseId'),
+        developmentUniverseId: parseUniverseId(body && body.developmentUniverseId, 'developmentUniverseId')
+    };
+}
+
+function validateDistinctUniverseIds(ids) {
+    if (
+        ids.productionUniverseId === ids.developmentUniverseId
+        || ids.productionUniverseId === ids.testUniverseId
+        || ids.developmentUniverseId === ids.testUniverseId
+    ) {
+        throw new Error('Production, Test, and Development universe IDs must be different');
+    }
+}
+
+function hasUniverseIdValue(value) {
+    return String(value || '').trim().length > 0;
+}
+
+function hasAnyUniverseIdFields(body) {
+    return (
+        hasUniverseIdValue(body && body.productionUniverseId)
+        || hasUniverseIdValue(body && body.testUniverseId)
+        || hasUniverseIdValue(body && body.developmentUniverseId)
+    );
+}
+
+function hasAllUniverseIdFields(body) {
+    return (
+        hasUniverseIdValue(body && body.productionUniverseId)
+        && hasUniverseIdValue(body && body.testUniverseId)
+        && hasUniverseIdValue(body && body.developmentUniverseId)
+    );
+}
+
+async function resolveGameUniverseIds(body) {
+    if (hasAnyUniverseIdFields(body)) {
+        if (!hasAllUniverseIdFields(body)) {
+            throw new Error('Provide all three IDs or none. Leave all blank to use saved Game Configuration.');
+        }
+
+        const ids = parseGameUniverseIdsFromBody(body);
+        validateDistinctUniverseIds(ids);
+        return ids;
+    }
+
+    const storedConfig = await getStoredGameConfig();
+    if (!storedConfig) {
+        throw new Error(MISSING_CONFIG_MESSAGE);
+    }
+
+    const ids = {
+        productionUniverseId: Number(storedConfig.productionUniverseId),
+        testUniverseId: Number(storedConfig.testUniverseId),
+        developmentUniverseId: Number(storedConfig.developmentUniverseId)
+    };
+    validateDistinctUniverseIds(ids);
+    return ids;
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return methodNotAllowed(req, res, ['POST']);
@@ -188,26 +253,16 @@ module.exports = async (req, res) => {
         }
 
         const body = await readJsonBody(req);
-        let sourceUniverseId;
-        let developmentUniverseId;
-        let testUniverseId;
+        let ids;
         try {
-            sourceUniverseId = parseUniverseId(body && body.productionUniverseId, 'productionUniverseId');
-            developmentUniverseId = parseUniverseId(body && body.developmentUniverseId, 'developmentUniverseId');
-            testUniverseId = parseUniverseId(body && body.testUniverseId, 'testUniverseId');
+            ids = await resolveGameUniverseIds(body);
         } catch (error) {
             return sendJson(res, 400, { error: error.message || 'Invalid request body' });
         }
 
-        if (
-            sourceUniverseId === developmentUniverseId
-            || sourceUniverseId === testUniverseId
-            || developmentUniverseId === testUniverseId
-        ) {
-            return sendJson(res, 400, {
-                error: 'Production, Test, and Development universe IDs must be different'
-            });
-        }
+        const sourceUniverseId = ids.productionUniverseId;
+        const developmentUniverseId = ids.developmentUniverseId;
+        const testUniverseId = ids.testUniverseId;
         const targetUniverseIds = [testUniverseId, developmentUniverseId];
         const forceOneRobuxPricing = true;
         const pricingOverrideOptions = { fixedPrice: FORCED_TARGET_PRICE };

@@ -8,10 +8,12 @@ const {
     getUniverseDescription,
     updateUniverseDescription
 } = require('../_lib/roblox-open-cloud');
+const { getStoredGameConfig, saveStoredGameConfig } = require('../_lib/admin-game-config-store');
 
 const TEST_PREFIX = '\u26A0\uFE0F THIS IS THE TEST GAME - THIS IS NOT THE OFFICIAL GAME';
 const DEVELOPMENT_PREFIX = '\u26A0\uFE0F THIS IS THE DEVELOPMENT GAME - THIS IS NOT THE OFFICIAL GAME';
 const ENVIRONMENT_PREFIX_REGEX = /^\u26A0(?:\uFE0F)? THIS IS THE (TEST|DEVELOPMENT) GAME - THIS IS NOT THE OFFICIAL GAME(?:\r?\n|\r)?(?:\r?\n|\r)?/i;
+const MISSING_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
 
 async function requireAdmin(req, res) {
     const groupId = getAdminGroupId();
@@ -28,7 +30,7 @@ async function requireAdmin(req, res) {
     };
 }
 
-function parseGameUniverseIds(body) {
+function parseGameUniverseIdsFromBody(body) {
     return {
         developmentUniverseId: parseUniverseId(body && body.developmentUniverseId, 'developmentUniverseId'),
         testUniverseId: parseUniverseId(body && body.testUniverseId, 'testUniverseId'),
@@ -44,6 +46,26 @@ function validateDistinctUniverseIds(ids) {
     ) {
         throw new Error('Production, Test, and Development universe IDs must be different');
     }
+}
+
+function hasUniverseIdValue(value) {
+    return String(value || '').trim().length > 0;
+}
+
+function hasAnyUniverseIdFields(body) {
+    return (
+        hasUniverseIdValue(body && body.productionUniverseId)
+        || hasUniverseIdValue(body && body.testUniverseId)
+        || hasUniverseIdValue(body && body.developmentUniverseId)
+    );
+}
+
+function hasAllUniverseIdFields(body) {
+    return (
+        hasUniverseIdValue(body && body.productionUniverseId)
+        && hasUniverseIdValue(body && body.testUniverseId)
+        && hasUniverseIdValue(body && body.developmentUniverseId)
+    );
 }
 
 function normalizeDescriptionInput(value) {
@@ -69,22 +91,67 @@ function prefixDescription(prefix, description) {
     return `${prefix}\n\n${base}`;
 }
 
-async function loadProductionDescription(body) {
-    const productionUniverseId = parseUniverseId(body && body.productionUniverseId, 'productionUniverseId');
-    const productionData = await getUniverseDescription(productionUniverseId);
+async function resolveGameUniverseIds(body) {
+    if (hasAnyUniverseIdFields(body)) {
+        if (!hasAllUniverseIdFields(body)) {
+            throw new Error('Provide all three IDs or none. Leave all blank to use saved Game Configuration.');
+        }
+
+        const ids = parseGameUniverseIdsFromBody(body);
+        validateDistinctUniverseIds(ids);
+        return ids;
+    }
+
+    const storedConfig = await getStoredGameConfig();
+    if (!storedConfig) {
+        throw new Error(MISSING_CONFIG_MESSAGE);
+    }
+
+    const ids = {
+        productionUniverseId: Number(storedConfig.productionUniverseId),
+        testUniverseId: Number(storedConfig.testUniverseId),
+        developmentUniverseId: Number(storedConfig.developmentUniverseId)
+    };
+    validateDistinctUniverseIds(ids);
+    return ids;
+}
+
+async function getGameConfigPayload() {
+    const config = await getStoredGameConfig();
+    return {
+        config: config || null
+    };
+}
+
+async function saveGameConfigPayload(body, user) {
+    const ids = parseGameUniverseIdsFromBody(body);
+    validateDistinctUniverseIds(ids);
+
+    const config = await saveStoredGameConfig({
+        productionUniverseId: ids.productionUniverseId,
+        testUniverseId: ids.testUniverseId,
+        developmentUniverseId: ids.developmentUniverseId,
+        updatedByUserId: user && user.id ? String(user.id) : null,
+        updatedByUsername: user && user.username ? String(user.username) : null
+    });
 
     return {
-        productionUniverseId,
+        config
+    };
+}
+
+async function loadProductionDescription(ids) {
+    const productionData = await getUniverseDescription(ids.productionUniverseId);
+
+    return {
+        productionUniverseId: ids.productionUniverseId,
         productionRootPlaceId: productionData.placeId,
         productionDescription: productionData.description || ''
     };
 }
 
-async function saveDescriptions(body) {
-    const ids = parseGameUniverseIds(body);
-    validateDistinctUniverseIds(ids);
-
-    const editedDescription = normalizeDescriptionInput(body && body.description);
+async function saveDescriptions(ids, descriptionRaw) {
+    const editedDescription = normalizeDescriptionInput(descriptionRaw);
     const productionDescription = stripEnvironmentPrefix(editedDescription);
     const testDescription = prefixDescription(TEST_PREFIX, productionDescription);
     const developmentDescription = prefixDescription(DEVELOPMENT_PREFIX, productionDescription);
@@ -268,22 +335,40 @@ module.exports = async (req, res) => {
         }
 
         const body = await readJsonBody(req);
-
         const operation = String(body && body.operation ? body.operation : '').trim().toLowerCase();
-        if (operation === 'load') {
+
+        if (operation === 'game-config:get') {
+            const payload = await getGameConfigPayload();
+            return sendJson(res, 200, payload);
+        }
+
+        if (operation === 'game-config:save') {
             try {
-                const payload = await loadProductionDescription(body);
+                const payload = await saveGameConfigPayload(body, auth.user);
                 return sendJson(res, 200, payload);
             } catch (error) {
                 return sendJson(res, 400, {
-                    error: error.message || 'Invalid production universe ID'
+                    error: error.message || 'Invalid game configuration'
+                });
+            }
+        }
+
+        if (operation === 'load') {
+            try {
+                const ids = await resolveGameUniverseIds(body);
+                const payload = await loadProductionDescription(ids);
+                return sendJson(res, 200, payload);
+            } catch (error) {
+                return sendJson(res, 400, {
+                    error: error.message || 'Failed to load production description'
                 });
             }
         }
 
         if (operation === 'save') {
             try {
-                const payload = await saveDescriptions(body);
+                const ids = await resolveGameUniverseIds(body);
+                const payload = await saveDescriptions(ids, body && body.description);
                 return sendJson(res, 200, payload);
             } catch (error) {
                 const failures = Array.isArray(error && error.failures) ? error.failures : null;
@@ -298,7 +383,7 @@ module.exports = async (req, res) => {
 
         let ids;
         try {
-            ids = parseGameUniverseIds(body);
+            ids = await resolveGameUniverseIds(body);
         } catch (error) {
             return sendJson(res, 400, { error: error.message || 'Invalid game universe IDs' });
         }
@@ -310,6 +395,11 @@ module.exports = async (req, res) => {
         ]);
 
         return sendJson(res, 200, {
+            config: {
+                productionUniverseId: ids.productionUniverseId,
+                testUniverseId: ids.testUniverseId,
+                developmentUniverseId: ids.developmentUniverseId
+            },
             games,
             combinedText: buildCombinedTextBlob(games)
         });

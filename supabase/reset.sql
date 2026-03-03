@@ -1,2 +1,1 @@
--- No-op.
--- There are no auth-related database tables to reset.
+truncate table if exists public.admin_game_config;

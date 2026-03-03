@@ -10,6 +10,9 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `POST /api/auth/logout` -> clears session
 - `POST /api/admin/roblox-copy-monetization` -> admin sync tool for game passes + developer products + badges
 - `POST /api/admin/roblox-list-monetization-items` -> admin listing tool for Development/Test/Production game pass + product IDs/names
+  - Also handles:
+    - shared game configuration: `operation = game-config:get` / `operation = game-config:save`
+    - game description sync: `operation = load` / `operation = save`
 - `GET /api/profile` -> same user profile data from session
 - `GET /api/health`
 
@@ -18,6 +21,8 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `ROBLOX_OAUTH_CLIENT_ID`
 - `ROBLOX_OAUTH_CLIENT_SECRET`
 - `ROBLOX_OPEN_CLOUD_API_KEY` (used by the admin monetization tools)
+- `SUPABASE_URL` (used to persist shared Production/Test/Development game IDs)
+- `SUPABASE_SERVICE_ROLE_KEY` (server-side write/read key for shared game ID config)
 
 Optional:
 - `ROBLOX_OAUTH_REDIRECT_URI`
@@ -34,6 +39,9 @@ For `ROBLOX_OPEN_CLOUD_API_KEY`, include these Open Cloud scopes on all source/t
 - `legacy-universe.badge:manage-and-spend-robux`
 - `legacy-universe.badge:write`
 - `legacy-badge:manage`
+
+For description sync, also include:
+- `universe.place:write`
 
 Admin sync behavior notes:
 - Request body now uses fixed fields: `productionUniverseId` (source), `developmentUniverseId` (target), `testUniverseId` (target).
@@ -57,8 +65,9 @@ Recommended app links:
 
 ## Deploy Steps
 1. Set environment variables in Vercel.
-2. Redeploy.
-3. Open your site homepage and click `Sign in with Roblox` in the top-right account badge.
+2. Run `supabase/schema.sql` against your Supabase project (creates `admin_game_config` table).
+3. Redeploy.
+4. Open your site homepage and click `Sign in with Roblox` in the top-right account badge.
 
 ## Notes
 - Session is stored in HttpOnly cookie: `rd_session`.
