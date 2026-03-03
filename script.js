@@ -989,7 +989,9 @@ async function initAdminGameConfigTool() {
 
 async function initAdminToolsDirectory() {
     const toolsList = document.getElementById('admin-tools-list');
-    if (!toolsList) {
+    const systemsGateway = document.getElementById('admin-systems-gateway');
+    const toolsHeading = document.getElementById('admin-tools-heading');
+    if (!toolsList && !systemsGateway) {
         return;
     }
 
@@ -997,7 +999,15 @@ async function initAdminToolsDirectory() {
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
     if (!isAdmin) {
-        toolsList.classList.add('hidden');
+        if (toolsList) {
+            toolsList.classList.add('hidden');
+        }
+        if (systemsGateway) {
+            systemsGateway.classList.add('hidden');
+        }
+        if (toolsHeading) {
+            toolsHeading.classList.add('hidden');
+        }
         if (deniedElement) {
             deniedElement.classList.remove('hidden');
         }
@@ -1007,7 +1017,15 @@ async function initAdminToolsDirectory() {
     if (deniedElement) {
         deniedElement.classList.add('hidden');
     }
-    toolsList.classList.remove('hidden');
+    if (systemsGateway) {
+        systemsGateway.classList.remove('hidden');
+    }
+    if (toolsHeading) {
+        toolsHeading.classList.remove('hidden');
+    }
+    if (toolsList) {
+        toolsList.classList.remove('hidden');
+    }
 }
 
 // Age calculation function

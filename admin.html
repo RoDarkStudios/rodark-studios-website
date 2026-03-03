@@ -47,20 +47,20 @@
                             Configure shared admin infrastructure first, then run workflow-specific tools.
                         </p>
 
-                        <div id="admin-tools-list" class="admin-tools-list hidden">
-                            <a href="/admin/tools/game-configuration" class="admin-tool-link admin-tool-link-core">
-                                <div class="admin-tool-link-content">
-                                    <p class="admin-core-pill">Core System</p>
-                                    <h2 class="admin-tool-title">Admin Systems Configuration</h2>
-                                    <p class="admin-tool-note">
-                                        Global Production, Test, and Development universe routing used across all admin workflows.
-                                    </p>
-                                </div>
-                                <span class="admin-tool-link-icon" aria-hidden="true">
-                                    <i class="fas fa-arrow-right"></i>
-                                </span>
+                        <section id="admin-systems-gateway" class="admin-systems-gateway hidden" aria-labelledby="admin-systems-heading">
+                            <p class="admin-core-pill">Core System</p>
+                            <h2 id="admin-systems-heading" class="admin-tool-title">Admin Systems Configuration</h2>
+                            <p class="admin-tool-note">
+                                This is the platform-level control plane for all admin workflows, not just another tool.
+                            </p>
+                            <a href="/admin/tools/game-configuration" class="btn btn-primary admin-systems-gateway-btn">
+                                <i class="fas fa-satellite-dish" aria-hidden="true"></i>
+                                Open Systems Configuration
                             </a>
+                        </section>
 
+                        <h2 id="admin-tools-heading" class="admin-tools-heading hidden">Workflow Tools</h2>
+                        <div id="admin-tools-list" class="admin-tools-list hidden">
                             <a href="/admin/tools/copy-monetization" class="admin-tool-link">
                                 <div class="admin-tool-link-content">
                                     <h2 class="admin-tool-title">Copy Game Passes + Developer Products + Badges</h2>
