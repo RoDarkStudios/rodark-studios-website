@@ -891,21 +891,12 @@ body {
 }
 
 .admin-systems-gateway {
-    border: 1px solid rgba(6, 182, 212, 0.5);
-    border-radius: 16px;
-    padding: 1.2rem 1.2rem 1.3rem;
-    margin-bottom: 1.5rem;
-    background:
-        radial-gradient(circle at top right, rgba(6, 182, 212, 0.2), transparent 60%),
-        rgba(8, 20, 24, 0.85);
-}
-
-.admin-systems-gateway .admin-tool-note {
-    max-width: 760px;
+    margin-bottom: 1.25rem;
 }
 
 .admin-systems-gateway-btn {
-    margin-top: 0.25rem;
+    padding-left: 1.15rem;
+    padding-right: 1.15rem;
 }
 
 .admin-tools-heading {
@@ -987,40 +978,6 @@ body {
 .admin-tool-title {
     font-size: 1.4rem;
     margin-bottom: 0.5rem;
-}
-
-.admin-core-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    margin-bottom: 0.65rem;
-    color: #67e8f9;
-    border: 1px solid rgba(6, 182, 212, 0.5);
-    border-radius: 999px;
-    background: rgba(6, 182, 212, 0.14);
-    padding: 0.28rem 0.7rem;
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
-.admin-core-usage {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    margin-bottom: 1.1rem;
-}
-
-.admin-core-chip {
-    border: 1px solid rgba(100, 116, 139, 0.55);
-    border-radius: 999px;
-    background: rgba(15, 23, 42, 0.6);
-    color: #cbd5e1;
-    padding: 0.28rem 0.6rem;
-    font-size: 0.77rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
 }
 
 .admin-tool-note {

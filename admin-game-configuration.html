@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Systems Configuration - RoDark Studios</title>
-    <meta name="description" content="RoDark Studios shared admin systems configuration">
+    <title>Admin - Game IDs - RoDark Studios</title>
+    <meta name="description" content="RoDark Studios shared game IDs configuration">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -40,27 +40,21 @@
     <main class="auth-page-main">
         <section class="auth-section">
             <div class="container">
-                <h1 class="section-title">Admin Systems Configuration</h1>
+                <h1 class="section-title">Game IDs</h1>
                 <div class="legal-shell">
                     <article class="legal-card">
                         <p class="admin-tool-back-link-wrap">
                             <a href="/admin" class="admin-tool-back-link">
                                 <i class="fas fa-arrow-left" aria-hidden="true"></i>
-                                Back to admin tools
+                                Back to admin
                             </a>
                         </p>
 
                         <div id="admin-game-config-tool" class="admin-tool hidden">
-                            <p class="admin-core-pill">Core Control Plane</p>
-                            <h2 class="admin-tool-title">Shared Production, Test, and Development Universe Routing</h2>
+                            <h2 class="admin-tool-title">Shared Production, Test, and Development Universe IDs</h2>
                             <p class="admin-tool-note">
-                                This is global admin infrastructure, not a single workflow. Save once here and every admin operation uses these universe IDs automatically.
+                                Save once here and all admin tools use these IDs automatically.
                             </p>
-                            <div class="admin-core-usage" aria-label="Admin systems using this configuration">
-                                <span class="admin-core-chip">Copy Monetization</span>
-                                <span class="admin-core-chip">List Monetization IDs</span>
-                                <span class="admin-core-chip">Sync Description</span>
-                            </div>
 
                             <form id="game-config-form" class="admin-form">
                                 <label for="config-production-universe-id" class="admin-label">Production Universe ID</label>
@@ -73,7 +67,7 @@
                                 <input id="config-development-universe-id" class="admin-input" type="text" inputmode="numeric" required>
 
                                 <button id="game-config-save-btn" type="submit" class="btn btn-primary admin-submit-btn">
-                                    Save Shared Configuration
+                                    Save Game IDs
                                 </button>
                             </form>
 
