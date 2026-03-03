@@ -733,7 +733,9 @@ async function handleLoadProductionDescriptionClick() {
 
         const result = await postJson('/api/admin/roblox-list-monetization-items', {
             operation: 'load',
-            productionUniverseId: gameConfig.productionUniverseId
+            productionUniverseId: gameConfig.productionUniverseId,
+            testUniverseId: gameConfig.testUniverseId,
+            developmentUniverseId: gameConfig.developmentUniverseId
         });
 
         const descriptionInput = document.getElementById('game-description-text');
@@ -793,7 +795,6 @@ async function initAdminDescriptionSyncTool() {
 
     const deniedElement = document.getElementById('admin-access-denied');
     const form = document.getElementById('description-sync-form');
-    const loadButton = document.getElementById('load-production-description-btn');
     const descriptionInput = document.getElementById('game-description-text');
 
     const adminStatus = await fetchAdminStatus();
@@ -810,10 +811,6 @@ async function initAdminDescriptionSyncTool() {
         deniedElement.classList.add('hidden');
     }
     toolElement.classList.remove('hidden');
-
-    if (loadButton) {
-        loadButton.addEventListener('click', handleLoadProductionDescriptionClick);
-    }
 
     try {
         const gameConfig = await fetchAdminGameConfig({ force: true });
