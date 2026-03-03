@@ -24,6 +24,11 @@
       "source": "/admin-list-monetization-ids.html",
       "destination": "/admin/tools/list-monetization-ids",
       "permanent": true
+    },
+    {
+      "source": "/admin-sync-game-description.html",
+      "destination": "/admin/tools/sync-game-description",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -46,6 +51,10 @@
     {
       "source": "/admin/tools/list-monetization-ids",
       "destination": "/admin-list-monetization-ids.html"
+    },
+    {
+      "source": "/admin/tools/sync-game-description",
+      "destination": "/admin-sync-game-description.html"
     }
   ]
 }

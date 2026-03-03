@@ -538,6 +538,235 @@ async function initAdminListMonetizationTool() {
     }
 }
 
+function setDescriptionSyncStatus(message, type) {
+    const statusElement = document.getElementById('description-sync-status');
+    if (!statusElement) {
+        return;
+    }
+
+    if (!message) {
+        statusElement.textContent = '';
+        statusElement.classList.add('hidden');
+        statusElement.classList.remove('success', 'error', 'info');
+        return;
+    }
+
+    statusElement.textContent = message;
+    statusElement.classList.remove('hidden');
+    statusElement.classList.remove('success', 'error', 'info');
+    statusElement.classList.add(type || 'info');
+}
+
+function setDescriptionLoadBusy(isBusy) {
+    const loadButton = document.getElementById('load-production-description-btn');
+    if (!loadButton) {
+        return;
+    }
+
+    loadButton.disabled = Boolean(isBusy);
+    loadButton.textContent = isBusy
+        ? 'Loading Production Description...'
+        : 'Load Production Description';
+}
+
+function setDescriptionSaveBusy(isBusy) {
+    const saveButton = document.getElementById('save-description-sync-btn');
+    if (!saveButton) {
+        return;
+    }
+
+    saveButton.disabled = Boolean(isBusy);
+    saveButton.textContent = isBusy
+        ? 'Saving to All 3 Games...'
+        : 'Save to All 3 Games';
+}
+
+function renderDescriptionSyncResults(result) {
+    const resultElement = document.getElementById('description-sync-results');
+    if (!resultElement) {
+        return;
+    }
+
+    if (!result || typeof result !== 'object') {
+        resultElement.innerHTML = '';
+        resultElement.classList.add('hidden');
+        return;
+    }
+
+    const updates = Array.isArray(result && result.updates) ? result.updates : [];
+    const updateLines = updates.map((item) => {
+        const label = String(item && item.label ? item.label : 'Game');
+        const universeId = Number(item && item.universeId);
+        const placeId = Number(item && item.placeId);
+        return `${label}: Universe ${Number.isFinite(universeId) ? universeId : 'Unknown'} (Root Place ${Number.isFinite(placeId) ? placeId : 'Unknown'})`;
+    }).join('\n');
+
+    const productionDescription = String(result && result.productionDescription ? result.productionDescription : '');
+    const testDescription = String(result && result.testDescription ? result.testDescription : '');
+    const developmentDescription = String(result && result.developmentDescription ? result.developmentDescription : '');
+
+    resultElement.innerHTML = `
+        <article class="admin-target-result">
+            <label class="admin-label admin-catalog-label">Updated Games</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(updateLines || 'No update details returned')}</textarea>
+            <label class="admin-label admin-catalog-label">Saved Production Description</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(productionDescription)}</textarea>
+            <label class="admin-label admin-catalog-label">Saved Test Description</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(testDescription)}</textarea>
+            <label class="admin-label admin-catalog-label">Saved Development Description</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(developmentDescription)}</textarea>
+        </article>
+    `;
+
+    resultElement.classList.remove('hidden');
+}
+
+function getDescriptionSyncFormValues() {
+    const productionInput = document.getElementById('production-description-universe-id');
+    const testInput = document.getElementById('test-description-universe-id');
+    const developmentInput = document.getElementById('development-description-universe-id');
+    const descriptionInput = document.getElementById('game-description-text');
+
+    return {
+        productionUniverseId: String(productionInput && productionInput.value ? productionInput.value : '').trim(),
+        testUniverseId: String(testInput && testInput.value ? testInput.value : '').trim(),
+        developmentUniverseId: String(developmentInput && developmentInput.value ? developmentInput.value : '').trim(),
+        description: String(descriptionInput && descriptionInput.value ? descriptionInput.value : '')
+    };
+}
+
+async function handleLoadProductionDescriptionClick() {
+    const values = getDescriptionSyncFormValues();
+    if (!values.productionUniverseId) {
+        setDescriptionSyncStatus('Enter the Production universe ID first.', 'error');
+        return;
+    }
+
+    setDescriptionLoadBusy(true);
+    setDescriptionSyncStatus('Loading current Production description...', 'info');
+    renderDescriptionSyncResults(null);
+
+    try {
+        const result = await postJson('/api/admin/roblox-sync-game-description', {
+            operation: 'load',
+            productionUniverseId: values.productionUniverseId
+        });
+
+        const descriptionInput = document.getElementById('game-description-text');
+        if (descriptionInput) {
+            descriptionInput.value = String(result && result.productionDescription ? result.productionDescription : '');
+            descriptionInput.dataset.loadedProductionUniverseId = values.productionUniverseId;
+        }
+
+        setDescriptionSyncStatus('Production description loaded. Edit and save when ready.', 'success');
+    } catch (error) {
+        setDescriptionSyncStatus(error.message || 'Failed to load Production description.', 'error');
+    } finally {
+        setDescriptionLoadBusy(false);
+    }
+}
+
+async function handleDescriptionSyncSubmit(event) {
+    event.preventDefault();
+
+    const values = getDescriptionSyncFormValues();
+    if (!values.productionUniverseId || !values.testUniverseId || !values.developmentUniverseId) {
+        setDescriptionSyncStatus('Please enter Production, Test, and Development universe IDs.', 'error');
+        return;
+    }
+
+    setDescriptionSaveBusy(true);
+    setDescriptionSyncStatus('Saving descriptions to Production, Test, and Development...', 'info');
+    renderDescriptionSyncResults(null);
+
+    try {
+        const result = await postJson('/api/admin/roblox-sync-game-description', {
+            operation: 'save',
+            productionUniverseId: values.productionUniverseId,
+            testUniverseId: values.testUniverseId,
+            developmentUniverseId: values.developmentUniverseId,
+            description: values.description
+        });
+
+        const descriptionInput = document.getElementById('game-description-text');
+        if (descriptionInput) {
+            descriptionInput.value = String(result && result.productionDescription ? result.productionDescription : '');
+            descriptionInput.dataset.loadedProductionUniverseId = values.productionUniverseId;
+        }
+
+        renderDescriptionSyncResults(result);
+        setDescriptionSyncStatus('Descriptions updated successfully for all 3 games.', 'success');
+    } catch (error) {
+        setDescriptionSyncStatus(error.message || 'Failed to save game descriptions.', 'error');
+    } finally {
+        setDescriptionSaveBusy(false);
+    }
+}
+
+async function initAdminDescriptionSyncTool() {
+    const toolElement = document.getElementById('admin-description-sync-tool');
+    if (!toolElement) {
+        return;
+    }
+
+    const deniedElement = document.getElementById('admin-access-denied');
+    const form = document.getElementById('description-sync-form');
+    const loadButton = document.getElementById('load-production-description-btn');
+    const productionInput = document.getElementById('production-description-universe-id');
+
+    const adminStatus = await fetchAdminStatus();
+    const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
+    if (!isAdmin) {
+        toolElement.classList.add('hidden');
+        if (deniedElement) {
+            deniedElement.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (deniedElement) {
+        deniedElement.classList.add('hidden');
+    }
+    toolElement.classList.remove('hidden');
+
+    if (loadButton) {
+        loadButton.addEventListener('click', handleLoadProductionDescriptionClick);
+    }
+
+    if (productionInput) {
+        productionInput.addEventListener('change', async () => {
+            const descriptionInput = document.getElementById('game-description-text');
+            const productionUniverseId = String(productionInput.value || '').trim();
+            if (!productionUniverseId) {
+                return;
+            }
+
+            const loadedId = String(
+                descriptionInput && descriptionInput.dataset && descriptionInput.dataset.loadedProductionUniverseId
+                    ? descriptionInput.dataset.loadedProductionUniverseId
+                    : ''
+            ).trim();
+
+            if (loadedId === productionUniverseId) {
+                return;
+            }
+
+            const hasExistingDescription = Boolean(
+                descriptionInput && String(descriptionInput.value || '').trim()
+            );
+            if (hasExistingDescription && loadedId && loadedId !== productionUniverseId) {
+                return;
+            }
+
+            await handleLoadProductionDescriptionClick();
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', handleDescriptionSyncSubmit);
+    }
+}
+
 async function initAdminToolsDirectory() {
     const toolsList = document.getElementById('admin-tools-list');
     if (!toolsList) {
@@ -849,6 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initAdminToolsDirectory();
     initAdminCopyTool();
     initAdminListMonetizationTool();
+    initAdminDescriptionSyncTool();
 
     // Calculate and display ages
     const myronAge = calculateAge('2008-05-31');

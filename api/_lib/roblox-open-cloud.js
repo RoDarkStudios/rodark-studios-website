@@ -649,6 +649,85 @@ async function updateBadgeIcon(badgeId, imageBuffer) {
     });
 }
 
+function parsePlaceIdFromResourcePath(placePath) {
+    const value = String(placePath || '').trim();
+    if (!value) {
+        throw new Error('Missing root place path');
+    }
+
+    const match = value.match(/^universes\/\d+\/places\/(\d+)$/);
+    if (!match) {
+        throw new Error('Invalid root place path format');
+    }
+
+    const placeId = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(placeId) || placeId <= 0) {
+        throw new Error('Invalid root place ID');
+    }
+
+    return placeId;
+}
+
+async function getUniverse(universeId) {
+    return robloxOpenCloudRequest({
+        method: 'GET',
+        path: `/cloud/v2/universes/${universeId}`
+    });
+}
+
+async function getPlace(universeId, placeId) {
+    return robloxOpenCloudRequest({
+        method: 'GET',
+        path: `/cloud/v2/universes/${universeId}/places/${placeId}`
+    });
+}
+
+async function updatePlaceDescription(universeId, placeId, description) {
+    await robloxOpenCloudRequest({
+        method: 'PATCH',
+        path: `/cloud/v2/universes/${universeId}/places/${placeId}`,
+        query: {
+            updateMask: 'description'
+        },
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            description: String(description || '')
+        })
+    });
+}
+
+async function getUniverseRootPlaceInfo(universeId) {
+    const universe = await getUniverse(universeId);
+    const placePath = universe && universe.rootPlace ? String(universe.rootPlace).trim() : '';
+    const placeId = parsePlaceIdFromResourcePath(placePath);
+    return {
+        universe,
+        placeId,
+        placePath
+    };
+}
+
+async function getUniverseDescription(universeId) {
+    const rootPlace = await getUniverseRootPlaceInfo(universeId);
+    const place = await getPlace(universeId, rootPlace.placeId);
+    return {
+        placeId: rootPlace.placeId,
+        description: place && typeof place.description === 'string'
+            ? place.description
+            : ''
+    };
+}
+
+async function updateUniverseDescription(universeId, description) {
+    const rootPlace = await getUniverseRootPlaceInfo(universeId);
+    await updatePlaceDescription(universeId, rootPlace.placeId, description);
+    return {
+        placeId: rootPlace.placeId
+    };
+}
+
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -671,5 +750,11 @@ module.exports = {
     createBadge,
     updateBadge,
     updateBadgeIcon,
+    getUniverse,
+    getPlace,
+    updatePlaceDescription,
+    getUniverseRootPlaceInfo,
+    getUniverseDescription,
+    updateUniverseDescription,
     sleep
 };
