@@ -197,7 +197,7 @@ function escapeHtml(value) {
 let cachedAdminGameConfig = null;
 let cachedAdminGameConfigAt = 0;
 const ADMIN_GAME_CONFIG_CACHE_TTL_MS = 10 * 1000;
-const MISSING_GAME_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
+const MISSING_GAME_CONFIG_MESSAGE = 'Shared admin systems configuration is missing. Open Admin > Admin Systems Configuration and save Production/Test/Development universe IDs.';
 
 function toPositiveIntegerOrNull(value) {
     const parsed = Number.parseInt(String(value || '').trim(), 10);
@@ -855,7 +855,7 @@ function setGameConfigBusy(isBusy) {
     }
 
     button.disabled = Boolean(isBusy);
-    button.textContent = isBusy ? 'Saving...' : 'Save Game Configuration';
+    button.textContent = isBusy ? 'Saving...' : 'Save Shared Configuration';
 }
 
 function renderGameConfigResults(config) {
@@ -927,19 +927,19 @@ async function handleGameConfigSubmit(event) {
     }
 
     setGameConfigBusy(true);
-    setGameConfigStatus('Saving shared game IDs...', 'info');
+    setGameConfigStatus('Saving shared admin systems configuration...', 'info');
 
     try {
         const config = await saveAdminGameConfig(values);
         if (!config) {
-            throw new Error('Game configuration save returned no IDs');
+            throw new Error('Shared configuration save returned no IDs');
         }
 
         writeGameConfigFormValues(config);
         renderGameConfigResults(config);
-        setGameConfigStatus('Game configuration saved successfully.', 'success');
+        setGameConfigStatus('Shared admin systems configuration saved successfully.', 'success');
     } catch (error) {
-        setGameConfigStatus(error.message || 'Failed to save game configuration.', 'error');
+        setGameConfigStatus(error.message || 'Failed to save shared admin systems configuration.', 'error');
     } finally {
         setGameConfigBusy(false);
     }
@@ -975,11 +975,11 @@ async function initAdminGameConfigTool() {
             writeGameConfigFormValues(config);
             renderGameConfigResults(config);
         } else {
-            setGameConfigStatus('No shared game IDs saved yet. Enter IDs and save.', 'info');
+            setGameConfigStatus('No shared admin systems configuration saved yet. Enter IDs and save.', 'info');
             renderGameConfigResults(null);
         }
     } catch (error) {
-        setGameConfigStatus(error.message || 'Failed to load game configuration.', 'error');
+        setGameConfigStatus(error.message || 'Failed to load shared admin systems configuration.', 'error');
     }
 
     if (form) {
