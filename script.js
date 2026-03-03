@@ -647,7 +647,7 @@ async function handleLoadProductionDescriptionClick() {
     renderDescriptionSyncResults(null);
 
     try {
-        const result = await postJson('/api/admin/roblox-sync-game-description', {
+        const result = await postJson('/api/admin/roblox-list-monetization-items', {
             operation: 'load',
             productionUniverseId: values.productionUniverseId
         });
@@ -680,7 +680,7 @@ async function handleDescriptionSyncSubmit(event) {
     renderDescriptionSyncResults(null);
 
     try {
-        const result = await postJson('/api/admin/roblox-sync-game-description', {
+        const result = await postJson('/api/admin/roblox-list-monetization-items', {
             operation: 'save',
             productionUniverseId: values.productionUniverseId,
             testUniverseId: values.testUniverseId,
