@@ -46,12 +46,14 @@ For description sync, also include:
 Admin sync behavior notes:
 - Request body now uses fixed fields: `productionUniverseId` (source), `developmentUniverseId` (target), `testUniverseId` (target).
 - Target items are matched by name (case-insensitive), then updated to source name/description/icon.
-- Missing target items are created.
+- If no name match is found for a source game pass/product, the sync reuses one archived target item first (if available) before creating a new one.
 - Development/Test target prices are always forced to `1` Robux for game passes and developer products.
 - Badges always copy as-is (name/description/enabled/icon).
 - Regional pricing for synced/created items is copied from source items.
 - The endpoint has a concurrency lock: if another sync is already running for any of the same universes, a `409` is returned.
-- Open Cloud currently has no delete endpoints for these resources, so unmatched target items are renamed with `[ARCHIVED] ` and archived (`isForSale=false` for game passes/developer products, `enabled=false` for badges) instead of deleted.
+- Open Cloud currently has no delete endpoints for these resources, so unmatched target items are archived instead of deleted.
+- Archived game passes/developer products are normalized to name `Archived`, forced off-sale, and assigned a blank icon so they can act as a reusable bank.
+- Archived badges are renamed to `Archived`, disabled, and assigned a blank icon.
 
 ## Roblox OAuth App Configuration
 In your Roblox OAuth app settings, ensure the redirect URI matches:

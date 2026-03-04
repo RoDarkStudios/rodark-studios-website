@@ -24,6 +24,12 @@ const { tryAcquireMonetizationLock, releaseMonetizationLock } = require('../_lib
 const { getStoredGameConfig } = require('../_lib/admin-game-config-store');
 
 const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
+const ARCHIVED_MONETIZATION_NAME = 'Archived';
+const ARCHIVED_MONETIZATION_NAME_KEY = ARCHIVED_MONETIZATION_NAME.toLowerCase();
+const ARCHIVED_ICON_BUFFER = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z8ioAAAAASUVORK5CYII=',
+    'base64'
+);
 const FORCED_TARGET_PRICE = 1;
 const MISSING_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
 
@@ -101,9 +107,19 @@ function normalizeNameKey(value) {
     return String(value || '').trim().toLowerCase();
 }
 
-function buildTargetNameIndex(configs, idFieldName) {
+function isArchivedMonetizationConfig(config, resolvedName) {
+    const name = String(resolvedName || (config && config.name) || '').trim();
+    const nameKey = normalizeNameKey(name);
+    const legacyArchivedPrefixKey = normalizeNameKey(ARCHIVED_NAME_PREFIX);
+    return nameKey === ARCHIVED_MONETIZATION_NAME_KEY || nameKey.startsWith(legacyArchivedPrefixKey);
+}
+
+function buildTargetNameIndex(configs, idFieldName, options) {
     const allEntries = [];
     const byName = new Map();
+    const archivedEntries = [];
+    const settings = options || {};
+    const includeArchivedPool = settings.includeArchivedPool === true;
 
     for (const config of configs) {
         const id = Number(config && config[idFieldName]);
@@ -122,6 +138,10 @@ function buildTargetNameIndex(configs, idFieldName) {
 
         allEntries.push(entry);
 
+        if (includeArchivedPool && isArchivedMonetizationConfig(config, name)) {
+            archivedEntries.push(entry);
+        }
+
         if (!nameKey) {
             continue;
         }
@@ -134,7 +154,8 @@ function buildTargetNameIndex(configs, idFieldName) {
 
     return {
         allEntries,
-        byName
+        byName,
+        archivedEntries
     };
 }
 
@@ -159,18 +180,18 @@ function consumeMatchByName(byName, nameKey, consumedIds) {
     return null;
 }
 
-function buildArchivedName(name) {
-    const rawName = String(name || '').trim();
-    if (!rawName) {
-        return ARCHIVED_NAME_PREFIX.trim();
+function consumeArchivedEntry(archivedEntries, consumedIds) {
+    const pool = Array.isArray(archivedEntries) ? archivedEntries : [];
+
+    while (pool.length > 0) {
+        const entry = pool.shift();
+        if (!entry || consumedIds.has(entry.id)) {
+            continue;
+        }
+        return entry;
     }
 
-    const lowerPrefix = ARCHIVED_NAME_PREFIX.toLowerCase();
-    if (rawName.toLowerCase().startsWith(lowerPrefix)) {
-        return rawName;
-    }
-
-    return `${ARCHIVED_NAME_PREFIX}${rawName}`;
+    return null;
 }
 
 function parseGameUniverseIdsFromBody(body) {
@@ -338,8 +359,12 @@ module.exports = async (req, res) => {
             const existingTargetGamePasses = await listAllGamePassConfigs(targetUniverseId);
             const existingTargetDeveloperProducts = await listAllDeveloperProductConfigs(targetUniverseId);
             const existingTargetBadges = await listAllBadges(targetUniverseId);
-            const indexedTargetGamePasses = buildTargetNameIndex(existingTargetGamePasses, 'gamePassId');
-            const indexedTargetDeveloperProducts = buildTargetNameIndex(existingTargetDeveloperProducts, 'productId');
+            const indexedTargetGamePasses = buildTargetNameIndex(existingTargetGamePasses, 'gamePassId', {
+                includeArchivedPool: true
+            });
+            const indexedTargetDeveloperProducts = buildTargetNameIndex(existingTargetDeveloperProducts, 'productId', {
+                includeArchivedPool: true
+            });
             const indexedTargetBadges = buildTargetNameIndex(existingTargetBadges, 'id');
             const matchedTargetGamePassIds = new Set();
             const matchedTargetDeveloperProductIds = new Set();
@@ -353,11 +378,15 @@ module.exports = async (req, res) => {
                     ? `${sourcePass.imageWarning}. Synced without icon.`
                     : null;
 
-                const matchedTargetPass = consumeMatchByName(
+                const matchedTargetPassByName = consumeMatchByName(
                     indexedTargetGamePasses.byName,
                     sourceNameKey,
                     matchedTargetGamePassIds
                 );
+                const matchedArchivedPass = matchedTargetPassByName
+                    ? null
+                    : consumeArchivedEntry(indexedTargetGamePasses.archivedEntries, matchedTargetGamePassIds);
+                const matchedTargetPass = matchedTargetPassByName || matchedArchivedPass;
 
                 try {
                     if (matchedTargetPass) {
@@ -370,7 +399,8 @@ module.exports = async (req, res) => {
                         gamePasses.updatedItems.push({
                             sourceId: sourcePass.sourceId,
                             targetId: matchedTargetPass.id,
-                            name: sourceName
+                            name: sourceName,
+                            recycledFromArchive: Boolean(matchedArchivedPass)
                         });
                         if (iconWarning) {
                             gamePasses.warnings.push({
@@ -417,9 +447,9 @@ module.exports = async (req, res) => {
                 gamePasses.attempted += 1;
 
                 try {
-                    await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, null, {
+                    await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, ARCHIVED_ICON_BUFFER, {
                         ...pricingOverrideOptions,
-                        nameOverride: buildArchivedName(targetPass.name),
+                        nameOverride: ARCHIVED_MONETIZATION_NAME,
                         forceForSale: false,
                         forceRegionalPricingEnabled: false
                     });
@@ -450,11 +480,15 @@ module.exports = async (req, res) => {
                     ? `${sourceProduct.imageWarning}. Synced without icon.`
                     : null;
 
-                const matchedTargetProduct = consumeMatchByName(
+                const matchedTargetProductByName = consumeMatchByName(
                     indexedTargetDeveloperProducts.byName,
                     sourceNameKey,
                     matchedTargetDeveloperProductIds
                 );
+                const matchedArchivedProduct = matchedTargetProductByName
+                    ? null
+                    : consumeArchivedEntry(indexedTargetDeveloperProducts.archivedEntries, matchedTargetDeveloperProductIds);
+                const matchedTargetProduct = matchedTargetProductByName || matchedArchivedProduct;
 
                 try {
                     if (matchedTargetProduct) {
@@ -473,7 +507,8 @@ module.exports = async (req, res) => {
                         developerProducts.updatedItems.push({
                             sourceId: sourceProduct.sourceId,
                             targetId: matchedTargetProduct.id,
-                            name: sourceName
+                            name: sourceName,
+                            recycledFromArchive: Boolean(matchedArchivedProduct)
                         });
                         if (iconWarning) {
                             developerProducts.warnings.push({
@@ -525,9 +560,9 @@ module.exports = async (req, res) => {
                 developerProducts.attempted += 1;
 
                 try {
-                    await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, null, {
+                    await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, ARCHIVED_ICON_BUFFER, {
                         ...pricingOverrideOptions,
-                        nameOverride: buildArchivedName(targetProduct.name),
+                        nameOverride: ARCHIVED_MONETIZATION_NAME,
                         forceForSale: false,
                         forceRegionalPricingEnabled: false
                     });
@@ -629,9 +664,10 @@ module.exports = async (req, res) => {
 
                 try {
                     await updateBadge(targetBadge.id, targetBadge.config, {
-                        nameOverride: buildArchivedName(targetBadge.name),
+                        nameOverride: ARCHIVED_MONETIZATION_NAME,
                         forceEnabled: false
                     });
+                    await updateBadgeIcon(targetBadge.id, ARCHIVED_ICON_BUFFER);
                     badges.archived += 1;
                     badges.archivedItems.push({
                         targetId: targetBadge.id,
@@ -701,7 +737,7 @@ module.exports = async (req, res) => {
                 totalBadgeWarnings
             },
             limitations: [
-                'Roblox Open Cloud does not currently provide delete endpoints for game passes, developer products, or badges. Unmatched target items are renamed with an [ARCHIVED] prefix and archived instead of deleted.'
+                'Roblox Open Cloud does not currently provide delete endpoints for game passes, developer products, or badges. Unmatched items are renamed to Archived, set off-sale/disabled, and assigned a blank icon. Archived game passes/products are reused for future source items when possible.'
             ],
             targets
         });
