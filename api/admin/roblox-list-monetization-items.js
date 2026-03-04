@@ -14,6 +14,8 @@ const TEST_PREFIX = '\u26A0\uFE0F THIS IS THE TEST GAME - THIS IS NOT THE OFFICI
 const DEVELOPMENT_PREFIX = '\u26A0\uFE0F THIS IS THE DEVELOPMENT GAME - THIS IS NOT THE OFFICIAL GAME';
 const ENVIRONMENT_PREFIX_REGEX = /^\u26A0(?:\uFE0F)? THIS IS THE (TEST|DEVELOPMENT) GAME - THIS IS NOT THE OFFICIAL GAME(?:\r?\n|\r)?(?:\r?\n|\r)?/i;
 const MISSING_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
+const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
+const LEGACY_ARCHIVED_MONETIZATION_NAME_KEY = 'archived';
 
 async function requireAdmin(req, res) {
     const groupId = getAdminGroupId();
@@ -70,6 +72,16 @@ function hasAllUniverseIdFields(body) {
 
 function normalizeDescriptionInput(value) {
     return String(value || '').replace(/\r\n/g, '\n').trim();
+}
+
+function normalizeNameKey(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function isArchivedMonetizationName(name) {
+    const nameKey = normalizeNameKey(name);
+    const archivedPrefixKey = normalizeNameKey(ARCHIVED_NAME_PREFIX);
+    return nameKey === LEGACY_ARCHIVED_MONETIZATION_NAME_KEY || nameKey.startsWith(archivedPrefixKey);
 }
 
 function stripEnvironmentPrefix(description) {
@@ -225,9 +237,14 @@ function toGamePassRow(config) {
         return null;
     }
 
+    const name = String(config && config.name ? config.name : '').trim();
+    if (isArchivedMonetizationName(name)) {
+        return null;
+    }
+
     return {
         id,
-        name: String(config && config.name ? config.name : '').trim() || '(Unnamed Game Pass)'
+        name: name || '(Unnamed Game Pass)'
     };
 }
 
@@ -237,9 +254,14 @@ function toDeveloperProductRow(config) {
         return null;
     }
 
+    const name = String(config && config.name ? config.name : '').trim();
+    if (isArchivedMonetizationName(name)) {
+        return null;
+    }
+
     return {
         id,
-        name: String(config && config.name ? config.name : '').trim() || '(Unnamed Developer Product)'
+        name: name || '(Unnamed Developer Product)'
     };
 }
 

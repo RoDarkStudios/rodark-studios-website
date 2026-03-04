@@ -17,8 +17,7 @@ const {
     updateDeveloperProduct,
     createBadge,
     updateBadge,
-    updateBadgeIcon,
-    sleep
+    updateBadgeIcon
 } = require('../_lib/roblox-open-cloud');
 const { tryAcquireMonetizationLock, releaseMonetizationLock } = require('../_lib/monetization-sync-lock');
 const { getStoredGameConfig } = require('../_lib/admin-game-config-store');
@@ -520,7 +519,6 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(250);
             }
 
             for (const targetPass of indexedTargetGamePasses.allEntries) {
@@ -560,7 +558,6 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(150);
             }
 
             for (const sourceProduct of preparedDeveloperProducts) {
@@ -642,7 +639,6 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(400);
             }
 
             for (const targetProduct of indexedTargetDeveloperProducts.allEntries) {
@@ -688,7 +684,6 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(250);
             }
 
             for (const sourceBadge of preparedBadges) {
@@ -760,7 +755,6 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(300);
             }
 
             for (const targetBadge of indexedTargetBadges.allEntries) {
@@ -826,7 +820,6 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(150);
             }
 
             targets.push({
