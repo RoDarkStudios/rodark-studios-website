@@ -337,6 +337,19 @@ function renderAdminCopyResults(result) {
     const summary = result.totals || {};
     const sourceCounts = result.sourceCounts || {};
     const targetRows = Array.isArray(result.targets) ? result.targets : [];
+    const getFailureId = (item) => {
+        const sourceId = Number(item && item.sourceId);
+        if (Number.isFinite(sourceId) && sourceId > 0) {
+            return sourceId;
+        }
+
+        const targetId = Number(item && item.targetId);
+        if (Number.isFinite(targetId) && targetId > 0) {
+            return targetId;
+        }
+
+        return 'Unknown';
+    };
 
     const targetMarkup = targetRows.map((target) => {
         const gamePasses = target && target.gamePasses ? target.gamePasses : {};
@@ -353,9 +366,9 @@ function renderAdminCopyResults(result) {
             : [];
 
         const combinedFailures = []
-            .concat(gamePassFailures.map((item) => `Game pass ${item.sourceId}: ${item.error}`))
-            .concat(developerProductFailures.map((item) => `Product ${item.sourceId}: ${item.error}`))
-            .concat(badgeFailures.map((item) => `Badge ${item.sourceId || item.targetId}: ${item.error}`));
+            .concat(gamePassFailures.map((item) => `Game pass ${getFailureId(item)}: ${item.error}`))
+            .concat(developerProductFailures.map((item) => `Product ${getFailureId(item)}: ${item.error}`))
+            .concat(badgeFailures.map((item) => `Badge ${getFailureId(item)}: ${item.error}`));
 
         const failurePreview = combinedFailures.slice(0, 5).map((line) => escapeHtml(line)).join('\n');
 
@@ -1482,4 +1495,3 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-

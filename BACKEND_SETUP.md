@@ -52,8 +52,8 @@ Admin sync behavior notes:
 - Regional pricing for synced/created items is copied from source items.
 - The endpoint has a concurrency lock: if another sync is already running for any of the same universes, a `409` is returned.
 - Open Cloud currently has no delete endpoints for these resources, so unmatched target items are archived instead of deleted.
-- Archived game passes/developer products are normalized to name `Archived`, forced off-sale, and assigned a blank icon so they can act as a reusable bank.
-- Archived badges are renamed to `Archived`, disabled, and assigned a blank icon.
+- Archived game passes/developer products are normalized to `[ARCHIVED] <item-id>`. They are forced off-sale and assigned a blank icon so they can act as a reusable bank.
+- Archived badges are renamed to `[ARCHIVED] <item-id>`, disabled, and assigned a blank icon.
 - If Roblox rejects a neutral icon upload, the item is still archived and the sync records a warning (instead of failing the whole item).
 
 ## Roblox OAuth App Configuration

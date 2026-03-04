@@ -24,8 +24,8 @@ const { tryAcquireMonetizationLock, releaseMonetizationLock } = require('../_lib
 const { getStoredGameConfig } = require('../_lib/admin-game-config-store');
 
 const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
-const ARCHIVED_MONETIZATION_NAME = 'Archived';
-const ARCHIVED_MONETIZATION_NAME_KEY = ARCHIVED_MONETIZATION_NAME.toLowerCase();
+const LEGACY_ARCHIVED_MONETIZATION_NAME = 'Archived';
+const LEGACY_ARCHIVED_MONETIZATION_NAME_KEY = LEGACY_ARCHIVED_MONETIZATION_NAME.toLowerCase();
 const ARCHIVED_ICON_BUFFER = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z8ioAAAAASUVORK5CYII=',
     'base64'
@@ -111,7 +111,7 @@ function isArchivedMonetizationConfig(config, resolvedName) {
     const name = String(resolvedName || (config && config.name) || '').trim();
     const nameKey = normalizeNameKey(name);
     const legacyArchivedPrefixKey = normalizeNameKey(ARCHIVED_NAME_PREFIX);
-    return nameKey === ARCHIVED_MONETIZATION_NAME_KEY || nameKey.startsWith(legacyArchivedPrefixKey);
+    return nameKey === LEGACY_ARCHIVED_MONETIZATION_NAME_KEY || nameKey.startsWith(legacyArchivedPrefixKey);
 }
 
 function buildTargetNameIndex(configs, idFieldName, options) {
@@ -205,6 +205,77 @@ function isImageUploadError(error) {
         || message.includes('invalid')
         || message.includes('file')
     );
+}
+
+function isDuplicateNameError(error) {
+    const message = String(error && error.message ? error.message : '').toLowerCase();
+    return (
+        message.includes('duplicateproductname')
+        || message.includes('name already exists')
+        || message.includes('already exists in the universe')
+    );
+}
+
+function buildArchiveNameCandidates(targetId) {
+    const numericId = Number(targetId);
+    const suffix = Number.isFinite(numericId) && numericId > 0
+        ? String(Math.round(numericId))
+        : 'unknown';
+    return [`${ARCHIVED_NAME_PREFIX}${suffix}`];
+}
+
+async function archiveMonetizationItemWithNameFallback(
+    targetId,
+    updateAttempt,
+    warnings,
+    warningPayload
+) {
+    const nameCandidates = buildArchiveNameCandidates(targetId);
+    let lastError = null;
+
+    for (let index = 0; index < nameCandidates.length; index += 1) {
+        const nameOverride = nameCandidates[index];
+
+        try {
+            try {
+                await updateAttempt(nameOverride, ARCHIVED_ICON_BUFFER);
+                return;
+            } catch (error) {
+                if (isDuplicateNameError(error) && index < nameCandidates.length - 1) {
+                    continue;
+                }
+                if (!isImageUploadError(error)) {
+                    throw error;
+                }
+
+                try {
+                    await updateAttempt(nameOverride, null);
+                    warnings.push({
+                        ...warningPayload,
+                        warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
+                    });
+                    return;
+                } catch (fallbackError) {
+                    if (isDuplicateNameError(fallbackError) && index < nameCandidates.length - 1) {
+                        continue;
+                    }
+                    throw fallbackError;
+                }
+            }
+        } catch (error) {
+            lastError = error;
+            if (isDuplicateNameError(error) && index < nameCandidates.length - 1) {
+                continue;
+            }
+            break;
+        }
+    }
+
+    if (lastError) {
+        throw lastError;
+    }
+
+    throw new Error('Failed to archive item');
 }
 
 function parseGameUniverseIdsFromBody(body) {
@@ -460,31 +531,21 @@ module.exports = async (req, res) => {
                 gamePasses.attempted += 1;
 
                 try {
-                    try {
-                        await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, ARCHIVED_ICON_BUFFER, {
+                    await archiveMonetizationItemWithNameFallback(
+                        targetPass.id,
+                        async (nameOverride, imageBuffer) => updateGamePass(targetUniverseId, targetPass.id, targetPass.config, imageBuffer, {
                             ...pricingOverrideOptions,
-                            nameOverride: ARCHIVED_MONETIZATION_NAME,
+                            nameOverride,
                             forceForSale: false,
                             forceRegionalPricingEnabled: false
-                        });
-                    } catch (error) {
-                        if (!isImageUploadError(error)) {
-                            throw error;
-                        }
-
-                        await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, null, {
-                            ...pricingOverrideOptions,
-                            nameOverride: ARCHIVED_MONETIZATION_NAME,
-                            forceForSale: false,
-                            forceRegionalPricingEnabled: false
-                        });
-                        gamePasses.warnings.push({
+                        }),
+                        gamePasses.warnings,
+                        {
                             sourceId: null,
                             targetId: targetPass.id,
-                            name: targetPass.name,
-                            warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
-                        });
-                    }
+                            name: targetPass.name
+                        }
+                    );
                     gamePasses.archived += 1;
                     gamePasses.archivedItems.push({
                         targetId: targetPass.id,
@@ -592,31 +653,27 @@ module.exports = async (req, res) => {
                 developerProducts.attempted += 1;
 
                 try {
-                    try {
-                        await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, ARCHIVED_ICON_BUFFER, {
-                            ...pricingOverrideOptions,
-                            nameOverride: ARCHIVED_MONETIZATION_NAME,
-                            forceForSale: false,
-                            forceRegionalPricingEnabled: false
-                        });
-                    } catch (error) {
-                        if (!isImageUploadError(error)) {
-                            throw error;
-                        }
-
-                        await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, null, {
-                            ...pricingOverrideOptions,
-                            nameOverride: ARCHIVED_MONETIZATION_NAME,
-                            forceForSale: false,
-                            forceRegionalPricingEnabled: false
-                        });
-                        developerProducts.warnings.push({
+                    await archiveMonetizationItemWithNameFallback(
+                        targetProduct.id,
+                        async (nameOverride, imageBuffer) => updateDeveloperProduct(
+                            targetUniverseId,
+                            targetProduct.id,
+                            targetProduct.config,
+                            imageBuffer,
+                            {
+                                ...pricingOverrideOptions,
+                                nameOverride,
+                                forceForSale: false,
+                                forceRegionalPricingEnabled: false
+                            }
+                        ),
+                        developerProducts.warnings,
+                        {
                             sourceId: null,
                             targetId: targetProduct.id,
-                            name: targetProduct.name,
-                            warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
-                        });
-                    }
+                            name: targetProduct.name
+                        }
+                    );
                     developerProducts.archived += 1;
                     developerProducts.archivedItems.push({
                         targetId: targetProduct.id,
@@ -714,24 +771,47 @@ module.exports = async (req, res) => {
                 badges.attempted += 1;
 
                 try {
-                    await updateBadge(targetBadge.id, targetBadge.config, {
-                        nameOverride: ARCHIVED_MONETIZATION_NAME,
-                        forceEnabled: false
-                    });
-                    try {
-                        await updateBadgeIcon(targetBadge.id, ARCHIVED_ICON_BUFFER);
-                    } catch (error) {
-                        if (!isImageUploadError(error)) {
+                    const nameCandidates = buildArchiveNameCandidates(targetBadge.id);
+                    let archived = false;
+                    let lastBadgeError = null;
+
+                    for (let index = 0; index < nameCandidates.length; index += 1) {
+                        const nameOverride = nameCandidates[index];
+                        try {
+                            await updateBadge(targetBadge.id, targetBadge.config, {
+                                nameOverride,
+                                forceEnabled: false
+                            });
+                            try {
+                                await updateBadgeIcon(targetBadge.id, ARCHIVED_ICON_BUFFER);
+                            } catch (error) {
+                                if (!isImageUploadError(error)) {
+                                    throw error;
+                                }
+
+                                badges.warnings.push({
+                                    sourceId: null,
+                                    targetId: targetBadge.id,
+                                    name: targetBadge.name,
+                                    warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
+                                });
+                            }
+
+                            archived = true;
+                            break;
+                        } catch (error) {
+                            lastBadgeError = error;
+                            if (isDuplicateNameError(error) && index < nameCandidates.length - 1) {
+                                continue;
+                            }
                             throw error;
                         }
-
-                        badges.warnings.push({
-                            sourceId: null,
-                            targetId: targetBadge.id,
-                            name: targetBadge.name,
-                            warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
-                        });
                     }
+
+                    if (!archived) {
+                        throw lastBadgeError || new Error('Failed to archive badge');
+                    }
+
                     badges.archived += 1;
                     badges.archivedItems.push({
                         targetId: targetBadge.id,
@@ -801,7 +881,7 @@ module.exports = async (req, res) => {
                 totalBadgeWarnings
             },
             limitations: [
-                'Roblox Open Cloud does not currently provide delete endpoints for game passes, developer products, or badges. Unmatched items are renamed to Archived, set off-sale/disabled, and assigned a blank icon. Archived game passes/products are reused for future source items when possible.'
+                'Roblox Open Cloud does not currently provide delete endpoints for game passes, developer products, or badges. Unmatched items are archived (renamed to [ARCHIVED] <item-id>), set off-sale/disabled, and assigned a blank icon. Archived game passes/products are reused for future source items when possible.'
             ],
             targets
         });
