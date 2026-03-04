@@ -32,6 +32,16 @@ const ARCHIVED_ICON_BUFFER = Buffer.from(
 );
 const FORCED_TARGET_PRICE = 1;
 const MISSING_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
+const COPY_SLEEP_SOURCE_GAME_PASS_MS = 250;
+const COPY_SLEEP_ARCHIVE_GAME_PASS_MS = 150;
+const COPY_SLEEP_SOURCE_DEVELOPER_PRODUCT_MS = 400;
+const COPY_SLEEP_ARCHIVE_DEVELOPER_PRODUCT_MS = 250;
+const COPY_SLEEP_SOURCE_BADGE_MS = 300;
+const COPY_SLEEP_ARCHIVE_BADGE_MS = 150;
+const ESTIMATE_PER_OPERATION_MIN_OVERHEAD_MS = 120;
+const ESTIMATE_PER_OPERATION_MAX_OVERHEAD_MS = 320;
+const ESTIMATE_FIXED_MIN_OVERHEAD_MS = 3000;
+const ESTIMATE_FIXED_MAX_OVERHEAD_MS = 8000;
 
 async function requireAdmin(req, res) {
     const groupId = getAdminGroupId();
@@ -341,6 +351,121 @@ async function resolveGameUniverseIds(body) {
     return ids;
 }
 
+function parseOperation(body) {
+    const value = String(body && body.operation ? body.operation : 'copy').trim().toLowerCase();
+    if (!value || value === 'copy' || value === 'estimate') {
+        return value || 'copy';
+    }
+
+    throw new Error('Invalid operation. Supported values: copy, estimate.');
+}
+
+function toNonNegativeCount(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return 0;
+    }
+
+    return Math.max(0, Math.round(numeric));
+}
+
+function buildCopyDurationEstimate(sourceCounts, targetCounts) {
+    const source = {
+        gamePasses: toNonNegativeCount(sourceCounts && sourceCounts.gamePasses),
+        developerProducts: toNonNegativeCount(sourceCounts && sourceCounts.developerProducts),
+        badges: toNonNegativeCount(sourceCounts && sourceCounts.badges)
+    };
+    const targets = Array.isArray(targetCounts) ? targetCounts : [];
+
+    let sleepBudgetMs = 0;
+    let operationCount = 0;
+
+    for (const target of targets) {
+        const targetGamePasses = toNonNegativeCount(target && target.gamePasses);
+        const targetDeveloperProducts = toNonNegativeCount(target && target.developerProducts);
+        const targetBadges = toNonNegativeCount(target && target.badges);
+
+        operationCount += (
+            source.gamePasses
+            + source.developerProducts
+            + source.badges
+            + targetGamePasses
+            + targetDeveloperProducts
+            + targetBadges
+        );
+
+        sleepBudgetMs += (
+            (source.gamePasses * COPY_SLEEP_SOURCE_GAME_PASS_MS)
+            + (targetGamePasses * COPY_SLEEP_ARCHIVE_GAME_PASS_MS)
+            + (source.developerProducts * COPY_SLEEP_SOURCE_DEVELOPER_PRODUCT_MS)
+            + (targetDeveloperProducts * COPY_SLEEP_ARCHIVE_DEVELOPER_PRODUCT_MS)
+            + (source.badges * COPY_SLEEP_SOURCE_BADGE_MS)
+            + (targetBadges * COPY_SLEEP_ARCHIVE_BADGE_MS)
+        );
+    }
+
+    const minimumDurationMs = sleepBudgetMs + (operationCount * ESTIMATE_PER_OPERATION_MIN_OVERHEAD_MS) + ESTIMATE_FIXED_MIN_OVERHEAD_MS;
+    const conservativeDurationMs = sleepBudgetMs + (operationCount * ESTIMATE_PER_OPERATION_MAX_OVERHEAD_MS) + ESTIMATE_FIXED_MAX_OVERHEAD_MS;
+    const estimatedDurationMs = Math.round((minimumDurationMs + conservativeDurationMs) / 2);
+
+    return {
+        sleepBudgetMs,
+        operationCount,
+        minimumDurationMs,
+        estimatedDurationMs,
+        conservativeDurationMs
+    };
+}
+
+async function buildCopyEstimatePayload(ids) {
+    const sourceUniverseId = ids.productionUniverseId;
+    const targetUniverseIds = [ids.testUniverseId, ids.developmentUniverseId];
+
+    const [sourceGamePasses, sourceDeveloperProducts, sourceBadges] = await Promise.all([
+        listAllGamePassConfigs(sourceUniverseId),
+        listAllDeveloperProductConfigs(sourceUniverseId),
+        listAllBadges(sourceUniverseId)
+    ]);
+
+    const targetSummaries = await Promise.all(targetUniverseIds.map(async (targetUniverseId) => {
+        const [targetGamePasses, targetDeveloperProducts, targetBadges] = await Promise.all([
+            listAllGamePassConfigs(targetUniverseId),
+            listAllDeveloperProductConfigs(targetUniverseId),
+            listAllBadges(targetUniverseId)
+        ]);
+
+        return {
+            targetUniverseId,
+            gamePasses: targetGamePasses.length,
+            developerProducts: targetDeveloperProducts.length,
+            badges: targetBadges.length
+        };
+    }));
+
+    const sourceCounts = {
+        gamePasses: sourceGamePasses.length,
+        developerProducts: sourceDeveloperProducts.length,
+        badges: sourceBadges.length
+    };
+    const estimate = buildCopyDurationEstimate(
+        sourceCounts,
+        targetSummaries.map((item) => ({
+            gamePasses: item.gamePasses,
+            developerProducts: item.developerProducts,
+            badges: item.badges
+        }))
+    );
+
+    return {
+        operation: 'estimate',
+        sourceUniverseId,
+        targetUniverseIds,
+        sourceCounts,
+        targetCounts: targetSummaries,
+        ...estimate
+    };
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return methodNotAllowed(req, res, ['POST']);
@@ -358,6 +483,13 @@ module.exports = async (req, res) => {
         }
 
         const body = await readJsonBody(req);
+        let operation;
+        try {
+            operation = parseOperation(body);
+        } catch (error) {
+            return sendJson(res, 400, { error: error.message || 'Invalid operation' });
+        }
+
         let ids;
         try {
             ids = await resolveGameUniverseIds(body);
@@ -365,11 +497,15 @@ module.exports = async (req, res) => {
             return sendJson(res, 400, { error: error.message || 'Invalid request body' });
         }
 
+        if (operation === 'estimate') {
+            const estimatePayload = await buildCopyEstimatePayload(ids);
+            return sendJson(res, 200, estimatePayload);
+        }
+
         const sourceUniverseId = ids.productionUniverseId;
         const developmentUniverseId = ids.developmentUniverseId;
         const testUniverseId = ids.testUniverseId;
         const targetUniverseIds = [testUniverseId, developmentUniverseId];
-        const forceOneRobuxPricing = true;
         const pricingOverrideOptions = { fixedPrice: FORCED_TARGET_PRICE };
 
         const lockAttempt = tryAcquireMonetizationLock(
@@ -520,7 +656,7 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(250);
+                await sleep(COPY_SLEEP_SOURCE_GAME_PASS_MS);
             }
 
             for (const targetPass of indexedTargetGamePasses.allEntries) {
@@ -560,7 +696,7 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(150);
+                await sleep(COPY_SLEEP_ARCHIVE_GAME_PASS_MS);
             }
 
             for (const sourceProduct of preparedDeveloperProducts) {
@@ -642,7 +778,7 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(400);
+                await sleep(COPY_SLEEP_SOURCE_DEVELOPER_PRODUCT_MS);
             }
 
             for (const targetProduct of indexedTargetDeveloperProducts.allEntries) {
@@ -688,7 +824,7 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(250);
+                await sleep(COPY_SLEEP_ARCHIVE_DEVELOPER_PRODUCT_MS);
             }
 
             for (const sourceBadge of preparedBadges) {
@@ -760,7 +896,7 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(300);
+                await sleep(COPY_SLEEP_SOURCE_BADGE_MS);
             }
 
             for (const targetBadge of indexedTargetBadges.allEntries) {
@@ -826,7 +962,7 @@ module.exports = async (req, res) => {
                     });
                 }
 
-                await sleep(150);
+                await sleep(COPY_SLEEP_ARCHIVE_BADGE_MS);
             }
 
             targets.push({

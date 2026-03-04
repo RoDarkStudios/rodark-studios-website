@@ -45,6 +45,7 @@ For description sync, also include:
 
 Admin sync behavior notes:
 - Request body now uses fixed fields: `productionUniverseId` (source), `developmentUniverseId` (target), `testUniverseId` (target).
+- Optional: set `operation = estimate` on `POST /api/admin/roblox-copy-monetization` to return an ETA estimate payload without performing any writes.
 - Target items are matched by name (case-insensitive), then updated to source name/description/icon.
 - If no name match is found for a source game pass/product, the sync reuses one archived target item first (if available) before creating a new one.
 - Development/Test target prices are always forced to `1` Robux for game passes and developer products.

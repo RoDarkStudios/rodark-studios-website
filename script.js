@@ -322,6 +322,151 @@ function setAdminCopyBusy(isBusy) {
     }
 }
 
+const DEFAULT_ADMIN_COPY_ESTIMATE_MS = 3 * 60 * 1000;
+const ADMIN_COPY_ACTIVE_MAX_PERCENT = 97;
+let adminCopyProgressTimerId = null;
+let adminCopyProgressStartedAt = 0;
+
+function getAdminCopyProgressElements() {
+    return {
+        root: document.getElementById('copy-monetization-progress'),
+        label: document.getElementById('copy-progress-label'),
+        percent: document.getElementById('copy-progress-percent'),
+        track: document.querySelector('#copy-monetization-progress .admin-copy-progress-track'),
+        fill: document.getElementById('copy-progress-fill'),
+        meta: document.getElementById('copy-progress-meta')
+    };
+}
+
+function formatDurationClock(totalMs) {
+    const ms = Number(totalMs);
+    const safeMs = Number.isFinite(ms) && ms > 0 ? ms : 0;
+    const totalSeconds = Math.floor(safeMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+        return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function setAdminCopyProgressState(options) {
+    const elements = getAdminCopyProgressElements();
+    if (!elements.root) {
+        return;
+    }
+
+    const settings = options || {};
+    const isVisible = settings.visible !== false;
+    const percentNumber = Math.max(0, Math.min(100, Number(settings.percent) || 0));
+    const label = String(settings.label || '').trim();
+    const meta = String(settings.meta || '').trim();
+
+    if (!isVisible) {
+        elements.root.classList.add('hidden');
+        return;
+    }
+
+    elements.root.classList.remove('hidden');
+    if (elements.label) {
+        elements.label.textContent = label || 'Copy in progress...';
+    }
+    if (elements.percent) {
+        elements.percent.textContent = `${Math.round(percentNumber)}%`;
+    }
+    if (elements.fill) {
+        elements.fill.style.width = `${percentNumber}%`;
+    }
+    if (elements.track) {
+        elements.track.setAttribute('aria-valuenow', String(Math.round(percentNumber)));
+    }
+    if (elements.meta) {
+        elements.meta.textContent = meta || `Elapsed ${formatDurationClock(0)}`;
+    }
+}
+
+function stopAdminCopyProgressTimer() {
+    if (adminCopyProgressTimerId !== null) {
+        clearInterval(adminCopyProgressTimerId);
+        adminCopyProgressTimerId = null;
+    }
+}
+
+function resetAdminCopyProgress() {
+    stopAdminCopyProgressTimer();
+    adminCopyProgressStartedAt = 0;
+    setAdminCopyProgressState({ visible: false });
+}
+
+function startAdminCopyProgress(estimatedDurationMs) {
+    stopAdminCopyProgressTimer();
+    adminCopyProgressStartedAt = Date.now();
+    const estimateMs = Number.isFinite(Number(estimatedDurationMs)) && Number(estimatedDurationMs) > 0
+        ? Number(estimatedDurationMs)
+        : DEFAULT_ADMIN_COPY_ESTIMATE_MS;
+
+    const tick = () => {
+        const elapsedMs = Date.now() - adminCopyProgressStartedAt;
+        const ratio = elapsedMs / estimateMs;
+        const percent = Math.min(ADMIN_COPY_ACTIVE_MAX_PERCENT, Math.max(1, Math.floor(ratio * 100)));
+        const remainingMs = Math.max(0, estimateMs - elapsedMs);
+        const isFinishing = elapsedMs >= estimateMs;
+        setAdminCopyProgressState({
+            visible: true,
+            percent,
+            label: isFinishing ? 'Finalizing copy...' : 'Copy in progress...',
+            meta: `Elapsed ${formatDurationClock(elapsedMs)} | ETA ${formatDurationClock(remainingMs)}`
+        });
+    };
+
+    tick();
+    adminCopyProgressTimerId = window.setInterval(tick, 1000);
+    return estimateMs;
+}
+
+function finishAdminCopyProgress(isSuccess) {
+    if (adminCopyProgressStartedAt <= 0) {
+        stopAdminCopyProgressTimer();
+        setAdminCopyProgressState({ visible: false });
+        return 0;
+    }
+
+    const elapsedMs = adminCopyProgressStartedAt > 0
+        ? Date.now() - adminCopyProgressStartedAt
+        : 0;
+    stopAdminCopyProgressTimer();
+    setAdminCopyProgressState({
+        visible: true,
+        percent: 100,
+        label: isSuccess ? 'Copy finished' : 'Copy stopped',
+        meta: `Elapsed ${formatDurationClock(elapsedMs)}`
+    });
+    adminCopyProgressStartedAt = 0;
+    return elapsedMs;
+}
+
+async function fetchAdminCopyEstimate(gameConfig) {
+    const estimate = await postJson('/api/admin/roblox-copy-monetization', {
+        operation: 'estimate',
+        productionUniverseId: gameConfig.productionUniverseId,
+        testUniverseId: gameConfig.testUniverseId,
+        developmentUniverseId: gameConfig.developmentUniverseId
+    });
+
+    const conservativeDurationMs = Number(estimate && estimate.conservativeDurationMs);
+    const estimatedDurationMs = Number(estimate && estimate.estimatedDurationMs);
+    const durationMs = Number.isFinite(conservativeDurationMs) && conservativeDurationMs > 0
+        ? conservativeDurationMs
+        : estimatedDurationMs;
+
+    return {
+        durationMs: Number.isFinite(durationMs) && durationMs > 0 ? durationMs : null
+    };
+}
+
 function renderAdminCopyResults(result) {
     const resultElement = document.getElementById('copy-monetization-results');
     if (!resultElement) {
@@ -402,11 +547,29 @@ async function handleAdminCopySubmit(event) {
 
     setAdminCopyBusy(true);
     renderAdminCopyResults(null);
-    setAdminCopyStatus('Copy job started. This may take a while for large catalogs.', 'info');
+    resetAdminCopyProgress();
+    setAdminCopyStatus('Preparing copy job...', 'info');
 
     try {
         const gameConfig = await requireAdminGameConfig(setAdminCopyStatus);
         setAdminGameConfigBanner('copy-monetization-config', gameConfig);
+
+        setAdminCopyStatus('Estimating copy duration...', 'info');
+        let estimateDurationMs = null;
+        try {
+            const estimate = await fetchAdminCopyEstimate(gameConfig);
+            estimateDurationMs = estimate && Number.isFinite(Number(estimate.durationMs))
+                ? Number(estimate.durationMs)
+                : null;
+        } catch (error) {
+            estimateDurationMs = null;
+        }
+
+        const resolvedEstimateMs = startAdminCopyProgress(estimateDurationMs);
+        setAdminCopyStatus(
+            `Copy job started. Estimated duration around ${formatDurationClock(resolvedEstimateMs)}.`,
+            'info'
+        );
 
         const result = await postJson('/api/admin/roblox-copy-monetization', {
             productionUniverseId: gameConfig.productionUniverseId,
@@ -414,6 +577,7 @@ async function handleAdminCopySubmit(event) {
             developmentUniverseId: gameConfig.developmentUniverseId
         });
 
+        const elapsedMs = finishAdminCopyProgress(true);
         renderAdminCopyResults(result);
 
         const hasFailures = result
@@ -427,12 +591,18 @@ async function handleAdminCopySubmit(event) {
 
         setAdminCopyStatus(
             hasFailures
-                ? 'Copy finished with some failures. See details below.'
-                : 'Copy completed successfully.',
+                ? `Copy finished with some failures in ${formatDurationClock(elapsedMs)}. See details below.`
+                : `Copy completed successfully in ${formatDurationClock(elapsedMs)}.`,
             hasFailures ? 'error' : 'success'
         );
     } catch (error) {
-        setAdminCopyStatus(error.message || 'Failed to copy monetization data.', 'error');
+        const elapsedMs = finishAdminCopyProgress(false);
+        setAdminCopyStatus(
+            elapsedMs > 0
+                ? `${error.message || 'Failed to copy monetization data.'} (after ${formatDurationClock(elapsedMs)})`
+                : (error.message || 'Failed to copy monetization data.'),
+            'error'
+        );
     } finally {
         setAdminCopyBusy(false);
     }
@@ -443,6 +613,8 @@ async function initAdminCopyTool() {
     if (!adminTool) {
         return;
     }
+
+    resetAdminCopyProgress();
 
     const deniedElement = document.getElementById('admin-access-denied');
     const form = document.getElementById('copy-monetization-form');

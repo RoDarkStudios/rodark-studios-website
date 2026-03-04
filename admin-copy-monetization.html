@@ -64,6 +64,16 @@
                             </form>
 
                             <p id="copy-monetization-status" class="admin-status hidden"></p>
+                            <section id="copy-monetization-progress" class="admin-copy-progress hidden" aria-live="polite">
+                                <div class="admin-copy-progress-head">
+                                    <p id="copy-progress-label" class="admin-copy-progress-label">Preparing copy...</p>
+                                    <p id="copy-progress-percent" class="admin-copy-progress-percent">0%</p>
+                                </div>
+                                <div class="admin-copy-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                                    <span id="copy-progress-fill" class="admin-copy-progress-fill"></span>
+                                </div>
+                                <p id="copy-progress-meta" class="admin-copy-progress-meta">Elapsed 0:00</p>
+                            </section>
                             <div id="copy-monetization-results" class="admin-results hidden"></div>
                         </div>
 
