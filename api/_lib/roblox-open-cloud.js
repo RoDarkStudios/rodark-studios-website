@@ -728,6 +728,10 @@ async function updateUniverseDescription(universeId, description) {
     };
 }
 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 module.exports = {
     parseUniverseId,
     parseTargetUniverseIds,
@@ -751,5 +755,6 @@ module.exports = {
     updatePlaceDescription,
     getUniverseRootPlaceInfo,
     getUniverseDescription,
-    updateUniverseDescription
+    updateUniverseDescription,
+    sleep
 };
