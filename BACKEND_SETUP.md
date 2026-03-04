@@ -54,6 +54,7 @@ Admin sync behavior notes:
 - Open Cloud currently has no delete endpoints for these resources, so unmatched target items are archived instead of deleted.
 - Archived game passes/developer products are normalized to name `Archived`, forced off-sale, and assigned a blank icon so they can act as a reusable bank.
 - Archived badges are renamed to `Archived`, disabled, and assigned a blank icon.
+- If Roblox rejects a neutral icon upload, the item is still archived and the sync records a warning (instead of failing the whole item).
 
 ## Roblox OAuth App Configuration
 In your Roblox OAuth app settings, ensure the redirect URI matches:

@@ -194,6 +194,19 @@ function consumeArchivedEntry(archivedEntries, consumedIds) {
     return null;
 }
 
+function isImageUploadError(error) {
+    const message = String(error && error.message ? error.message : '').toLowerCase();
+    return (
+        message.includes('image')
+        || message.includes('icon')
+        || message.includes('malformed')
+        || message.includes('format')
+        || message.includes('process image')
+        || message.includes('invalid')
+        || message.includes('file')
+    );
+}
+
 function parseGameUniverseIdsFromBody(body) {
     return {
         productionUniverseId: parseUniverseId(body && body.productionUniverseId, 'productionUniverseId'),
@@ -447,12 +460,31 @@ module.exports = async (req, res) => {
                 gamePasses.attempted += 1;
 
                 try {
-                    await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, ARCHIVED_ICON_BUFFER, {
-                        ...pricingOverrideOptions,
-                        nameOverride: ARCHIVED_MONETIZATION_NAME,
-                        forceForSale: false,
-                        forceRegionalPricingEnabled: false
-                    });
+                    try {
+                        await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, ARCHIVED_ICON_BUFFER, {
+                            ...pricingOverrideOptions,
+                            nameOverride: ARCHIVED_MONETIZATION_NAME,
+                            forceForSale: false,
+                            forceRegionalPricingEnabled: false
+                        });
+                    } catch (error) {
+                        if (!isImageUploadError(error)) {
+                            throw error;
+                        }
+
+                        await updateGamePass(targetUniverseId, targetPass.id, targetPass.config, null, {
+                            ...pricingOverrideOptions,
+                            nameOverride: ARCHIVED_MONETIZATION_NAME,
+                            forceForSale: false,
+                            forceRegionalPricingEnabled: false
+                        });
+                        gamePasses.warnings.push({
+                            sourceId: null,
+                            targetId: targetPass.id,
+                            name: targetPass.name,
+                            warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
+                        });
+                    }
                     gamePasses.archived += 1;
                     gamePasses.archivedItems.push({
                         targetId: targetPass.id,
@@ -560,12 +592,31 @@ module.exports = async (req, res) => {
                 developerProducts.attempted += 1;
 
                 try {
-                    await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, ARCHIVED_ICON_BUFFER, {
-                        ...pricingOverrideOptions,
-                        nameOverride: ARCHIVED_MONETIZATION_NAME,
-                        forceForSale: false,
-                        forceRegionalPricingEnabled: false
-                    });
+                    try {
+                        await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, ARCHIVED_ICON_BUFFER, {
+                            ...pricingOverrideOptions,
+                            nameOverride: ARCHIVED_MONETIZATION_NAME,
+                            forceForSale: false,
+                            forceRegionalPricingEnabled: false
+                        });
+                    } catch (error) {
+                        if (!isImageUploadError(error)) {
+                            throw error;
+                        }
+
+                        await updateDeveloperProduct(targetUniverseId, targetProduct.id, targetProduct.config, null, {
+                            ...pricingOverrideOptions,
+                            nameOverride: ARCHIVED_MONETIZATION_NAME,
+                            forceForSale: false,
+                            forceRegionalPricingEnabled: false
+                        });
+                        developerProducts.warnings.push({
+                            sourceId: null,
+                            targetId: targetProduct.id,
+                            name: targetProduct.name,
+                            warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
+                        });
+                    }
                     developerProducts.archived += 1;
                     developerProducts.archivedItems.push({
                         targetId: targetProduct.id,
@@ -667,7 +718,20 @@ module.exports = async (req, res) => {
                         nameOverride: ARCHIVED_MONETIZATION_NAME,
                         forceEnabled: false
                     });
-                    await updateBadgeIcon(targetBadge.id, ARCHIVED_ICON_BUFFER);
+                    try {
+                        await updateBadgeIcon(targetBadge.id, ARCHIVED_ICON_BUFFER);
+                    } catch (error) {
+                        if (!isImageUploadError(error)) {
+                            throw error;
+                        }
+
+                        badges.warnings.push({
+                            sourceId: null,
+                            targetId: targetBadge.id,
+                            name: targetBadge.name,
+                            warning: 'Archived without replacing icon because Roblox rejected neutral icon upload'
+                        });
+                    }
                     badges.archived += 1;
                     badges.archivedItems.push({
                         targetId: targetBadge.id,
