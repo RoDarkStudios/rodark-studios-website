@@ -316,10 +316,24 @@ function setAdminCopyStatus(message, type) {
 
 function setAdminCopyBusy(isBusy) {
     const submitButton = document.getElementById('copy-monetization-submit');
+    const testPriceModeSelect = document.getElementById('copy-monetization-test-price-mode');
     if (submitButton) {
         submitButton.disabled = Boolean(isBusy);
         submitButton.textContent = isBusy ? 'Copying...' : 'Start Copy';
     }
+    if (testPriceModeSelect) {
+        testPriceModeSelect.disabled = Boolean(isBusy);
+    }
+}
+
+function readAdminCopyTestPriceMode() {
+    const selectElement = document.getElementById('copy-monetization-test-price-mode');
+    const selectedValue = String(selectElement && selectElement.value ? selectElement.value : '').trim();
+    if (selectedValue === 'match-production') {
+        return 'match-production';
+    }
+
+    return 'force-one-robux';
 }
 
 const DEFAULT_ADMIN_COPY_ESTIMATE_MS = 3 * 60 * 1000;
@@ -497,6 +511,11 @@ function renderAdminCopyResults(result) {
     };
 
     const targetMarkup = targetRows.map((target) => {
+        const targetEnvironment = String(target && target.environment ? target.environment : '').trim();
+        const targetUniverseId = target && target.targetUniverseId;
+        const targetLabel = targetEnvironment
+            ? `${targetEnvironment.charAt(0).toUpperCase()}${targetEnvironment.slice(1)} Universe ${targetUniverseId}`
+            : `Target Universe ${targetUniverseId}`;
         const gamePasses = target && target.gamePasses ? target.gamePasses : {};
         const developerProducts = target && target.developerProducts ? target.developerProducts : {};
         const badges = target && target.badges ? target.badges : {};
@@ -519,7 +538,7 @@ function renderAdminCopyResults(result) {
 
         return `
             <article class="admin-target-result">
-                <h4>Target Universe ${escapeHtml(target.targetUniverseId)}</h4>
+                <h4>${escapeHtml(targetLabel)}</h4>
                 <p>Game passes: ${escapeHtml(gamePasses.created)} created, ${escapeHtml(gamePasses.updated)} updated, ${escapeHtml(gamePasses.archived)} archived</p>
                 <p>Developer products: ${escapeHtml(developerProducts.created)} created, ${escapeHtml(developerProducts.updated)} updated, ${escapeHtml(developerProducts.archived)} archived</p>
                 <p>Badges: ${escapeHtml(badges.created)} created, ${escapeHtml(badges.updated)} updated, ${escapeHtml(badges.archived)} archived</p>
@@ -552,6 +571,7 @@ async function handleAdminCopySubmit(event) {
 
     try {
         const gameConfig = await requireAdminGameConfig(setAdminCopyStatus);
+        const testPriceMode = readAdminCopyTestPriceMode();
         setAdminGameConfigBanner('copy-monetization-config', gameConfig);
 
         setAdminCopyStatus('Estimating copy duration...', 'info');
@@ -574,7 +594,8 @@ async function handleAdminCopySubmit(event) {
         const result = await postJson('/api/admin/roblox-copy-monetization', {
             productionUniverseId: gameConfig.productionUniverseId,
             testUniverseId: gameConfig.testUniverseId,
-            developmentUniverseId: gameConfig.developmentUniverseId
+            developmentUniverseId: gameConfig.developmentUniverseId,
+            testPriceMode
         });
 
         const elapsedMs = finishAdminCopyProgress(true);

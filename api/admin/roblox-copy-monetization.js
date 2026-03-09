@@ -31,6 +31,8 @@ const ARCHIVED_ICON_BUFFER = Buffer.from(
     'base64'
 );
 const FORCED_TARGET_PRICE = 1;
+const TEST_PRICE_MODE_FORCE_ONE_ROBUX = 'force-one-robux';
+const TEST_PRICE_MODE_MATCH_PRODUCTION = 'match-production';
 const MISSING_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
 const COPY_SLEEP_SOURCE_GAME_PASS_MS = 250;
 const COPY_SLEEP_ARCHIVE_GAME_PASS_MS = 150;
@@ -466,6 +468,35 @@ async function buildCopyEstimatePayload(ids) {
     };
 }
 
+function parseTestPriceMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === TEST_PRICE_MODE_MATCH_PRODUCTION) {
+        return TEST_PRICE_MODE_MATCH_PRODUCTION;
+    }
+
+    return TEST_PRICE_MODE_FORCE_ONE_ROBUX;
+}
+
+function buildTargetPricingOptions(environment, testPriceMode) {
+    if (environment === 'development') {
+        return { fixedPrice: FORCED_TARGET_PRICE };
+    }
+
+    if (environment === 'test' && testPriceMode === TEST_PRICE_MODE_FORCE_ONE_ROBUX) {
+        return { fixedPrice: FORCED_TARGET_PRICE };
+    }
+
+    return {};
+}
+
+function describePriceSyncMode(testPriceMode) {
+    if (testPriceMode === TEST_PRICE_MODE_MATCH_PRODUCTION) {
+        return `Development forced to ${FORCED_TARGET_PRICE} Robux; Test matches Production prices`;
+    }
+
+    return `Development and Test forced to ${FORCED_TARGET_PRICE} Robux`;
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return methodNotAllowed(req, res, ['POST']);
@@ -505,8 +536,20 @@ module.exports = async (req, res) => {
         const sourceUniverseId = ids.productionUniverseId;
         const developmentUniverseId = ids.developmentUniverseId;
         const testUniverseId = ids.testUniverseId;
-        const targetUniverseIds = [testUniverseId, developmentUniverseId];
-        const pricingOverrideOptions = { fixedPrice: FORCED_TARGET_PRICE };
+        const testPriceMode = parseTestPriceMode(body && body.testPriceMode);
+        const targetConfigs = [
+            {
+                universeId: testUniverseId,
+                environment: 'test',
+                pricingOverrideOptions: buildTargetPricingOptions('test', testPriceMode)
+            },
+            {
+                universeId: developmentUniverseId,
+                environment: 'development',
+                pricingOverrideOptions: buildTargetPricingOptions('development', testPriceMode)
+            }
+        ];
+        const targetUniverseIds = targetConfigs.map((target) => target.universeId);
 
         const lockAttempt = tryAcquireMonetizationLock(
             [sourceUniverseId, ...targetUniverseIds],
@@ -571,7 +614,9 @@ module.exports = async (req, res) => {
 
         const targets = [];
 
-        for (const targetUniverseId of targetUniverseIds) {
+        for (const targetConfig of targetConfigs) {
+            const targetUniverseId = targetConfig.universeId;
+            const pricingOverrideOptions = targetConfig.pricingOverrideOptions;
             const gamePasses = buildResultBucket();
             const developerProducts = buildResultBucket();
             const badges = buildResultBucket();
@@ -966,6 +1011,7 @@ module.exports = async (req, res) => {
             }
 
             targets.push({
+                environment: targetConfig.environment,
                 targetUniverseId,
                 gamePasses,
                 developerProducts,
@@ -992,7 +1038,8 @@ module.exports = async (req, res) => {
         return sendJson(res, 200, {
             sourceUniverseId,
             targetUniverseIds,
-            priceSyncMode: `Forced ${FORCED_TARGET_PRICE} Robux on Development and Test target universes`,
+            testPriceMode,
+            priceSyncMode: describePriceSyncMode(testPriceMode),
             sourceCounts: {
                 gamePasses: preparedGamePasses.length,
                 developerProducts: preparedDeveloperProducts.length,

@@ -53,11 +53,16 @@
                         <div id="admin-copy-tool" class="admin-tool hidden">
                             <h2 class="admin-tool-title">Copy Game Passes + Developer Products + Badges</h2>
                             <p class="admin-tool-note">
-                                Uses the shared Game IDs. Production is always the source. Test and Development are always targets and are forced to 1 Robux for game pass and developer product prices. Badge sync ignores pricing.
+                                Uses the shared Game IDs. Production is always the source with unchanged full prices. Development is always forced to 1 Robux. Test can either be forced to 1 Robux or match Production pricing for game passes and developer products. Badge sync ignores pricing.
                             </p>
                             <p id="copy-monetization-config" class="admin-shared-config hidden"></p>
 
                             <form id="copy-monetization-form" class="admin-form">
+                                <label for="copy-monetization-test-price-mode" class="admin-label">Test pricing</label>
+                                <select id="copy-monetization-test-price-mode" class="admin-input">
+                                    <option value="force-one-robux">Force test to 1 Robux</option>
+                                    <option value="match-production">Match production prices</option>
+                                </select>
                                 <button id="copy-monetization-submit" type="submit" class="btn btn-primary admin-submit-btn">
                                     Start Copy
                                 </button>
