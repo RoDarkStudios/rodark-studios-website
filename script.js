@@ -1337,22 +1337,8 @@ async function fetchGameStats() {
 }
 
 async function fetchAllGameStats() {
-    const gameConfigs = [
-        {
-            elementId: 'visit-count',
-            universeId: 5602610435,
-            fallbackVisits: 4354515
-        }
-    ];
-
-    const targets = gameConfigs
-        .map((config) => ({
-            ...config,
-            element: document.getElementById(config.elementId)
-        }))
-        .filter((target) => target.element);
-
-    if (!targets.length) {
+    const featuredGameCards = Array.from(document.querySelectorAll('.game-card.featured[data-universe-id]'));
+    if (!featuredGameCards.length) {
         return;
     }
 
@@ -1360,44 +1346,99 @@ async function fetchAllGameStats() {
         return num.toLocaleString();
     }
 
-    async function fetchVisitsForUniverse(universeId) {
-        const gameResponse = await fetch(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
-        if (!gameResponse.ok) {
-            throw new Error(`Games API failed (${gameResponse.status})`);
+    async function fetchRobloxGames(universeIds) {
+        const response = await fetch(`/api/roblox/games?universeIds=${encodeURIComponent(universeIds.join(','))}`, {
+            method: 'GET'
+        });
+        if (!response.ok) {
+            throw new Error(`Games API failed (${response.status})`);
         }
 
-        const gameData = await gameResponse.json();
-        const games = Array.isArray(gameData && gameData.data) ? gameData.data : [];
-        if (!games.length) {
-            throw new Error('Games API returned no game data');
-        }
-
-        const matchingGame = games.find((game) => (
-            Number(game && game.id) === universeId
-            || Number(game && game.universeId) === universeId
-        )) || games[0];
-
-        const visits = Number(matchingGame && matchingGame.visits);
-        if (!Number.isFinite(visits) || visits < 0) {
-            throw new Error('Games API returned invalid visits');
-        }
-
-        return Math.trunc(visits);
+        const payload = await response.json();
+        return Array.isArray(payload && payload.games) ? payload.games : [];
     }
 
-    await Promise.all(targets.map(async (target) => {
-        try {
-            const visits = await fetchVisitsForUniverse(target.universeId);
-            target.element.textContent = formatNumber(visits);
-        } catch (error) {
-            if (Number.isFinite(target.fallbackVisits)) {
-                target.element.textContent = formatNumber(target.fallbackVisits);
+    function applyFallbackVisits(card) {
+        const visitsElementId = String(card.dataset.visitsElementId || '').trim();
+        if (!visitsElementId) {
+            return;
+        }
+
+        const visitsElement = document.getElementById(visitsElementId);
+        if (!visitsElement) {
+            return;
+        }
+
+        const fallbackVisits = Number(card.dataset.fallbackVisits);
+        visitsElement.textContent = Number.isFinite(fallbackVisits)
+            ? formatNumber(Math.trunc(fallbackVisits))
+            : 'N/A';
+    }
+
+    const universeIds = Array.from(new Set(
+        featuredGameCards
+            .map((card) => Number(card.dataset.universeId))
+            .filter((universeId) => Number.isFinite(universeId) && universeId > 0)
+    ));
+
+    if (!universeIds.length) {
+        featuredGameCards.forEach(applyFallbackVisits);
+        return;
+    }
+
+    try {
+        const games = await fetchRobloxGames(universeIds);
+        const gamesByUniverseId = new Map(
+            games.map((game) => [Number(game && game.universeId), game])
+        );
+
+        featuredGameCards.forEach((card) => {
+            const universeId = Number(card.dataset.universeId);
+            const game = gamesByUniverseId.get(universeId);
+            if (!game) {
+                applyFallbackVisits(card);
                 return;
             }
 
-            target.element.textContent = 'N/A';
-        }
-    }));
+            const titleElement = card.querySelector('[data-game-title]');
+            if (titleElement && typeof game.name === 'string' && game.name.trim()) {
+                titleElement.textContent = game.name.trim();
+            }
+
+            const imageElement = card.querySelector('.game-image');
+            if (imageElement && typeof game.name === 'string' && game.name.trim()) {
+                imageElement.alt = game.name.trim();
+            }
+
+            const rootPlaceId = Number(game.rootPlaceId);
+            if (Number.isFinite(rootPlaceId) && rootPlaceId > 0) {
+                card.querySelectorAll('[data-roblox-link]').forEach((link) => {
+                    link.href = `https://www.roblox.com/games/${rootPlaceId}`;
+                });
+            }
+
+            const visitsElementId = String(card.dataset.visitsElementId || '').trim();
+            if (!visitsElementId) {
+                return;
+            }
+
+            const visitsElement = document.getElementById(visitsElementId);
+            if (!visitsElement) {
+                return;
+            }
+
+            const visits = Number(game.visits);
+            if (Number.isFinite(visits) && visits >= 0) {
+                visitsElement.textContent = formatNumber(Math.trunc(visits));
+                return;
+            }
+
+            applyFallbackVisits(card);
+        });
+    } catch (error) {
+        console.error('Failed to fetch featured game metadata:', error);
+        featuredGameCards.forEach(applyFallbackVisits);
+    }
 }
 
 // Function to fetch group member count from Roblox
