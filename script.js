@@ -1347,7 +1347,7 @@ async function fetchAllGameStats() {
     }
 
     async function fetchRobloxGames(universeIds) {
-        const response = await fetch(`/api/roblox/games?universeIds=${encodeURIComponent(universeIds.join(','))}`, {
+        const response = await fetch(`https://games.roblox.com/v1/games?universeIds=${encodeURIComponent(universeIds.join(','))}`, {
             method: 'GET'
         });
         if (!response.ok) {
@@ -1355,7 +1355,13 @@ async function fetchAllGameStats() {
         }
 
         const payload = await response.json();
-        return Array.isArray(payload && payload.games) ? payload.games : [];
+        const rows = Array.isArray(payload && payload.data) ? payload.data : [];
+        return rows.map((row) => ({
+            universeId: Number(row && row.id),
+            rootPlaceId: Number(row && row.rootPlaceId),
+            name: typeof (row && row.name) === 'string' ? row.name.trim() : '',
+            visits: Number(row && row.visits)
+        }));
     }
 
     function applyFallbackVisits(card) {
