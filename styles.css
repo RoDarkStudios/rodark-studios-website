@@ -374,8 +374,7 @@ body {
 }
 
 .game-card.featured {
-    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-    align-items: start;
+    grid-template-columns: 1fr 1fr;
 }
 
 .game-nav {
@@ -430,21 +429,12 @@ body {
 .game-thumbnail {
     position: relative;
     overflow: hidden;
-    aspect-ratio: 1 / 1;
-    align-self: start;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background:
-        radial-gradient(circle at 20% 20%, rgba(6, 182, 212, 0.16), transparent 52%),
-        linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 1) 100%);
 }
 
 .game-image {
     width: 100%;
     height: 100%;
-    display: block;
-    object-fit: contain;
+    object-fit: cover;
     transition: transform 0.3s ease;
 }
 
