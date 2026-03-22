@@ -31,6 +31,11 @@
       "permanent": true
     },
     {
+      "source": "/admin-sync-experience-configs.html",
+      "destination": "/admin/tools/sync-experience-configs",
+      "permanent": true
+    },
+    {
       "source": "/admin-game-configuration.html",
       "destination": "/admin/tools/game-configuration",
       "permanent": true
@@ -60,6 +65,10 @@
     {
       "source": "/admin/tools/sync-game-description",
       "destination": "/admin-sync-game-description.html"
+    },
+    {
+      "source": "/admin/tools/sync-experience-configs",
+      "destination": "/admin-sync-experience-configs.html"
     },
     {
       "source": "/admin/tools/game-configuration",

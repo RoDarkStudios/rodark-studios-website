@@ -1,6 +1,25 @@
 const ROBLOX_OPEN_CLOUD_BASE_URL = 'https://apis.roblox.com';
 const ROBLOX_THUMBNAILS_BASE_URL = 'https://thumbnails.roblox.com';
 const ROBLOX_BADGES_BASE_URL = 'https://badges.roblox.com';
+const UNIVERSE_SOCIAL_LINK_FIELD_NAMES = [
+    'facebookSocialLink',
+    'twitterSocialLink',
+    'youtubeSocialLink',
+    'twitchSocialLink',
+    'discordSocialLink',
+    'robloxGroupSocialLink',
+    'guildedSocialLink'
+];
+const UNIVERSE_EXPERIENCE_CONFIG_FIELD_NAMES = [
+    ...UNIVERSE_SOCIAL_LINK_FIELD_NAMES,
+    'voiceChatEnabled',
+    'privateServerPriceRobux',
+    'desktopEnabled',
+    'mobileEnabled',
+    'tabletEnabled',
+    'consoleEnabled',
+    'vrEnabled'
+];
 
 function getRobloxOpenCloudApiKey() {
     const apiKey = String(process.env.ROBLOX_OPEN_CLOUD_API_KEY || '').trim();
@@ -668,6 +687,99 @@ function parsePlaceIdFromResourcePath(placePath) {
     return placeId;
 }
 
+function cloneUniverseSocialLink(value) {
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+
+    const title = typeof value.title === 'string' ? value.title : '';
+    const uri = typeof value.uri === 'string' ? value.uri : '';
+    if (!title && !uri) {
+        return null;
+    }
+
+    return {
+        title,
+        uri
+    };
+}
+
+function readRequiredBooleanField(source, fieldName) {
+    if (!source || typeof source !== 'object' || typeof source[fieldName] !== 'boolean') {
+        throw new Error(`Universe config is missing ${fieldName}`);
+    }
+
+    return source[fieldName];
+}
+
+function readRequiredIntegerField(source, fieldName) {
+    const value = Number(source && source[fieldName]);
+    if (!Number.isFinite(value) || value <= 0) {
+        throw new Error(`Place config is missing ${fieldName}`);
+    }
+
+    return Math.round(value);
+}
+
+function extractUniverseExperienceConfig(universe) {
+    const config = {
+        voiceChatEnabled: readRequiredBooleanField(universe, 'voiceChatEnabled'),
+        privateServerPriceRobux: universe && universe.privateServerPriceRobux !== undefined
+            ? universe.privateServerPriceRobux
+            : null,
+        desktopEnabled: readRequiredBooleanField(universe, 'desktopEnabled'),
+        mobileEnabled: readRequiredBooleanField(universe, 'mobileEnabled'),
+        tabletEnabled: readRequiredBooleanField(universe, 'tabletEnabled'),
+        consoleEnabled: readRequiredBooleanField(universe, 'consoleEnabled'),
+        vrEnabled: readRequiredBooleanField(universe, 'vrEnabled')
+    };
+
+    UNIVERSE_SOCIAL_LINK_FIELD_NAMES.forEach((fieldName) => {
+        config[fieldName] = cloneUniverseSocialLink(universe && universe[fieldName]);
+    });
+
+    return config;
+}
+
+function extractPlaceExperienceConfig(place) {
+    return {
+        serverSize: readRequiredIntegerField(place, 'serverSize')
+    };
+}
+
+function toExperienceConfigSnapshot(universeId, rootPlaceId, universe, place) {
+    return {
+        universeId: Number(universeId),
+        rootPlaceId: Number(rootPlaceId),
+        universeSettings: extractUniverseExperienceConfig(universe),
+        placeSettings: extractPlaceExperienceConfig(place)
+    };
+}
+
+function buildUniverseExperienceConfigUpdateBody(config) {
+    const body = {};
+
+    UNIVERSE_EXPERIENCE_CONFIG_FIELD_NAMES.forEach((fieldName) => {
+        if (fieldName === 'privateServerPriceRobux') {
+            const rawValue = config ? config[fieldName] : null;
+            const numericValue = Number(rawValue);
+            body[fieldName] = Number.isFinite(numericValue) && numericValue > 0
+                ? Math.round(numericValue)
+                : null;
+            return;
+        }
+
+        if (UNIVERSE_SOCIAL_LINK_FIELD_NAMES.includes(fieldName)) {
+            body[fieldName] = cloneUniverseSocialLink(config && config[fieldName]);
+            return;
+        }
+
+        body[fieldName] = readRequiredBooleanField(config, fieldName);
+    });
+
+    return body;
+}
+
 async function getUniverse(universeId) {
     return robloxOpenCloudRequest({
         method: 'GET',
@@ -709,6 +821,14 @@ async function getUniverseRootPlaceInfo(universeId) {
     };
 }
 
+async function getUniverseExperienceConfig(universeId) {
+    const universe = await getUniverse(universeId);
+    const placePath = universe && universe.rootPlace ? String(universe.rootPlace).trim() : '';
+    const placeId = parsePlaceIdFromResourcePath(placePath);
+    const place = await getPlace(universeId, placeId);
+    return toExperienceConfigSnapshot(universeId, placeId, universe, place);
+}
+
 async function getUniverseDescription(universeId) {
     const rootPlace = await getUniverseRootPlaceInfo(universeId);
     const place = await getPlace(universeId, rootPlace.placeId);
@@ -725,6 +845,48 @@ async function updateUniverseDescription(universeId, description) {
     await updatePlaceDescription(universeId, rootPlace.placeId, description);
     return {
         placeId: rootPlace.placeId
+    };
+}
+
+async function updateUniverseExperienceConfig(universeId, universeSettings) {
+    const universe = await robloxOpenCloudRequest({
+        method: 'PATCH',
+        path: `/cloud/v2/universes/${universeId}`,
+        query: {
+            updateMask: UNIVERSE_EXPERIENCE_CONFIG_FIELD_NAMES.join(',')
+        },
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(buildUniverseExperienceConfigUpdateBody(universeSettings))
+    });
+
+    return {
+        universe,
+        universeSettings: extractUniverseExperienceConfig(universe)
+    };
+}
+
+async function updateUniverseRootPlaceConfig(universeId, placeSettings) {
+    const rootPlace = await getUniverseRootPlaceInfo(universeId);
+    const place = await robloxOpenCloudRequest({
+        method: 'PATCH',
+        path: `/cloud/v2/universes/${universeId}/places/${rootPlace.placeId}`,
+        query: {
+            updateMask: 'serverSize'
+        },
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            serverSize: readRequiredIntegerField(placeSettings, 'serverSize')
+        })
+    });
+
+    return {
+        placeId: rootPlace.placeId,
+        place,
+        placeSettings: extractPlaceExperienceConfig(place)
     };
 }
 
@@ -754,7 +916,10 @@ module.exports = {
     getPlace,
     updatePlaceDescription,
     getUniverseRootPlaceInfo,
+    getUniverseExperienceConfig,
     getUniverseDescription,
     updateUniverseDescription,
+    updateUniverseExperienceConfig,
+    updateUniverseRootPlaceConfig,
     sleep
 };

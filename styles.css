@@ -1001,6 +1001,13 @@ body {
     gap: 0.65rem;
 }
 
+.admin-inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+
 .admin-label {
     color: var(--text-secondary);
     font-weight: 600;

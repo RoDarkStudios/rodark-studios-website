@@ -13,6 +13,9 @@ This repo uses Roblox OAuth 2.0 as the only login method.
   - Also handles:
     - shared game configuration: `operation = game-config:get` / `operation = game-config:save`
     - game description sync: `operation = load` / `operation = save`
+- `POST /api/admin/roblox-sync-experience-configs` -> admin sync tool for Roblox experience config fields exposed by the Universes/Places Open Cloud APIs
+  - `operation = load` -> load the Production config snapshot
+  - `operation = sync` -> copy Production config to Test + Development
 - `GET /api/profile` -> same user profile data from session
 - `GET /api/health`
 
@@ -42,6 +45,15 @@ For `ROBLOX_OPEN_CLOUD_API_KEY`, include these Open Cloud scopes on all source/t
 
 For description sync, also include:
 - `universe.place:write`
+
+For experience config sync, also include:
+- `universe:write`
+- `universe.place:write`
+
+Roblox Open Cloud experience config fields currently exposed by the official Universes/Places APIs and synced by this tool:
+- universe: voice chat, private server price, supported devices, social links
+- root place: server size
+- excluded intentionally: name/description (handled separately), visibility (read-only)
 
 Admin sync behavior notes:
 - Request body now uses fixed fields: `productionUniverseId` (source), `developmentUniverseId` (target), `testUniverseId` (target).
