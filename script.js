@@ -612,11 +612,14 @@ async function handleAdminCopySubmit(event) {
                 + (Number(result.totals.totalBadgeFailures) || 0)
                 > 0
             );
+        const alreadySynced = Boolean(result && result.alreadySynced);
 
         setAdminCopyStatus(
             hasFailures
                 ? `Copy finished with some failures in ${formatDurationClock(elapsedMs)}. See details below.`
-                : `Copy completed successfully in ${formatDurationClock(elapsedMs)}.`,
+                : alreadySynced
+                    ? `No changes were needed. Test and Development were already in sync (${formatDurationClock(elapsedMs)}).`
+                    : `Copy completed successfully in ${formatDurationClock(elapsedMs)}.`,
             hasFailures ? 'error' : 'success'
         );
     } catch (error) {

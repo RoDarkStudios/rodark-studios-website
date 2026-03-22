@@ -119,6 +119,100 @@ function normalizeNameKey(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+function getTrimmedName(value) {
+    return String(value || '').trim();
+}
+
+function getComparableDescription(value) {
+    return typeof value === 'string' ? value : null;
+}
+
+function getComparablePriceValue(config) {
+    const price = Number(config && config.priceInformation && config.priceInformation.defaultPriceInRobux);
+    if (!Number.isFinite(price) || price <= 0) {
+        return null;
+    }
+
+    return Math.round(price);
+}
+
+function getComparableRegionalPricingEnabled(config) {
+    const features = config && config.priceInformation && Array.isArray(config.priceInformation.enabledFeatures)
+        ? config.priceInformation.enabledFeatures
+        : [];
+
+    return features.includes('RegionalPricing');
+}
+
+function getDesiredMonetizationState(config, options) {
+    const settings = options || {};
+    const forcedPrice = Number(settings.fixedPrice);
+    const desiredPrice = Number.isFinite(forcedPrice)
+        ? Math.max(0, Math.round(forcedPrice))
+        : getComparablePriceValue(config);
+
+    return {
+        name: getTrimmedName(config && config.name),
+        description: getComparableDescription(config && config.description),
+        isForSale: typeof settings.forceForSale === 'boolean'
+            ? settings.forceForSale
+            : Boolean(config && config.isForSale),
+        price: desiredPrice,
+        isRegionalPricingEnabled: typeof settings.forceRegionalPricingEnabled === 'boolean'
+            ? settings.forceRegionalPricingEnabled
+            : getComparableRegionalPricingEnabled(config)
+    };
+}
+
+function areMonetizationItemsEquivalent(sourceConfig, targetConfig, options) {
+    const desired = getDesiredMonetizationState(sourceConfig, options);
+
+    if (desired.name !== getTrimmedName(targetConfig && targetConfig.name)) {
+        return false;
+    }
+
+    if (desired.description !== null) {
+        const targetDescription = typeof (targetConfig && targetConfig.description) === 'string'
+            ? targetConfig.description
+            : '';
+        if (desired.description !== targetDescription) {
+            return false;
+        }
+    }
+
+    if (desired.isForSale !== Boolean(targetConfig && targetConfig.isForSale)) {
+        return false;
+    }
+
+    if (desired.price !== null && desired.price !== getComparablePriceValue(targetConfig)) {
+        return false;
+    }
+
+    if (desired.isRegionalPricingEnabled !== getComparableRegionalPricingEnabled(targetConfig)) {
+        return false;
+    }
+
+    return true;
+}
+
+function areBadgesEquivalent(sourceConfig, targetConfig) {
+    if (getTrimmedName(sourceConfig && sourceConfig.name) !== getTrimmedName(targetConfig && targetConfig.name)) {
+        return false;
+    }
+
+    const sourceDescription = typeof (sourceConfig && sourceConfig.description) === 'string'
+        ? sourceConfig.description
+        : '';
+    const targetDescription = typeof (targetConfig && targetConfig.description) === 'string'
+        ? targetConfig.description
+        : '';
+    if (sourceDescription !== targetDescription) {
+        return false;
+    }
+
+    return Boolean(sourceConfig && sourceConfig.enabled) === Boolean(targetConfig && targetConfig.enabled);
+}
+
 function isArchivedMonetizationConfig(config, resolvedName) {
     const name = String(resolvedName || (config && config.name) || '').trim();
     const nameKey = normalizeNameKey(name);
@@ -204,6 +298,70 @@ function consumeArchivedEntry(archivedEntries, consumedIds) {
     }
 
     return null;
+}
+
+function isCollectionAlreadySynced(sourceConfigs, targetConfigs, idFieldName, compareFn) {
+    const indexedTargets = buildTargetNameIndex(targetConfigs, idFieldName);
+    const matchedTargetIds = new Set();
+
+    for (const sourceConfig of sourceConfigs) {
+        const sourceNameKey = normalizeNameKey(sourceConfig && sourceConfig.name);
+        const matchedTarget = consumeMatchByName(indexedTargets.byName, sourceNameKey, matchedTargetIds);
+        if (!matchedTarget) {
+            return false;
+        }
+
+        if (!compareFn(sourceConfig, matchedTarget.config)) {
+            return false;
+        }
+
+        matchedTargetIds.add(matchedTarget.id);
+    }
+
+    return indexedTargets.allEntries.every((entry) => matchedTargetIds.has(entry.id));
+}
+
+function buildAlreadySyncedResponse(sourceUniverseId, targetConfigs, sourceCounts, testPriceMode) {
+    return {
+        alreadySynced: true,
+        sourceUniverseId,
+        targetUniverseIds: targetConfigs.map((item) => item.universeId),
+        testPriceMode,
+        priceSyncMode: describePriceSyncMode(testPriceMode),
+        sourceCounts: {
+            gamePasses: sourceCounts.gamePasses,
+            developerProducts: sourceCounts.developerProducts,
+            badges: sourceCounts.badges
+        },
+        totals: {
+            targetsProcessed: targetConfigs.length,
+            totalGamePassesCreated: 0,
+            totalGamePassesUpdated: 0,
+            totalGamePassesArchived: 0,
+            totalDeveloperProductsCreated: 0,
+            totalDeveloperProductsUpdated: 0,
+            totalDeveloperProductsArchived: 0,
+            totalBadgesCreated: 0,
+            totalBadgesUpdated: 0,
+            totalBadgesArchived: 0,
+            totalGamePassFailures: 0,
+            totalDeveloperProductFailures: 0,
+            totalBadgeFailures: 0,
+            totalGamePassWarnings: 0,
+            totalDeveloperProductWarnings: 0,
+            totalBadgeWarnings: 0
+        },
+        limitations: [
+            'Roblox Open Cloud does not currently provide delete endpoints for game passes, developer products, or badges. Unmatched items are archived (renamed to [ARCHIVED] <item-id>), set off-sale/disabled, and assigned a blank icon. Archived game passes/products are reused for future source items when possible.'
+        ],
+        targets: targetConfigs.map((targetConfig) => ({
+            environment: targetConfig.environment,
+            targetUniverseId: targetConfig.universeId,
+            gamePasses: buildResultBucket(),
+            developerProducts: buildResultBucket(),
+            badges: buildResultBucket()
+        }))
+    };
 }
 
 function isImageUploadError(error) {
@@ -567,6 +725,70 @@ module.exports = async (req, res) => {
         const sourceDeveloperProducts = await listAllDeveloperProductConfigs(sourceUniverseId);
         const sourceBadges = await listAllBadges(sourceUniverseId);
 
+        const sourceCounts = {
+            gamePasses: sourceGamePasses.length,
+            developerProducts: sourceDeveloperProducts.length,
+            badges: sourceBadges.length
+        };
+
+        const targetStates = [];
+        let alreadySynced = true;
+
+        for (const targetConfig of targetConfigs) {
+            const targetUniverseId = targetConfig.universeId;
+            const pricingOverrideOptions = targetConfig.pricingOverrideOptions;
+            const existingTargetGamePasses = await listAllGamePassConfigs(targetUniverseId);
+            const existingTargetDeveloperProducts = await listAllDeveloperProductConfigs(targetUniverseId);
+            const existingTargetBadges = await listAllBadges(targetUniverseId);
+
+            const targetAlreadySynced = (
+                isCollectionAlreadySynced(
+                    sourceGamePasses,
+                    existingTargetGamePasses,
+                    'gamePassId',
+                    (sourceConfig, targetConfigEntry) => areMonetizationItemsEquivalent(sourceConfig, targetConfigEntry, {
+                        ...pricingOverrideOptions,
+                        forceForSale: true
+                    })
+                )
+                && isCollectionAlreadySynced(
+                    sourceDeveloperProducts,
+                    existingTargetDeveloperProducts,
+                    'productId',
+                    (sourceConfig, targetConfigEntry) => areMonetizationItemsEquivalent(sourceConfig, targetConfigEntry, {
+                        ...pricingOverrideOptions,
+                        forceForSale: true
+                    })
+                )
+                && isCollectionAlreadySynced(
+                    sourceBadges,
+                    existingTargetBadges,
+                    'id',
+                    areBadgesEquivalent
+                )
+            );
+
+            targetStates.push({
+                ...targetConfig,
+                existingTargetGamePasses,
+                existingTargetDeveloperProducts,
+                existingTargetBadges
+            });
+
+            if (!targetAlreadySynced) {
+                alreadySynced = false;
+            }
+        }
+
+        if (alreadySynced) {
+            return sendJson(res, 200, buildAlreadySyncedResponse(
+                sourceUniverseId,
+                targetConfigs,
+                sourceCounts,
+                testPriceMode
+            ));
+        }
+
         const gamePassThumbnailMap = await getGamePassThumbnailUrlMap(
             sourceGamePasses.map((item) => Number(item && item.gamePassId)).filter((id) => Number.isFinite(id))
         );
@@ -614,23 +836,19 @@ module.exports = async (req, res) => {
 
         const targets = [];
 
-        for (const targetConfig of targetConfigs) {
-            const targetUniverseId = targetConfig.universeId;
-            const pricingOverrideOptions = targetConfig.pricingOverrideOptions;
+        for (const targetState of targetStates) {
+            const targetUniverseId = targetState.universeId;
+            const pricingOverrideOptions = targetState.pricingOverrideOptions;
             const gamePasses = buildResultBucket();
             const developerProducts = buildResultBucket();
             const badges = buildResultBucket();
-
-            const existingTargetGamePasses = await listAllGamePassConfigs(targetUniverseId);
-            const existingTargetDeveloperProducts = await listAllDeveloperProductConfigs(targetUniverseId);
-            const existingTargetBadges = await listAllBadges(targetUniverseId);
-            const indexedTargetGamePasses = buildTargetNameIndex(existingTargetGamePasses, 'gamePassId', {
+            const indexedTargetGamePasses = buildTargetNameIndex(targetState.existingTargetGamePasses, 'gamePassId', {
                 includeArchivedPool: true
             });
-            const indexedTargetDeveloperProducts = buildTargetNameIndex(existingTargetDeveloperProducts, 'productId', {
+            const indexedTargetDeveloperProducts = buildTargetNameIndex(targetState.existingTargetDeveloperProducts, 'productId', {
                 includeArchivedPool: true
             });
-            const indexedTargetBadges = buildTargetNameIndex(existingTargetBadges, 'id');
+            const indexedTargetBadges = buildTargetNameIndex(targetState.existingTargetBadges, 'id');
             const matchedTargetGamePassIds = new Set();
             const matchedTargetDeveloperProductIds = new Set();
             const matchedTargetBadgeIds = new Set();
@@ -1011,7 +1229,7 @@ module.exports = async (req, res) => {
             }
 
             targets.push({
-                environment: targetConfig.environment,
+                environment: targetState.environment,
                 targetUniverseId,
                 gamePasses,
                 developerProducts,
