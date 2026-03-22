@@ -31,8 +31,8 @@
       "permanent": true
     },
     {
-      "source": "/admin-sync-experience-configs.html",
-      "destination": "/admin/tools/sync-experience-configs",
+      "source": "/admin-sync-live-configs.html",
+      "destination": "/admin/tools/sync-live-configs",
       "permanent": true
     },
     {
@@ -42,10 +42,6 @@
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/profile",
-      "destination": "/api/auth/me?view=profile"
-    },
     {
       "source": "/privacy",
       "destination": "/privacy.html"
@@ -71,8 +67,8 @@
       "destination": "/admin-sync-game-description.html"
     },
     {
-      "source": "/admin/tools/sync-experience-configs",
-      "destination": "/admin-sync-experience-configs.html"
+      "source": "/admin/tools/sync-live-configs",
+      "destination": "/admin-sync-live-configs.html"
     },
     {
       "source": "/admin/tools/game-configuration",

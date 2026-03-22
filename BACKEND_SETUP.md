@@ -13,10 +13,8 @@ This repo uses Roblox OAuth 2.0 as the only login method.
   - Also handles:
     - shared game configuration: `operation = game-config:get` / `operation = game-config:save`
     - game description sync: `operation = load` / `operation = save`
-- `POST /api/admin/roblox-sync-experience-configs` -> admin sync tool for Roblox experience config fields exposed by the Universes/Places Open Cloud APIs
-  - `operation = load` -> load the Production config snapshot
-  - `operation = sync` -> copy Production config to Test + Development
-- `GET /api/profile` -> same user profile data from session (compatibility route rewritten to `/api/auth/me`)
+    - Roblox Configs sync: `operation = config:load` / `operation = config:sync`
+- `GET /api/profile` -> same user profile data from session
 - `GET /api/health`
 
 ## Required Environment Variables
@@ -46,14 +44,9 @@ For `ROBLOX_OPEN_CLOUD_API_KEY`, include these Open Cloud scopes on all source/t
 For description sync, also include:
 - `universe.place:write`
 
-For experience config sync, also include:
+For Roblox Configs sync (`InExperienceConfig`), also include:
+- `universe:read`
 - `universe:write`
-- `universe.place:write`
-
-Roblox Open Cloud experience config fields currently exposed by the official Universes/Places APIs and synced by this tool:
-- universe: voice chat, private server price, supported devices, social links
-- root place: server size
-- excluded intentionally: name/description (handled separately), visibility (read-only)
 
 Admin sync behavior notes:
 - Request body now uses fixed fields: `productionUniverseId` (source), `developmentUniverseId` (target), `testUniverseId` (target).
@@ -68,6 +61,7 @@ Admin sync behavior notes:
 - Archived game passes/developer products are normalized to `[ARCHIVED] <item-id>`. They are forced off-sale and assigned a blank icon so they can act as a reusable bank.
 - Archived badges are renamed to `[ARCHIVED] <item-id>`, disabled, and assigned a blank icon.
 - If Roblox rejects a neutral icon upload, the item is still archived and the sync records a warning (instead of failing the whole item).
+- The live config sync tool uses Roblox Configs `InExperienceConfig`, overwrites the current draft in Test/Development, and publishes immediately so changes go live without restarting servers.
 
 ## Roblox OAuth App Configuration
 In your Roblox OAuth app settings, ensure the redirect URI matches:

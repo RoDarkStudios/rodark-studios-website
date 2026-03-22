@@ -859,8 +859,8 @@ function setDescriptionSyncStatus(message, type) {
     statusElement.classList.add(type || 'info');
 }
 
-function setExperienceConfigSyncStatus(message, type) {
-    const statusElement = document.getElementById('experience-config-sync-status');
+function setLiveConfigSyncStatus(message, type) {
+    const statusElement = document.getElementById('live-config-sync-status');
     if (!statusElement) {
         return;
     }
@@ -878,8 +878,8 @@ function setExperienceConfigSyncStatus(message, type) {
     statusElement.classList.add(type || 'info');
 }
 
-function setExperienceConfigLoadBusy(isBusy) {
-    const loadButton = document.getElementById('load-experience-config-btn');
+function setLiveConfigLoadBusy(isBusy) {
+    const loadButton = document.getElementById('load-live-config-btn');
     if (!loadButton) {
         return;
     }
@@ -890,72 +890,46 @@ function setExperienceConfigLoadBusy(isBusy) {
         : 'Load Production Config';
 }
 
-function setExperienceConfigSyncBusy(isBusy) {
-    const syncButton = document.getElementById('sync-experience-config-btn');
+function setLiveConfigSyncBusy(isBusy) {
+    const syncButton = document.getElementById('sync-live-config-btn');
     if (!syncButton) {
         return;
     }
 
     syncButton.disabled = Boolean(isBusy);
     syncButton.textContent = isBusy
-        ? 'Syncing Test + Development...'
+        ? 'Publishing to Test + Development...'
         : 'Sync to Test + Development';
 }
 
-function formatExperienceConfigSocialLink(value) {
-    if (!value || typeof value !== 'object') {
-        return 'Disabled';
+function stringifyPrettyJson(value) {
+    try {
+        return JSON.stringify(value ?? {}, null, 2);
+    } catch (error) {
+        return '{}';
     }
-
-    const title = typeof value.title === 'string' && value.title.trim()
-        ? value.title.trim()
-        : '(untitled)';
-    const uri = typeof value.uri === 'string' && value.uri.trim()
-        ? value.uri.trim()
-        : '(missing uri)';
-    return `${title} -> ${uri}`;
 }
 
-function formatExperienceConfigSnapshot(snapshot, label) {
-    if (!snapshot || typeof snapshot !== 'object') {
-        return `${label}\nNo data returned.`;
+function formatLiveConfigSummary(entry) {
+    if (!entry || typeof entry !== 'object') {
+        return 'No config data returned.';
     }
 
-    const universeSettings = snapshot.universeSettings && typeof snapshot.universeSettings === 'object'
-        ? snapshot.universeSettings
-        : {};
-    const placeSettings = snapshot.placeSettings && typeof snapshot.placeSettings === 'object'
-        ? snapshot.placeSettings
-        : {};
-
-    const booleanLabel = (value) => value ? 'Enabled' : 'Disabled';
-    const privateServerPrice = Number(universeSettings.privateServerPriceRobux);
+    const label = String(entry.label || 'Game');
+    const universeId = Number(entry.universeId);
+    const configVersion = Number(entry.configVersion);
+    const entryCount = Number(entry.entryCount);
 
     return [
         `${label}`,
-        `Universe ID: ${Number(snapshot.universeId) || 'Unknown'}`,
-        `Root Place ID: ${Number(snapshot.rootPlaceId) || 'Unknown'}`,
-        `Voice chat: ${booleanLabel(Boolean(universeSettings.voiceChatEnabled))}`,
-        `Private servers: ${Number.isFinite(privateServerPrice) && privateServerPrice > 0 ? `${privateServerPrice} Robux` : 'Disabled'}`,
-        `Desktop: ${booleanLabel(Boolean(universeSettings.desktopEnabled))}`,
-        `Mobile: ${booleanLabel(Boolean(universeSettings.mobileEnabled))}`,
-        `Tablet: ${booleanLabel(Boolean(universeSettings.tabletEnabled))}`,
-        `Console: ${booleanLabel(Boolean(universeSettings.consoleEnabled))}`,
-        `VR: ${booleanLabel(Boolean(universeSettings.vrEnabled))}`,
-        `Server size: ${Number(placeSettings.serverSize) || 'Unknown'}`,
-        '',
-        `Facebook: ${formatExperienceConfigSocialLink(universeSettings.facebookSocialLink)}`,
-        `Twitter/X: ${formatExperienceConfigSocialLink(universeSettings.twitterSocialLink)}`,
-        `YouTube: ${formatExperienceConfigSocialLink(universeSettings.youtubeSocialLink)}`,
-        `Twitch: ${formatExperienceConfigSocialLink(universeSettings.twitchSocialLink)}`,
-        `Discord: ${formatExperienceConfigSocialLink(universeSettings.discordSocialLink)}`,
-        `Roblox group: ${formatExperienceConfigSocialLink(universeSettings.robloxGroupSocialLink)}`,
-        `Guilded: ${formatExperienceConfigSocialLink(universeSettings.guildedSocialLink)}`
+        `Universe ID: ${Number.isFinite(universeId) ? universeId : 'Unknown'}`,
+        `Config version: ${Number.isFinite(configVersion) ? configVersion : 'Unknown'}`,
+        `Entries: ${Number.isFinite(entryCount) ? entryCount : 'Unknown'}`
     ].join('\n');
 }
 
-function renderExperienceConfigSyncResults(result) {
-    const resultElement = document.getElementById('experience-config-sync-results');
+function renderLiveConfigSyncResults(result) {
+    const resultElement = document.getElementById('live-config-sync-results');
     if (!resultElement) {
         return;
     }
@@ -966,42 +940,42 @@ function renderExperienceConfigSyncResults(result) {
         return;
     }
 
-    const fieldsSynced = Array.isArray(result.fieldsSynced) ? result.fieldsSynced : [];
-    const fieldsExcluded = Array.isArray(result.fieldsExcluded) ? result.fieldsExcluded : [];
     const source = result.source || null;
     const targets = Array.isArray(result.targets)
         ? result.targets
         : (Array.isArray(result.successes) ? result.successes : []);
     const failures = Array.isArray(result.failures) ? result.failures : [];
+    const repository = String(result.repository || 'InExperienceConfig');
+    const note = String(result.note || '').trim();
+
+    const failureText = failures.map((item) => {
+        const label = String(item && item.label ? item.label : 'Target');
+        const universeId = Number(item && item.universeId);
+        const error = String(item && item.error ? item.error : 'Unknown error');
+        return `${label} (${Number.isFinite(universeId) ? universeId : 'Unknown'}): ${error}`;
+    }).join('\n');
 
     const targetMarkup = targets.map((target) => `
         <article class="admin-target-result">
-            <label class="admin-label admin-catalog-label">${escapeHtml(
-                `${String(target && target.label ? target.label : 'Target')} Result`
-            )}</label>
-            <textarea class="admin-catalog-output" readonly>${escapeHtml(
-                formatExperienceConfigSnapshot(target, `${String(target && target.label ? target.label : 'Target')} Synced Config`)
-            )}</textarea>
+            <label class="admin-label admin-catalog-label">${escapeHtml(String(target && target.label ? target.label : 'Target'))} Summary</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(formatLiveConfigSummary(target))}</textarea>
+            <label class="admin-label admin-catalog-label">${escapeHtml(String(target && target.label ? target.label : 'Target'))} Published Entries</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(stringifyPrettyJson(target && target.publishedEntries ? target.publishedEntries : {}))}</textarea>
         </article>
     `).join('');
 
-    const failureText = failures.length > 0
-        ? failures.map((item) => {
-            const label = String(item && item.label ? item.label : 'Target');
-            const universeId = Number(item && item.universeId);
-            const error = String(item && item.error ? item.error : 'Unknown error');
-            return `${label} (${Number.isFinite(universeId) ? universeId : 'Unknown'}): ${error}`;
-        }).join('\n')
-        : '';
-
     resultElement.innerHTML = `
         <article class="admin-target-result">
-            <label class="admin-label admin-catalog-label">Fields Synced</label>
-            <textarea class="admin-catalog-output" readonly>${escapeHtml(fieldsSynced.join('\n') || 'No field list returned')}</textarea>
-            <label class="admin-label admin-catalog-label">Fields Not Synced</label>
-            <textarea class="admin-catalog-output" readonly>${escapeHtml(fieldsExcluded.join('\n') || 'No exclusions returned')}</textarea>
-            <label class="admin-label admin-catalog-label">Production Source Config</label>
-            <textarea class="admin-catalog-output" readonly>${escapeHtml(formatExperienceConfigSnapshot(source, 'Production Source Config'))}</textarea>
+            <label class="admin-label admin-catalog-label">Repository</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(`${repository}${note ? `\n\n${note}` : ''}`)}</textarea>
+            <label class="admin-label admin-catalog-label">Production Summary</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(formatLiveConfigSummary(source))}</textarea>
+            <label class="admin-label admin-catalog-label">Production Published Entries</label>
+            <textarea class="admin-catalog-output" readonly>${escapeHtml(stringifyPrettyJson(source && source.publishedEntries ? source.publishedEntries : {}))}</textarea>
+            ${source && source.fullEntries ? `
+                <label class="admin-label admin-catalog-label">Production Full Entries + Metadata</label>
+                <textarea class="admin-catalog-output" readonly>${escapeHtml(stringifyPrettyJson(source.fullEntries))}</textarea>
+            ` : ''}
             ${failureText ? `
                 <label class="admin-label admin-catalog-label">Failures</label>
                 <textarea class="admin-catalog-output" readonly>${escapeHtml(failureText)}</textarea>
@@ -1077,67 +1051,69 @@ function renderDescriptionSyncResults(result) {
     resultElement.classList.remove('hidden');
 }
 
-async function handleLoadExperienceConfigClick() {
-    setExperienceConfigLoadBusy(true);
-    setExperienceConfigSyncStatus('Loading current Production experience config...', 'info');
-    renderExperienceConfigSyncResults(null);
-
-    try {
-        const gameConfig = await requireAdminGameConfig(setExperienceConfigSyncStatus);
-        setAdminGameConfigBanner('experience-config-sync-config', gameConfig);
-
-        const result = await postJson('/api/admin/roblox-sync-experience-configs', {
-            operation: 'load',
-            productionUniverseId: gameConfig.productionUniverseId,
-            testUniverseId: gameConfig.testUniverseId,
-            developmentUniverseId: gameConfig.developmentUniverseId
-        });
-
-        renderExperienceConfigSyncResults(result);
-        setExperienceConfigSyncStatus('Production experience config loaded.', 'success');
-    } catch (error) {
-        setExperienceConfigSyncStatus(error.message || 'Failed to load Production experience config.', 'error');
-    } finally {
-        setExperienceConfigLoadBusy(false);
-    }
-}
-
-async function handleExperienceConfigSyncSubmit(event) {
-    event.preventDefault();
-
-    setExperienceConfigSyncBusy(true);
-    setExperienceConfigSyncStatus('Syncing Production experience config to Test and Development...', 'info');
-    renderExperienceConfigSyncResults(null);
-
-    try {
-        const gameConfig = await requireAdminGameConfig(setExperienceConfigSyncStatus);
-        setAdminGameConfigBanner('experience-config-sync-config', gameConfig);
-
-        const result = await postJson('/api/admin/roblox-sync-experience-configs', {
-            operation: 'sync',
-            productionUniverseId: gameConfig.productionUniverseId,
-            testUniverseId: gameConfig.testUniverseId,
-            developmentUniverseId: gameConfig.developmentUniverseId
-        });
-
-        renderExperienceConfigSyncResults(result);
-        setExperienceConfigSyncStatus('Experience configs updated successfully for Test and Development.', 'success');
-    } catch (error) {
-        if (error && error.data) {
-            renderExperienceConfigSyncResults(error.data);
-        }
-        setExperienceConfigSyncStatus(error.message || 'Failed to sync experience configs.', 'error');
-    } finally {
-        setExperienceConfigSyncBusy(false);
-    }
-}
-
 function getDescriptionSyncFormValues() {
     const descriptionInput = document.getElementById('game-description-text');
 
     return {
         description: String(descriptionInput && descriptionInput.value ? descriptionInput.value : '')
     };
+}
+
+async function handleLoadLiveConfigClick() {
+    setLiveConfigLoadBusy(true);
+    setLiveConfigSyncStatus('Loading current Production live config...', 'info');
+    renderLiveConfigSyncResults(null);
+
+    try {
+        const gameConfig = await requireAdminGameConfig(setLiveConfigSyncStatus);
+        setAdminGameConfigBanner('live-config-sync-config', gameConfig);
+
+        const result = await postJson('/api/admin/roblox-list-monetization-items', {
+            operation: 'config:load',
+            repository: 'InExperienceConfig',
+            productionUniverseId: gameConfig.productionUniverseId,
+            testUniverseId: gameConfig.testUniverseId,
+            developmentUniverseId: gameConfig.developmentUniverseId
+        });
+
+        renderLiveConfigSyncResults(result);
+        setLiveConfigSyncStatus('Production live config loaded.', 'success');
+    } catch (error) {
+        setLiveConfigSyncStatus(error.message || 'Failed to load Production live config.', 'error');
+    } finally {
+        setLiveConfigLoadBusy(false);
+    }
+}
+
+async function handleLiveConfigSyncSubmit(event) {
+    event.preventDefault();
+
+    setLiveConfigSyncBusy(true);
+    setLiveConfigSyncStatus('Publishing Production live config to Test and Development...', 'info');
+    renderLiveConfigSyncResults(null);
+
+    try {
+        const gameConfig = await requireAdminGameConfig(setLiveConfigSyncStatus);
+        setAdminGameConfigBanner('live-config-sync-config', gameConfig);
+
+        const result = await postJson('/api/admin/roblox-list-monetization-items', {
+            operation: 'config:sync',
+            repository: 'InExperienceConfig',
+            productionUniverseId: gameConfig.productionUniverseId,
+            testUniverseId: gameConfig.testUniverseId,
+            developmentUniverseId: gameConfig.developmentUniverseId
+        });
+
+        renderLiveConfigSyncResults(result);
+        setLiveConfigSyncStatus('Live configs published successfully for Test and Development.', 'success');
+    } catch (error) {
+        if (error && error.data) {
+            renderLiveConfigSyncResults(error.data);
+        }
+        setLiveConfigSyncStatus(error.message || 'Failed to sync live configs.', 'error');
+    } finally {
+        setLiveConfigSyncBusy(false);
+    }
 }
 
 async function handleLoadProductionDescriptionClick() {
@@ -1247,15 +1223,15 @@ async function initAdminDescriptionSyncTool() {
     }
 }
 
-async function initAdminExperienceConfigSyncTool() {
-    const toolElement = document.getElementById('admin-experience-config-sync-tool');
+async function initAdminLiveConfigSyncTool() {
+    const toolElement = document.getElementById('admin-live-config-sync-tool');
     if (!toolElement) {
         return;
     }
 
     const deniedElement = document.getElementById('admin-access-denied');
-    const form = document.getElementById('experience-config-sync-form');
-    const loadButton = document.getElementById('load-experience-config-btn');
+    const form = document.getElementById('live-config-sync-form');
+    const loadButton = document.getElementById('load-live-config-btn');
 
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
@@ -1274,22 +1250,22 @@ async function initAdminExperienceConfigSyncTool() {
 
     try {
         const gameConfig = await fetchAdminGameConfig({ force: true });
-        setAdminGameConfigBanner('experience-config-sync-config', gameConfig);
+        setAdminGameConfigBanner('live-config-sync-config', gameConfig);
         if (!gameConfig) {
-            setExperienceConfigSyncStatus(MISSING_GAME_CONFIG_MESSAGE, 'error');
+            setLiveConfigSyncStatus(MISSING_GAME_CONFIG_MESSAGE, 'error');
         } else {
-            await handleLoadExperienceConfigClick();
+            await handleLoadLiveConfigClick();
         }
     } catch (error) {
-        setExperienceConfigSyncStatus(error.message || 'Failed to load shared game IDs.', 'error');
+        setLiveConfigSyncStatus(error.message || 'Failed to load shared game IDs.', 'error');
     }
 
     if (loadButton) {
-        loadButton.addEventListener('click', handleLoadExperienceConfigClick);
+        loadButton.addEventListener('click', handleLoadLiveConfigClick);
     }
 
     if (form) {
-        form.addEventListener('submit', handleExperienceConfigSyncSubmit);
+        form.addEventListener('submit', handleLiveConfigSyncSubmit);
     }
 }
 
@@ -1828,7 +1804,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initAdminCopyTool();
     initAdminListMonetizationTool();
     initAdminDescriptionSyncTool();
-    initAdminExperienceConfigSyncTool();
+    initAdminLiveConfigSyncTool();
     initAdminGameConfigTool();
 
     // Calculate and display ages

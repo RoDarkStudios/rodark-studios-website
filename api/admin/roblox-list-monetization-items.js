@@ -5,6 +5,11 @@ const {
     parseUniverseId,
     listAllGamePassConfigs,
     listAllDeveloperProductConfigs,
+    parseConfigRepository,
+    getConfigRepositoryValues,
+    getConfigRepositoryFull,
+    overwriteConfigRepositoryDraft,
+    publishConfigRepositoryDraft,
     getUniverseDescription,
     updateUniverseDescription
 } = require('../_lib/roblox-open-cloud');
@@ -16,6 +21,7 @@ const ENVIRONMENT_PREFIX_REGEX = /^\u26A0(?:\uFE0F)? THIS IS THE (TEST|DEVELOPME
 const MISSING_CONFIG_MESSAGE = 'Game IDs are not configured. Open Admin > Game Configuration and save Production/Test/Development IDs.';
 const ARCHIVED_NAME_PREFIX = '[ARCHIVED] ';
 const LEGACY_ARCHIVED_MONETIZATION_NAME_KEY = 'archived';
+const DEFAULT_CONFIG_REPOSITORY = 'InExperienceConfig';
 
 async function requireAdmin(req, res) {
     const groupId = getAdminGroupId();
@@ -231,6 +237,127 @@ async function saveDescriptions(ids, descriptionRaw) {
     };
 }
 
+function buildConfigSyncMetadata(repository) {
+    return {
+        repository,
+        deploymentStrategy: 'Immediate',
+        note: 'Publishes Roblox Configs live without restarting servers.'
+    };
+}
+
+function countConfigEntries(entries) {
+    if (!entries || typeof entries !== 'object' || Array.isArray(entries)) {
+        return 0;
+    }
+
+    return Object.keys(entries).length;
+}
+
+async function loadProductionConfigRepository(ids, repository) {
+    const [full, values] = await Promise.all([
+        getConfigRepositoryFull(ids.productionUniverseId, repository),
+        getConfigRepositoryValues(ids.productionUniverseId, repository)
+    ]);
+
+    return {
+        source: {
+            label: 'Production',
+            universeId: ids.productionUniverseId,
+            configVersion: Number(full && full.metadata && full.metadata.configVersion) || null,
+            entryCount: countConfigEntries(values && values.entries),
+            fullEntries: full && full.entries ? full.entries : {},
+            publishedEntries: values && values.entries ? values.entries : {}
+        },
+        ...buildConfigSyncMetadata(repository)
+    };
+}
+
+async function syncProductionConfigRepository(ids, repository) {
+    const sourceValues = await getConfigRepositoryValues(ids.productionUniverseId, repository);
+    const sourceEntries = sourceValues && sourceValues.entries ? sourceValues.entries : {};
+    const sourceConfigVersion = Number(sourceValues && sourceValues.metadata && sourceValues.metadata.configVersion) || null;
+    const publishMessage = `Sync ${repository} from Production ${ids.productionUniverseId} at ${new Date().toISOString()}`;
+
+    const targets = [
+        {
+            label: 'Test',
+            universeId: ids.testUniverseId
+        },
+        {
+            label: 'Development',
+            universeId: ids.developmentUniverseId
+        }
+    ];
+
+    const settled = await Promise.allSettled(targets.map(async (target) => {
+        const draft = await overwriteConfigRepositoryDraft(target.universeId, repository, sourceEntries);
+        const publish = await publishConfigRepositoryDraft(
+            target.universeId,
+            repository,
+            draft && draft.draftHash,
+            {
+                message: publishMessage,
+                deploymentStrategy: 'Immediate'
+            }
+        );
+
+        const latestValues = await getConfigRepositoryValues(target.universeId, repository);
+        return {
+            label: target.label,
+            universeId: target.universeId,
+            configVersion: Number(publish && publish.configVersion) || Number(latestValues && latestValues.metadata && latestValues.metadata.configVersion) || null,
+            entryCount: countConfigEntries(latestValues && latestValues.entries),
+            publishedEntries: latestValues && latestValues.entries ? latestValues.entries : {}
+        };
+    }));
+
+    const successes = [];
+    const failures = [];
+
+    settled.forEach((entry, index) => {
+        const target = targets[index];
+        if (entry.status === 'fulfilled') {
+            successes.push(entry.value);
+            return;
+        }
+
+        failures.push({
+            label: target.label,
+            universeId: target.universeId,
+            error: entry.reason && entry.reason.message
+                ? String(entry.reason.message)
+                : 'Unknown error'
+        });
+    });
+
+    if (failures.length > 0) {
+        const summary = failures.map((item) => `${item.label} (${item.universeId}): ${item.error}`).join(' | ');
+        const error = new Error(`Failed to sync all Roblox configs: ${summary}`);
+        error.source = {
+            label: 'Production',
+            universeId: ids.productionUniverseId,
+            configVersion: sourceConfigVersion,
+            entryCount: countConfigEntries(sourceEntries),
+            publishedEntries: sourceEntries
+        };
+        error.successes = successes;
+        error.failures = failures;
+        throw error;
+    }
+
+    return {
+        source: {
+            label: 'Production',
+            universeId: ids.productionUniverseId,
+            configVersion: sourceConfigVersion,
+            entryCount: countConfigEntries(sourceEntries),
+            publishedEntries: sourceEntries
+        },
+        targets: successes,
+        ...buildConfigSyncMetadata(repository)
+    };
+}
+
 function toGamePassRow(config) {
     const id = Number(config && config.gamePassId);
     if (!Number.isFinite(id)) {
@@ -399,6 +526,39 @@ module.exports = async (req, res) => {
                     error: error.message || 'Failed to sync game descriptions',
                     failures,
                     successes
+                });
+            }
+        }
+
+        if (operation === 'config:load') {
+            try {
+                const ids = await resolveGameUniverseIds(body);
+                const repository = parseConfigRepository(body && body.repository, 'repository');
+                const payload = await loadProductionConfigRepository(ids, repository);
+                return sendJson(res, 200, payload);
+            } catch (error) {
+                return sendJson(res, 400, {
+                    error: error.message || 'Failed to load production config repository'
+                });
+            }
+        }
+
+        if (operation === 'config:sync') {
+            let repository = DEFAULT_CONFIG_REPOSITORY;
+            try {
+                const ids = await resolveGameUniverseIds(body);
+                repository = parseConfigRepository(body && body.repository, 'repository');
+                const payload = await syncProductionConfigRepository(ids, repository);
+                return sendJson(res, 200, payload);
+            } catch (error) {
+                const failures = Array.isArray(error && error.failures) ? error.failures : null;
+                const successes = Array.isArray(error && error.successes) ? error.successes : null;
+                return sendJson(res, 500, {
+                    error: error.message || 'Failed to sync Roblox configs',
+                    source: error.source || null,
+                    failures,
+                    successes,
+                    ...buildConfigSyncMetadata(repository)
                 });
             }
         }
