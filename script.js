@@ -878,18 +878,6 @@ function setLiveConfigSyncStatus(message, type) {
     statusElement.classList.add(type || 'info');
 }
 
-function setLiveConfigLoadBusy(isBusy) {
-    const loadButton = document.getElementById('load-live-config-btn');
-    if (!loadButton) {
-        return;
-    }
-
-    loadButton.disabled = Boolean(isBusy);
-    loadButton.textContent = isBusy
-        ? 'Loading Production Config...'
-        : 'Load Production Config';
-}
-
 function setLiveConfigSyncBusy(isBusy) {
     const syncButton = document.getElementById('sync-live-config-btn');
     if (!syncButton) {
@@ -899,7 +887,7 @@ function setLiveConfigSyncBusy(isBusy) {
     syncButton.disabled = Boolean(isBusy);
     syncButton.textContent = isBusy
         ? 'Publishing to Test + Development...'
-        : 'Sync to Test + Development';
+        : 'Sync Production to Test + Development';
 }
 
 function stringifyPrettyJson(value) {
@@ -1059,32 +1047,6 @@ function getDescriptionSyncFormValues() {
     };
 }
 
-async function handleLoadLiveConfigClick() {
-    setLiveConfigLoadBusy(true);
-    setLiveConfigSyncStatus('Loading current Production live config...', 'info');
-    renderLiveConfigSyncResults(null);
-
-    try {
-        const gameConfig = await requireAdminGameConfig(setLiveConfigSyncStatus);
-        setAdminGameConfigBanner('live-config-sync-config', gameConfig);
-
-        const result = await postJson('/api/admin/roblox-list-monetization-items', {
-            operation: 'config:load',
-            repository: 'InExperienceConfig',
-            productionUniverseId: gameConfig.productionUniverseId,
-            testUniverseId: gameConfig.testUniverseId,
-            developmentUniverseId: gameConfig.developmentUniverseId
-        });
-
-        renderLiveConfigSyncResults(result);
-        setLiveConfigSyncStatus('Production live config loaded.', 'success');
-    } catch (error) {
-        setLiveConfigSyncStatus(error.message || 'Failed to load Production live config.', 'error');
-    } finally {
-        setLiveConfigLoadBusy(false);
-    }
-}
-
 async function handleLiveConfigSyncSubmit(event) {
     event.preventDefault();
 
@@ -1231,7 +1193,6 @@ async function initAdminLiveConfigSyncTool() {
 
     const deniedElement = document.getElementById('admin-access-denied');
     const form = document.getElementById('live-config-sync-form');
-    const loadButton = document.getElementById('load-live-config-btn');
 
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
@@ -1254,14 +1215,13 @@ async function initAdminLiveConfigSyncTool() {
         if (!gameConfig) {
             setLiveConfigSyncStatus(MISSING_GAME_CONFIG_MESSAGE, 'error');
         } else {
-            await handleLoadLiveConfigClick();
+            setLiveConfigSyncStatus(
+                'Ready to overwrite and publish Test and Development from the current published Production config.',
+                'info'
+            );
         }
     } catch (error) {
         setLiveConfigSyncStatus(error.message || 'Failed to load shared game IDs.', 'error');
-    }
-
-    if (loadButton) {
-        loadButton.addEventListener('click', handleLoadLiveConfigClick);
     }
 
     if (form) {
