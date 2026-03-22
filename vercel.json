@@ -43,6 +43,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/profile",
+      "destination": "/api/auth/me?view=profile"
+    },
+    {
       "source": "/privacy",
       "destination": "/privacy.html"
     },

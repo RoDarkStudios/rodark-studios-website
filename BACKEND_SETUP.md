@@ -16,7 +16,7 @@ This repo uses Roblox OAuth 2.0 as the only login method.
 - `POST /api/admin/roblox-sync-experience-configs` -> admin sync tool for Roblox experience config fields exposed by the Universes/Places Open Cloud APIs
   - `operation = load` -> load the Production config snapshot
   - `operation = sync` -> copy Production config to Test + Development
-- `GET /api/profile` -> same user profile data from session
+- `GET /api/profile` -> same user profile data from session (compatibility route rewritten to `/api/auth/me`)
 - `GET /api/health`
 
 ## Required Environment Variables
