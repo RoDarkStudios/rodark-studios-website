@@ -7,3 +7,5 @@ create table if not exists public.admin_game_config (
     updated_by_username text,
     updated_at timestamptz not null default now()
 );
+
+alter table public.admin_game_config enable row level security;
