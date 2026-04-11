@@ -75,9 +75,15 @@ Recommended app links:
 
 ## Deploy Steps
 1. Set environment variables in Vercel.
-2. Run `supabase/schema.sql` against your Supabase project (creates `admin_game_config` table).
+2. Run `supabase/schema.sql` against your Supabase project (creates `admin_game_config` and enables RLS on it).
 3. Redeploy.
 4. Open your site homepage and click `Sign in with Roblox` in the top-right account badge.
+
+If your Supabase table already exists from an older setup, run this one-time hardening SQL as well:
+
+```sql
+alter table public.admin_game_config enable row level security;
+```
 
 ## Notes
 - Session is stored in HttpOnly cookie: `rd_session`.
