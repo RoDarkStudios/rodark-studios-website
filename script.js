@@ -1467,72 +1467,6 @@ function shuffleTeamMembers() {
     });    console.log('Team members shuffled for fairness!');
 }
 
-// Function to fetch game statistics from Roblox
-async function fetchGameStats() {
-    const visitCountElement = document.getElementById('visit-count');
-    if (!visitCountElement) {
-        return;
-    }
-
-    const placeId = 16230991879; // Coding Simulator place ID
-    const universeId = 5602610435; // Pre-converted Universe ID to avoid API calls
-
-    try {
-        // Format numbers with commas
-        function formatNumber(num) {
-            return num.toLocaleString();
-        }
-
-        console.log('Fetching game statistics...');
-
-        // Try to get game details using Universe ID
-        try {
-            const gameResponse = await fetch(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
-            console.log('API Response status:', gameResponse.status);
-
-            if (gameResponse.ok) {
-                const gameData = await gameResponse.json();
-                console.log('Game data received:', gameData);
-
-                if (gameData.data && gameData.data.length > 0) {
-                    const game = gameData.data[0];
-                    console.log('Processing game data:', game);
-                      // Update visit count
-                    if (game.visits !== undefined) {
-                        console.log(`Setting visits to: ${formatNumber(game.visits)}`);
-                        visitCountElement.textContent = formatNumber(game.visits);
-                        console.log('✅ Game statistics updated successfully');
-                        return;
-                    } else {
-                        console.warn('No visits data in response');
-                    }
-                } else {
-                    console.warn('No game data in response');
-                }
-            } else {
-                console.warn('API response not OK:', gameResponse.status);
-            }
-        } catch (error) {
-            console.warn('API request failed:', error);
-        }          // If API fails due to CORS or other issues, use the known accurate data
-        console.log('API failed, using known accurate statistics...');
-
-        // Use the actual current statistics we know from the API test
-        const knownStats = {
-            visits: 4354515  // 4.3M+ visits (actual current number)
-        };
-
-        visitCountElement.textContent = formatNumber(knownStats.visits);
-
-        console.log('📊 Known accurate statistics loaded');
-
-    } catch (error) {
-        console.error('Failed to fetch game statistics:', error);
-          // Show error state
-        visitCountElement.textContent = 'N/A';
-    }
-}
-
 async function fetchAllGameStats() {
     const featuredGameCards = Array.from(document.querySelectorAll('.game-card.featured[data-universe-id]'));
     if (!featuredGameCards.length) {
@@ -1544,24 +1478,28 @@ async function fetchAllGameStats() {
     }
 
     async function fetchRobloxGames(universeIds) {
-        const response = await fetch(`https://games.roblox.com/v1/games?universeIds=${encodeURIComponent(universeIds.join(','))}`, {
+        const response = await fetch(`/api/roblox/games?universeIds=${encodeURIComponent(universeIds.join(','))}`, {
             method: 'GET'
         });
         if (!response.ok) {
-            throw new Error(`Games API failed (${response.status})`);
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (error) {
+                payload = null;
+            }
+
+            const detail = payload && typeof payload.details === 'string' && payload.details.trim()
+                ? payload.details.trim()
+                : `Games API failed (${response.status})`;
+            throw new Error(detail);
         }
 
         const payload = await response.json();
-        const rows = Array.isArray(payload && payload.data) ? payload.data : [];
-        return rows.map((row) => ({
-            universeId: Number(row && row.id),
-            rootPlaceId: Number(row && row.rootPlaceId),
-            name: typeof (row && row.name) === 'string' ? row.name.trim() : '',
-            visits: Number(row && row.visits)
-        }));
+        return Array.isArray(payload && payload.games) ? payload.games : [];
     }
 
-    function applyFallbackVisits(card) {
+    function setVisitsUnavailable(card) {
         const visitsElementId = String(card.dataset.visitsElementId || '').trim();
         if (!visitsElementId) {
             return;
@@ -1572,10 +1510,21 @@ async function fetchAllGameStats() {
             return;
         }
 
-        const fallbackVisits = Number(card.dataset.fallbackVisits);
-        visitsElement.textContent = Number.isFinite(fallbackVisits)
-            ? formatNumber(Math.trunc(fallbackVisits))
-            : 'N/A';
+        visitsElement.textContent = 'Unavailable';
+    }
+
+    function applyUnavailableMetadata(card) {
+        const titleElement = card.querySelector('[data-game-title]');
+        if (titleElement) {
+            titleElement.textContent = 'Unavailable';
+        }
+
+        const imageElement = card.querySelector('.game-image');
+        if (imageElement) {
+            imageElement.alt = 'Roblox game unavailable';
+        }
+
+        setVisitsUnavailable(card);
     }
 
     const universeIds = Array.from(new Set(
@@ -1585,7 +1534,7 @@ async function fetchAllGameStats() {
     ));
 
     if (!universeIds.length) {
-        featuredGameCards.forEach(applyFallbackVisits);
+        featuredGameCards.forEach(applyUnavailableMetadata);
         return;
     }
 
@@ -1599,7 +1548,7 @@ async function fetchAllGameStats() {
             const universeId = Number(card.dataset.universeId);
             const game = gamesByUniverseId.get(universeId);
             if (!game) {
-                applyFallbackVisits(card);
+                applyUnavailableMetadata(card);
                 return;
             }
 
@@ -1636,11 +1585,11 @@ async function fetchAllGameStats() {
                 return;
             }
 
-            applyFallbackVisits(card);
+            setVisitsUnavailable(card);
         });
     } catch (error) {
         console.error('Failed to fetch featured game metadata:', error);
-        featuredGameCards.forEach(applyFallbackVisits);
+        featuredGameCards.forEach(applyUnavailableMetadata);
     }
 }
 
