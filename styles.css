@@ -574,7 +574,7 @@ body {
 /* Team Section */
 .team {
     padding: 6rem 0;
-    background: var(--darker-bg);
+    background: var(--dark-bg);
 }
 
 .team-grid {
@@ -719,7 +719,7 @@ body {
 /* Social Section */
 .social {
     padding: 6rem 0;
-    background: var(--dark-bg);
+    background: var(--darker-bg);
 }
 
 .social-intro {
