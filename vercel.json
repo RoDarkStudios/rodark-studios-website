@@ -16,6 +16,16 @@
       "permanent": true
     },
     {
+      "source": "/admin-tools.html",
+      "destination": "/admin/tools",
+      "permanent": true
+    },
+    {
+      "source": "/admin-discord-bot.html",
+      "destination": "/admin/discord-bot",
+      "permanent": true
+    },
+    {
       "source": "/admin-copy-monetization.html",
       "destination": "/admin/tools/copy-monetization",
       "permanent": true
@@ -53,6 +63,14 @@
     {
       "source": "/admin",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/admin/tools",
+      "destination": "/admin-tools.html"
+    },
+    {
+      "source": "/admin/discord-bot",
+      "destination": "/admin-discord-bot.html"
     },
     {
       "source": "/admin/tools/copy-monetization",

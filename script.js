@@ -1394,7 +1394,8 @@ async function initAdminToolsDirectory() {
     const toolsList = document.getElementById('admin-tools-list');
     const systemsGateway = document.getElementById('admin-systems-gateway');
     const toolsHeading = document.getElementById('admin-tools-heading');
-    if (!toolsList && !systemsGateway) {
+    const ownedContent = document.getElementById('admin-owned-content');
+    if (!toolsList && !systemsGateway && !ownedContent) {
         return;
     }
 
@@ -1410,6 +1411,9 @@ async function initAdminToolsDirectory() {
         }
         if (toolsHeading) {
             toolsHeading.classList.add('hidden');
+        }
+        if (ownedContent) {
+            ownedContent.classList.add('hidden');
         }
         if (deniedElement) {
             deniedElement.classList.remove('hidden');
@@ -1428,6 +1432,9 @@ async function initAdminToolsDirectory() {
     }
     if (toolsList) {
         toolsList.classList.remove('hidden');
+    }
+    if (ownedContent) {
+        ownedContent.classList.remove('hidden');
     }
 }
 

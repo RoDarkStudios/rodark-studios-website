@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - RoDark Studios</title>
-    <meta name="description" content="RoDark Studios owner admin hub">
+    <title>Admin Tools - RoDark Studios</title>
+    <meta name="description" content="RoDark Studios owner workflow tools">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -40,22 +40,35 @@
     <main class="auth-page-main">
         <section class="auth-section">
             <div class="container">
-                <h1 class="section-title">Admin</h1>
+                <h1 class="section-title">Admin Tools</h1>
                 <div class="legal-shell">
                     <article class="legal-card">
-                        <p class="about-description admin-intro">
-                            Choose an owner system to manage.
+                        <p class="admin-tool-back-link-wrap">
+                            <a href="/admin" class="admin-tool-back-link">
+                                <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                                Back to admin
+                            </a>
                         </p>
 
-                        <div id="admin-owned-content" class="admin-section-grid hidden">
-                            <a href="/admin/tools" class="admin-section-card">
+                        <p class="about-description admin-intro">
+                            Set shared Game IDs first, then use workflow tools.
+                        </p>
+
+                        <section id="admin-systems-gateway" class="admin-systems-gateway hidden" aria-labelledby="admin-systems-heading">
+                            <h2 id="admin-systems-heading" class="admin-tools-heading">Game IDs</h2>
+                            <a href="/admin/tools/game-configuration" class="btn btn-primary admin-systems-gateway-btn">
+                                <i class="fas fa-hashtag" aria-hidden="true"></i>
+                                Game IDs
+                            </a>
+                        </section>
+
+                        <h2 id="admin-tools-heading" class="admin-tools-heading hidden">Workflow Tools</h2>
+                        <div id="admin-tools-list" class="admin-tools-list hidden">
+                            <a href="/admin/tools/copy-monetization" class="admin-tool-link">
                                 <div class="admin-tool-link-content">
-                                    <span class="admin-section-icon" aria-hidden="true">
-                                        <i class="fas fa-screwdriver-wrench"></i>
-                                    </span>
-                                    <h2 class="admin-tool-title">Admin Tools</h2>
+                                    <h2 class="admin-tool-title">Copy Game Passes + Developer Products + Badges</h2>
                                     <p class="admin-tool-note">
-                                        Game IDs, monetization sync, description sync, and live configuration workflows.
+                                        Sync monetization metadata from one source universe to one or more target universes.
                                     </p>
                                 </div>
                                 <span class="admin-tool-link-icon" aria-hidden="true">
@@ -63,14 +76,35 @@
                                 </span>
                             </a>
 
-                            <a href="/admin/discord-bot" class="admin-section-card">
+                            <a href="/admin/tools/list-monetization-ids" class="admin-tool-link">
                                 <div class="admin-tool-link-content">
-                                    <span class="admin-section-icon discord" aria-hidden="true">
-                                        <i class="fab fa-discord"></i>
-                                    </span>
-                                    <h2 class="admin-tool-title">Discord Bot</h2>
+                                    <h2 class="admin-tool-title">List Game Pass + Dev Product IDs</h2>
                                     <p class="admin-tool-note">
-                                        Open the Discord bot dashboard client interface.
+                                        Return game pass and product name/ID lists for Development, Test, and Production games.
+                                    </p>
+                                </div>
+                                <span class="admin-tool-link-icon" aria-hidden="true">
+                                    <i class="fas fa-arrow-right"></i>
+                                </span>
+                            </a>
+
+                            <a href="/admin/tools/sync-game-description" class="admin-tool-link">
+                                <div class="admin-tool-link-content">
+                                    <h2 class="admin-tool-title">Sync Game Descriptions</h2>
+                                    <p class="admin-tool-note">
+                                        Load Production description, edit once, then update Production, Test, and Development with automatic warning headers for Test and Development.
+                                    </p>
+                                </div>
+                                <span class="admin-tool-link-icon" aria-hidden="true">
+                                    <i class="fas fa-arrow-right"></i>
+                                </span>
+                            </a>
+
+                            <a href="/admin/tools/sync-live-configs" class="admin-tool-link">
+                                <div class="admin-tool-link-content">
+                                    <h2 class="admin-tool-title">Sync Live Configs</h2>
+                                    <p class="admin-tool-note">
+                                        Copy Production Roblox Configs (`InExperienceConfig`) to Test and Development and publish them live without restarting servers.
                                     </p>
                                 </div>
                                 <span class="admin-tool-link-icon" aria-hidden="true">
