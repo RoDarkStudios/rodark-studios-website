@@ -1,4 +1,5 @@
 const SUPABASE_REST_PATH = '/rest/v1/admin_game_config';
+let postgresPool;
 
 function getSupabaseConfig() {
     const url = String(process.env.SUPABASE_URL || '').trim();
@@ -12,6 +13,40 @@ function getSupabaseConfig() {
         url: url.replace(/\/+$/, ''),
         serviceRoleKey
     };
+}
+
+function hasSupabaseConfig() {
+    return Boolean(String(process.env.SUPABASE_URL || '').trim())
+        && Boolean(String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim());
+}
+
+function getDatabaseUrl() {
+    return String(process.env.DATABASE_URL || process.env.POSTGRES_URL || '').trim();
+}
+
+function hasPostgresConfig() {
+    return Boolean(getDatabaseUrl());
+}
+
+function getPostgresPool() {
+    if (postgresPool) {
+        return postgresPool;
+    }
+
+    const connectionString = getDatabaseUrl();
+    if (!connectionString) {
+        throw new Error('DATABASE_URL must be set');
+    }
+
+    const { Pool } = require('pg');
+    postgresPool = new Pool({
+        connectionString,
+        ssl: connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
+            ? false
+            : { rejectUnauthorized: false }
+    });
+
+    return postgresPool;
 }
 
 function parseJsonOrNull(text) {
@@ -92,6 +127,11 @@ async function supabaseRequest({ method, query, body, headers }) {
     return responseText;
 }
 
+async function postgresQuery(text, params) {
+    const pool = getPostgresPool();
+    return pool.query(text, params);
+}
+
 function toPositiveInteger(value, fieldName) {
     const parsed = Number.parseInt(String(value || '').trim(), 10);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -119,7 +159,29 @@ function mapRowToConfig(row) {
     };
 }
 
-async function getStoredGameConfig() {
+async function getStoredGameConfigFromPostgres() {
+    const result = await postgresQuery(`
+        select
+            id,
+            production_universe_id,
+            test_universe_id,
+            development_universe_id,
+            updated_at,
+            updated_by_user_id,
+            updated_by_username
+        from admin_game_config
+        where id = 1
+        limit 1
+    `);
+
+    if (!result.rows.length) {
+        return null;
+    }
+
+    return mapRowToConfig(result.rows[0]);
+}
+
+async function getStoredGameConfigFromSupabase() {
     const rows = await supabaseRequest({
         method: 'GET',
         query: {
@@ -144,7 +206,63 @@ async function getStoredGameConfig() {
     return mapRowToConfig(rows[0]);
 }
 
-async function saveStoredGameConfig(config) {
+async function getStoredGameConfig() {
+    if (hasPostgresConfig()) {
+        const postgresConfig = await getStoredGameConfigFromPostgres();
+        if (postgresConfig || !hasSupabaseConfig()) {
+            return postgresConfig;
+        }
+
+        return getStoredGameConfigFromSupabase();
+    }
+
+    return getStoredGameConfigFromSupabase();
+}
+
+async function saveStoredGameConfigToPostgres(config) {
+    const result = await postgresQuery(`
+        insert into admin_game_config (
+            id,
+            production_universe_id,
+            test_universe_id,
+            development_universe_id,
+            updated_by_user_id,
+            updated_by_username,
+            updated_at
+        )
+        values ($1, $2, $3, $4, $5, $6, now())
+        on conflict (id) do update set
+            production_universe_id = excluded.production_universe_id,
+            test_universe_id = excluded.test_universe_id,
+            development_universe_id = excluded.development_universe_id,
+            updated_by_user_id = excluded.updated_by_user_id,
+            updated_by_username = excluded.updated_by_username,
+            updated_at = excluded.updated_at
+        returning
+            id,
+            production_universe_id,
+            test_universe_id,
+            development_universe_id,
+            updated_at,
+            updated_by_user_id,
+            updated_by_username
+    `, [
+        1,
+        Number(config && config.productionUniverseId),
+        Number(config && config.testUniverseId),
+        Number(config && config.developmentUniverseId),
+        config && config.updatedByUserId ? String(config.updatedByUserId) : null,
+        config && config.updatedByUsername ? String(config.updatedByUsername) : null
+    ]);
+
+    if (!result.rows.length) {
+        throw new Error('Postgres upsert returned no game config row');
+    }
+
+    return mapRowToConfig(result.rows[0]);
+}
+
+async function saveStoredGameConfigToSupabase(config) {
     const payload = {
         id: 1,
         production_universe_id: Number(config && config.productionUniverseId),
@@ -180,6 +298,14 @@ async function saveStoredGameConfig(config) {
     }
 
     return mapRowToConfig(rows[0]);
+}
+
+async function saveStoredGameConfig(config) {
+    if (hasPostgresConfig()) {
+        return saveStoredGameConfigToPostgres(config);
+    }
+
+    return saveStoredGameConfigToSupabase(config);
 }
 
 module.exports = {

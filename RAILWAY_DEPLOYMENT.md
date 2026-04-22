@@ -39,6 +39,14 @@ SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 ```
 
+Database:
+
+```txt
+DATABASE_URL
+```
+
+`DATABASE_URL` is provided by Railway Postgres. Keep the Supabase variables during database migration so the app can fall back to the old stored game configuration until Postgres has the row.
+
 Recommended:
 
 ```txt
