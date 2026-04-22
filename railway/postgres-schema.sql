@@ -7,3 +7,18 @@ create table if not exists admin_game_config (
     updated_by_username text,
     updated_at timestamptz not null default now()
 );
+
+create table if not exists discord_bot_control (
+    id smallint primary key check (id = 1),
+    desired_enabled boolean not null default false,
+    runtime_status text not null default 'offline',
+    last_seen_at timestamptz,
+    last_error text,
+    updated_at timestamptz not null default now(),
+    updated_by_user_id text,
+    updated_by_username text
+);
+
+insert into discord_bot_control (id)
+values (1)
+on conflict (id) do nothing;

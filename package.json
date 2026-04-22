@@ -5,12 +5,14 @@
   "description": "RoDark Studios website and platform runtime.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:bot": "node bot/discord-bot.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "discord.js": "^14.15.3",
     "pg": "^8.11.5"
   }
 }

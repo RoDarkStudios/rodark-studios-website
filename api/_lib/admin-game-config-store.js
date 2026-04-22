@@ -1,34 +1,4 @@
-let postgresPool;
-
-function getDatabaseUrl() {
-    return String(process.env.DATABASE_URL || process.env.POSTGRES_URL || '').trim();
-}
-
-function getPostgresPool() {
-    if (postgresPool) {
-        return postgresPool;
-    }
-
-    const connectionString = getDatabaseUrl();
-    if (!connectionString) {
-        throw new Error('DATABASE_URL must be set');
-    }
-
-    const { Pool } = require('pg');
-    postgresPool = new Pool({
-        connectionString,
-        ssl: connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
-            ? false
-            : { rejectUnauthorized: false }
-    });
-
-    return postgresPool;
-}
-
-async function postgresQuery(text, params) {
-    const pool = getPostgresPool();
-    return pool.query(text, params);
-}
+const { postgresQuery } = require('./postgres');
 
 function toPositiveInteger(value, fieldName) {
     const parsed = Number.parseInt(String(value || '').trim(), 10);

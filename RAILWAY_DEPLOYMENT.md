@@ -71,4 +71,11 @@ It also redirects the old `.html` URLs to the clean routes.
 
 ## Future Bot Service
 
-Do not run the 24/7 Discord bot inside this website process long-term. Add it as a second Railway service later so the website and bot can restart, scale, and fail independently.
+Run the Discord bot as a second Railway service from this same GitHub repo.
+
+- Start command: `npm run start:bot`
+- Required variables:
+  - `DATABASE_URL` as a reference to Railway Postgres
+  - `DISCORD_BOT_TOKEN`
+
+The website dashboard at `/admin/discord-bot` sets the desired bot state in Postgres. The bot service reads that state and connects or disconnects from Discord.

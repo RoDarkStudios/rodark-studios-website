@@ -25,6 +25,7 @@ The app is deployed as a normal Node.js service on Railway. `server.js` serves t
 - `ROBLOX_OAUTH_CLIENT_SECRET`
 - `ROBLOX_OPEN_CLOUD_API_KEY` (used by the admin monetization tools)
 - `DATABASE_URL` (Railway Postgres connection used to persist shared Production/Test/Development game IDs)
+- `DISCORD_BOT_TOKEN` (only required by the separate Discord bot service)
 
 Optional:
 - `ROBLOX_OAUTH_REDIRECT_URI`

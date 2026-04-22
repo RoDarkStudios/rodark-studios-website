@@ -1438,6 +1438,154 @@ async function initAdminToolsDirectory() {
     }
 }
 
+function formatDiscordBotStatus(control) {
+    if (!control || typeof control !== 'object') {
+        return {
+            title: 'Discord bot status',
+            detail: 'Bot control state is unavailable.',
+            dotClass: 'error',
+            buttonText: 'Connect bot',
+            desiredEnabled: false
+        };
+    }
+
+    const desiredEnabled = Boolean(control.desiredEnabled);
+    const runtimeStatus = String(control.runtimeStatus || 'offline').toLowerCase();
+    const statusLabel = runtimeStatus.charAt(0).toUpperCase() + runtimeStatus.slice(1);
+    const desiredLabel = desiredEnabled ? 'Connect requested' : 'Disconnect requested';
+    const lastSeen = control.lastSeenAt ? ` Last seen: ${new Date(control.lastSeenAt).toLocaleString()}.` : '';
+    const lastError = control.lastError ? ` Error: ${control.lastError}` : '';
+
+    return {
+        title: `Discord bot: ${statusLabel}`,
+        detail: `${desiredLabel}.${lastSeen}${lastError}`,
+        dotClass: runtimeStatus === 'online' ? 'online' : (runtimeStatus === 'connecting' ? 'connecting' : (runtimeStatus === 'error' ? 'error' : '')),
+        buttonText: desiredEnabled ? 'Disconnect bot' : 'Connect bot',
+        desiredEnabled
+    };
+}
+
+function renderDiscordBotControl(control) {
+    const statusDot = document.getElementById('discord-bot-status-dot');
+    const statusTitle = document.getElementById('discord-bot-status-title');
+    const statusDetail = document.getElementById('discord-bot-status-detail');
+    const toggleButton = document.getElementById('discord-bot-toggle-btn');
+    const formatted = formatDiscordBotStatus(control);
+
+    if (statusDot) {
+        statusDot.className = `admin-discord-status-dot ${formatted.dotClass}`.trim();
+    }
+    if (statusTitle) {
+        statusTitle.textContent = formatted.title;
+    }
+    if (statusDetail) {
+        statusDetail.textContent = formatted.detail;
+    }
+    if (toggleButton) {
+        toggleButton.textContent = formatted.buttonText;
+        toggleButton.dataset.desiredEnabled = formatted.desiredEnabled ? 'true' : 'false';
+        toggleButton.disabled = false;
+    }
+}
+
+function setDiscordBotStatusMessage(message, type) {
+    const statusElement = document.getElementById('discord-bot-status-message');
+    if (!statusElement) {
+        return;
+    }
+
+    if (!message) {
+        statusElement.textContent = '';
+        statusElement.className = 'admin-status info hidden';
+        return;
+    }
+
+    statusElement.textContent = message;
+    statusElement.className = `admin-status ${type || 'info'}`;
+}
+
+async function fetchDiscordBotControl() {
+    const response = await fetch('/api/admin/discord-bot-control', {
+        method: 'GET',
+        credentials: 'include'
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload.error || `Discord bot status failed (${response.status})`);
+    }
+
+    return payload.control || null;
+}
+
+async function setDiscordBotDesiredState(desiredEnabled) {
+    const payload = await postJson('/api/admin/discord-bot-control', { desiredEnabled });
+    return payload.control || null;
+}
+
+async function initDiscordBotDashboard() {
+    const dashboard = document.getElementById('discord-bot-dashboard');
+    const ownedContent = document.getElementById('admin-owned-content');
+    if (!dashboard || !ownedContent) {
+        return;
+    }
+
+    const deniedElement = document.getElementById('admin-access-denied');
+    const toggleButton = document.getElementById('discord-bot-toggle-btn');
+    const adminStatus = await fetchAdminStatus();
+    const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
+
+    if (!isAdmin) {
+        ownedContent.classList.add('hidden');
+        if (deniedElement) {
+            deniedElement.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (deniedElement) {
+        deniedElement.classList.add('hidden');
+    }
+    ownedContent.classList.remove('hidden');
+
+    async function refreshControl() {
+        try {
+            const control = await fetchDiscordBotControl();
+            renderDiscordBotControl(control);
+            setDiscordBotStatusMessage('', 'info');
+        } catch (error) {
+            if (toggleButton) {
+                toggleButton.disabled = true;
+            }
+            setDiscordBotStatusMessage(error.message || 'Failed to load Discord bot status.', 'error');
+        }
+    }
+
+    if (toggleButton) {
+        toggleButton.addEventListener('click', async () => {
+            const currentlyDesiredEnabled = toggleButton.dataset.desiredEnabled === 'true';
+            const nextDesiredEnabled = !currentlyDesiredEnabled;
+            toggleButton.disabled = true;
+            setDiscordBotStatusMessage(nextDesiredEnabled ? 'Connecting bot...' : 'Disconnecting bot...', 'info');
+
+            try {
+                const control = await setDiscordBotDesiredState(nextDesiredEnabled);
+                renderDiscordBotControl(control);
+                setDiscordBotStatusMessage(nextDesiredEnabled
+                    ? 'Connect requested. The bot service will come online shortly.'
+                    : 'Disconnect requested. The bot service will go offline shortly.', 'success');
+            } catch (error) {
+                setDiscordBotStatusMessage(error.message || 'Failed to update Discord bot.', 'error');
+            } finally {
+                toggleButton.disabled = false;
+            }
+        });
+    }
+
+    await refreshControl();
+    window.setInterval(refreshControl, 5000);
+}
+
 // Age calculation function
 function calculateAge(birthDate) {
     const today = new Date();
@@ -1725,6 +1873,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initAdminDescriptionSyncTool();
     initAdminLiveConfigSyncTool();
     initAdminGameConfigTool();
+    initDiscordBotDashboard();
 
     // Calculate and display ages
     const myronAge = calculateAge('2008-05-31');

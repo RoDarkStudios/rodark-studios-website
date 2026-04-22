@@ -6,6 +6,7 @@ Full-stack website and internal admin platform for RoDark Studios.
 
 - Hosting: Railway
 - Web runtime: Node.js HTTP server (`server.js`)
+- Bot runtime: separate Railway service (`npm run start:bot`)
 - Database: Railway Postgres
 - Auth: Roblox OAuth 2.0
 
@@ -17,6 +18,12 @@ npm start
 ```
 
 The app listens on `http://localhost:3000` unless `PORT` is set.
+
+To run the Discord bot worker locally:
+
+```bash
+npm run start:bot
+```
 
 ## Required Environment Variables
 
@@ -37,6 +44,13 @@ ROBLOX_OAUTH_SCOPES
 ROBLOX_OAUTH_BASE_URL
 ```
 
+Required for the Discord bot worker:
+
+```txt
+DISCORD_BOT_TOKEN
+DATABASE_URL
+```
+
 ## Database
 
 The current schema lives in `railway/postgres-schema.sql`.
@@ -49,4 +63,5 @@ The current schema lives in `railway/postgres-schema.sql`.
 - `/admin`
 - `/admin/tools`
 - `/admin/tools/game-configuration`
+- `/admin/discord-bot`
 - `/api/health`

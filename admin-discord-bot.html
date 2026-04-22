@@ -51,18 +51,22 @@
                         </p>
 
                         <div id="admin-owned-content" class="hidden">
-                            <p class="about-description admin-intro">
-                                Client dashboard placeholder for future Discord bot controls.
-                            </p>
+                            <div id="discord-bot-dashboard" class="admin-discord-control">
+                                <div class="admin-discord-status-row">
+                                    <span id="discord-bot-status-dot" class="admin-discord-status-dot" aria-hidden="true"></span>
+                                    <div>
+                                        <h2 id="discord-bot-status-title" class="admin-tool-title">Discord bot status</h2>
+                                        <p id="discord-bot-status-detail" class="admin-tool-note">
+                                            Loading bot status...
+                                        </p>
+                                    </div>
+                                </div>
 
-                            <div class="admin-form">
-                                <label for="discord-bot-placeholder-text" class="admin-label">Random text</label>
-                                <textarea
-                                    id="discord-bot-placeholder-text"
-                                    class="admin-textarea admin-discord-placeholder-input"
-                                    placeholder="Type anything here..."
-                                    rows="8"
-                                ></textarea>
+                                <button id="discord-bot-toggle-btn" class="btn btn-primary admin-submit-btn" type="button" disabled>
+                                    Connect bot
+                                </button>
+
+                                <p id="discord-bot-status-message" class="admin-status info hidden"></p>
                             </div>
                         </div>
 

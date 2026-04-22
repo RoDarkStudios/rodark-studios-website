@@ -14,6 +14,7 @@ const robloxGroupStats = require('./api/roblox/group-stats');
 const adminCopyMonetization = require('./api/admin/roblox-copy-monetization');
 const adminListMonetizationItems = require('./api/admin/roblox-list-monetization-items');
 const adminSyncExperienceConfigs = require('./api/admin/roblox-sync-experience-configs');
+const adminDiscordBotControl = require('./api/admin/discord-bot-control');
 
 const rootDir = __dirname;
 const port = process.env.PORT || 3000;
@@ -57,7 +58,8 @@ const apiRoutes = {
     '/api/roblox/group-stats': robloxGroupStats,
     '/api/admin/roblox-copy-monetization': adminCopyMonetization,
     '/api/admin/roblox-list-monetization-items': adminListMonetizationItems,
-    '/api/admin/roblox-sync-experience-configs': adminSyncExperienceConfigs
+    '/api/admin/roblox-sync-experience-configs': adminSyncExperienceConfigs,
+    '/api/admin/discord-bot-control': adminDiscordBotControl
 };
 
 const mimeTypes = {
