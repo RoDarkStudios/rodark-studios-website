@@ -24,9 +24,7 @@ The app is deployed as a normal Node.js service on Railway. `server.js` serves t
 - `ROBLOX_OAUTH_CLIENT_ID`
 - `ROBLOX_OAUTH_CLIENT_SECRET`
 - `ROBLOX_OPEN_CLOUD_API_KEY` (used by the admin monetization tools)
-- `DATABASE_URL` (preferred Railway Postgres connection used to persist shared Production/Test/Development game IDs)
-- `SUPABASE_URL` (legacy fallback during migration)
-- `SUPABASE_SERVICE_ROLE_KEY` (legacy fallback during migration)
+- `DATABASE_URL` (Railway Postgres connection used to persist shared Production/Test/Development game IDs)
 
 Optional:
 - `ROBLOX_OAUTH_REDIRECT_URI`
@@ -79,8 +77,9 @@ Recommended app links:
 ## Deploy Steps
 1. Set environment variables in Railway.
 2. Add Railway Postgres and connect `DATABASE_URL` to the web service.
-3. Redeploy.
-4. Open your site homepage and click `Sign in with Roblox` in the top-right account badge.
+3. Run the Postgres schema in `railway/postgres-schema.sql` if the table has not already been created.
+4. Redeploy.
+5. Open your site homepage and click `Sign in with Roblox` in the top-right account badge.
 
 ## Notes
 - Session is stored in HttpOnly cookie: `rd_session`.

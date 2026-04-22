@@ -5,8 +5,7 @@
   "description": "RoDark Studios website and platform runtime.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "db:migrate:supabase-to-postgres": "node scripts/migrate-supabase-to-postgres.js"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=20"

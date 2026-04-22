@@ -1,6 +1,6 @@
 # Railway Deployment
 
-This repo now runs as a normal Node.js web service for Railway. The server in `server.js` serves the static website, preserves the clean page routes that previously lived in `vercel.json`, and mounts the existing API handlers under `/api`.
+This repo runs as a normal Node.js web service on Railway. The server in `server.js` serves the static website, keeps the clean page routes working, and mounts the API handlers under `/api`.
 
 ## Local Run
 
@@ -9,12 +9,6 @@ npm start
 ```
 
 Open `http://localhost:3000`.
-
-If `npm` is not available locally, this project has no production dependencies, so this also works:
-
-```bash
-node server.js
-```
 
 ## Railway Service Settings
 
@@ -35,17 +29,10 @@ AUTH_SECRET
 ROBLOX_OAUTH_CLIENT_ID
 ROBLOX_OAUTH_CLIENT_SECRET
 ROBLOX_OPEN_CLOUD_API_KEY
-SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
-```
-
-Database:
-
-```txt
 DATABASE_URL
 ```
 
-`DATABASE_URL` is provided by Railway Postgres. Keep the Supabase variables during database migration so the app can fall back to the old stored game configuration until Postgres has the row.
+`DATABASE_URL` is provided by Railway Postgres when the Postgres service is referenced from the web service.
 
 Recommended:
 
@@ -65,7 +52,7 @@ https://your-railway-or-custom-domain/api/auth/callback
 
 When the custom domain is connected, update both Roblox and Railway to use the custom-domain callback.
 
-## Routes Preserved From Vercel
+## Routes
 
 The server keeps these clean routes working:
 
