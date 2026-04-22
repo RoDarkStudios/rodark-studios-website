@@ -1,6 +1,8 @@
-# Roblox OAuth 2.0 + Vercel Setup
+# Roblox OAuth 2.0 + Railway Setup
 
 This repo uses Roblox OAuth 2.0 as the only login method.
+
+The app is deployed as a normal Node.js service on Railway. `server.js` serves the static website and mounts the existing API handlers. See `RAILWAY_DEPLOYMENT.md` for Railway-specific deployment steps.
 
 ## API Endpoints
 - `GET /api/auth/login` -> redirects to Roblox authorization
@@ -74,7 +76,7 @@ Recommended app links:
 - Terms of Service URL: `https://your-domain.com/terms`
 
 ## Deploy Steps
-1. Set environment variables in Vercel.
+1. Set environment variables in Railway.
 2. Run `supabase/schema.sql` against your Supabase project (creates `admin_game_config` and enables RLS on it).
 3. Redeploy.
 4. Open your site homepage and click `Sign in with Roblox` in the top-right account badge.

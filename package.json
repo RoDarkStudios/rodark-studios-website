@@ -1,0 +1,13 @@
+{
+  "name": "rodark-studios-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RoDark Studios website and platform runtime.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

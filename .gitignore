@@ -1,5 +1,6 @@
 .env*
 !.env.example
+node_modules
 .vercel
 .vercel-dev*.log
 .vercel-login*.log
