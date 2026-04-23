@@ -1,4 +1,5 @@
 const {
+    getGameRepoContext,
     getGameRepoSummary,
     hasGameRepoConfig,
     listRepoPaths,
@@ -14,6 +15,16 @@ const MAX_HISTORY_MESSAGES = 15;
 const MAX_IMAGE_INPUTS = 3;
 const MAX_AGENT_STEPS = 8;
 const OPENAI_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.OPENAI_TICKET_AGENT_TIMEOUT_MS || '90000', 10);
+const PUBLIC_HELP_RESCUE_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        reply: {
+            type: 'string'
+        }
+    },
+    required: ['reply']
+};
 
 const RESPONSE_SCHEMA = {
     type: 'object',
@@ -463,6 +474,76 @@ async function requestOpenAiResponse(body) {
     return payload;
 }
 
+async function buildPublicHelpRescueReply(options) {
+    const latestRequesterText = String(options && options.latestRequesterText || '').trim();
+    if (!latestRequesterText) {
+        return '';
+    }
+
+    const repoContext = await getGameRepoContext({
+        historyMessages: options && Array.isArray(options.historyMessages) ? options.historyMessages : [],
+        requesterUserId: options && options.requesterUserId ? String(options.requesterUserId) : null
+    });
+
+    if (!repoContext || !Array.isArray(repoContext.snippets) || !repoContext.snippets.length) {
+        return '';
+    }
+
+    const rescuePayload = await requestOpenAiResponse({
+        model: OPENAI_MODEL,
+        reasoning: {
+            effort: 'medium'
+        },
+        max_output_tokens: 320,
+        text: {
+            verbosity: 'low',
+            format: {
+                type: 'json_schema',
+                name: 'public_help_rescue',
+                schema: PUBLIC_HELP_RESCUE_SCHEMA,
+                strict: true
+            }
+        },
+        instructions: [
+            'You are rescuing a failed support-bot response for a Roblox game support ticket.',
+            'Use only the provided safe client/shared repo evidence.',
+            'Answer the player directly if the evidence supports a reasonable answer.',
+            'If the evidence is still thin, ask one short, specific clarifying question tied to the player request.',
+            'Do not hand off. Do not mention repo limitations. Be concise and natural.'
+        ].join(' '),
+        input: [
+            {
+                role: 'user',
+                content: [
+                    {
+                        type: 'input_text',
+                        text: [
+                            `Player question: ${latestRequesterText}`,
+                            `Repo: ${repoContext.owner}/${repoContext.repo} (${repoContext.branch})`,
+                            'Relevant repo evidence:',
+                            repoContext.snippets.join('\n\n---\n\n')
+                        ].join('\n\n')
+                    }
+                ]
+            }
+        ]
+    });
+
+    const parsed = parseDecisionText(extractResponseText(rescuePayload)) || (() => {
+        try {
+            return JSON.parse(extractResponseText(rescuePayload));
+        } catch (error) {
+            return null;
+        }
+    })();
+
+    if (!parsed) {
+        return '';
+    }
+
+    return typeof parsed.reply === 'string' ? parsed.reply.trim() : '';
+}
+
 async function decideTicketResponse(options) {
     if (!hasOpenAiConfig()) {
         throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
@@ -565,9 +646,22 @@ async function decideTicketResponse(options) {
         }
 
         if (publicHelpQuestion && parsed.action === 'handoff') {
+            const rescueReply = await buildPublicHelpRescueReply({
+                historyMessages,
+                requesterUserId,
+                latestRequesterText
+            });
+            if (rescueReply) {
+                return {
+                    action: 'reply',
+                    reply: rescueReply,
+                    handoffReason: ''
+                };
+            }
+
             return {
                 action: 'reply',
-                reply: 'Can you tell me a bit more about what you are trying to do in-game?',
+                reply: 'What exactly are you trying to get or unlock in-game?',
                 handoffReason: ''
             };
         }
