@@ -49,7 +49,20 @@ Required for the Discord bot worker:
 ```txt
 DISCORD_BOT_TOKEN
 DATABASE_URL
+OPENAI_API_KEY
 ```
+
+Optional for the Discord bot worker:
+
+```txt
+OPENAI_MODEL
+DISCORD_BOT_POLL_INTERVAL_MS
+```
+
+## Discord Bot Notes
+
+- Enable the Discord privileged `Message Content Intent` for the bot application, otherwise ticket message content and image context will not be available to the AI assistant.
+- The AI ticket assistant is configured from `/admin/discord-bot` and currently supports one monitored ticket category plus one owner role mention target.
 
 ## Database
 

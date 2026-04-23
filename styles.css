@@ -1202,6 +1202,34 @@ body {
     gap: 1rem;
 }
 
+.admin-discord-feature-card {
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background:
+        linear-gradient(180deg, rgba(249, 115, 22, 0.1) 0%, rgba(10, 10, 10, 0.82) 100%);
+    padding: 1.15rem;
+}
+
+.admin-discord-feature-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.9rem;
+}
+
+.admin-discord-field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.9rem;
+    margin-top: 0.8rem;
+}
+
+.admin-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
 .admin-discord-status-row {
     display: flex;
     align-items: center;

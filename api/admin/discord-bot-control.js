@@ -2,7 +2,7 @@ const { methodNotAllowed, readJsonBody, sendJson } = require('../_lib/http');
 const { requireAdmin } = require('../_lib/admin-auth');
 const {
     getDiscordBotControl,
-    setDiscordBotDesiredEnabled
+    updateDiscordBotControl
 } = require('../_lib/discord-bot-control-store');
 
 module.exports = async (req, res) => {
@@ -25,11 +25,34 @@ module.exports = async (req, res) => {
         }
 
         const body = await readJsonBody(req);
-        const desiredEnabled = Boolean(body && body.desiredEnabled);
-        const control = await setDiscordBotDesiredEnabled(desiredEnabled, auth.user);
+        const assistantConfig = body && typeof body.aiTicketAssistant === 'object' && body.aiTicketAssistant
+            ? body.aiTicketAssistant
+            : null;
+        const patch = {};
+
+        if (body && Object.prototype.hasOwnProperty.call(body, 'desiredEnabled')) {
+            patch.desiredEnabled = Boolean(body.desiredEnabled);
+        }
+
+        if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'enabled')) {
+            patch.aiTicketAssistantEnabled = Boolean(assistantConfig.enabled);
+        }
+
+        if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'ticketCategoryId')) {
+            patch.aiTicketCategoryId = assistantConfig.ticketCategoryId;
+        }
+
+        if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'ownerRoleId')) {
+            patch.aiTicketOwnerRoleId = assistantConfig.ownerRoleId;
+        }
+
+        const control = await updateDiscordBotControl(patch, auth.user);
         return sendJson(res, 200, { control });
     } catch (error) {
-        return sendJson(res, 500, {
+        const statusCode = /required|valid discord id|must be a valid discord id/i.test(String(error && error.message || ''))
+            ? 400
+            : 500;
+        return sendJson(res, statusCode, {
             error: 'Failed to update Discord bot control',
             details: error.message
         });

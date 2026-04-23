@@ -1465,12 +1465,47 @@ function formatDiscordBotStatus(control) {
     };
 }
 
-function renderDiscordBotControl(control) {
+function getDiscordAiAssistantControl(control) {
+    if (!control || typeof control !== 'object' || !control.aiTicketAssistant || typeof control.aiTicketAssistant !== 'object') {
+        return {
+            enabled: false,
+            ticketCategoryId: '',
+            ownerRoleId: ''
+        };
+    }
+
+    return {
+        enabled: Boolean(control.aiTicketAssistant.enabled),
+        ticketCategoryId: control.aiTicketAssistant.ticketCategoryId ? String(control.aiTicketAssistant.ticketCategoryId) : '',
+        ownerRoleId: control.aiTicketAssistant.ownerRoleId ? String(control.aiTicketAssistant.ownerRoleId) : ''
+    };
+}
+
+function formatDiscordAiSummary(control) {
+    const aiControl = getDiscordAiAssistantControl(control);
+    const categoryLabel = aiControl.ticketCategoryId ? `Category: ${aiControl.ticketCategoryId}.` : 'Category ID not set.';
+    const ownerLabel = aiControl.ownerRoleId ? ` Owner role: ${aiControl.ownerRoleId}.` : ' Owner role ID not set.';
+
+    if (!aiControl.enabled) {
+        return `Disabled. ${categoryLabel}${ownerLabel}`;
+    }
+
+    return `Enabled. ${categoryLabel}${ownerLabel}`;
+}
+
+function renderDiscordBotControl(control, options) {
     const statusDot = document.getElementById('discord-bot-status-dot');
     const statusTitle = document.getElementById('discord-bot-status-title');
     const statusDetail = document.getElementById('discord-bot-status-detail');
     const toggleButton = document.getElementById('discord-bot-toggle-btn');
+    const aiEnabledCheckbox = document.getElementById('discord-ai-enabled');
+    const ticketCategoryInput = document.getElementById('discord-ticket-category-id');
+    const ownerRoleInput = document.getElementById('discord-owner-role-id');
+    const aiSummary = document.getElementById('discord-ai-summary');
+    const aiSaveButton = document.getElementById('discord-ai-save-btn');
     const formatted = formatDiscordBotStatus(control);
+    const preserveAssistantForm = Boolean(options && options.preserveAssistantForm);
+    const aiControl = getDiscordAiAssistantControl(control);
 
     if (statusDot) {
         statusDot.className = `admin-discord-status-dot ${formatted.dotClass}`.trim();
@@ -1485,6 +1520,21 @@ function renderDiscordBotControl(control) {
         toggleButton.textContent = formatted.buttonText;
         toggleButton.dataset.desiredEnabled = formatted.desiredEnabled ? 'true' : 'false';
         toggleButton.disabled = false;
+    }
+    if (!preserveAssistantForm && aiEnabledCheckbox) {
+        aiEnabledCheckbox.checked = aiControl.enabled;
+    }
+    if (!preserveAssistantForm && ticketCategoryInput) {
+        ticketCategoryInput.value = aiControl.ticketCategoryId;
+    }
+    if (!preserveAssistantForm && ownerRoleInput) {
+        ownerRoleInput.value = aiControl.ownerRoleId;
+    }
+    if (!preserveAssistantForm && aiSummary) {
+        aiSummary.textContent = formatDiscordAiSummary(control);
+    }
+    if (aiSaveButton) {
+        aiSaveButton.disabled = false;
     }
 }
 
@@ -1523,6 +1573,18 @@ async function setDiscordBotDesiredState(desiredEnabled) {
     return payload.control || null;
 }
 
+async function saveDiscordBotAssistantConfig(config) {
+    const payload = await postJson('/api/admin/discord-bot-control', {
+        aiTicketAssistant: {
+            enabled: Boolean(config && config.enabled),
+            ticketCategoryId: config && config.ticketCategoryId ? String(config.ticketCategoryId).trim() : '',
+            ownerRoleId: config && config.ownerRoleId ? String(config.ownerRoleId).trim() : ''
+        }
+    });
+
+    return payload.control || null;
+}
+
 async function initDiscordBotDashboard() {
     const dashboard = document.getElementById('discord-bot-dashboard');
     const ownedContent = document.getElementById('admin-owned-content');
@@ -1532,6 +1594,10 @@ async function initDiscordBotDashboard() {
 
     const deniedElement = document.getElementById('admin-access-denied');
     const toggleButton = document.getElementById('discord-bot-toggle-btn');
+    const aiEnabledCheckbox = document.getElementById('discord-ai-enabled');
+    const ticketCategoryInput = document.getElementById('discord-ticket-category-id');
+    const ownerRoleInput = document.getElementById('discord-owner-role-id');
+    const aiSaveButton = document.getElementById('discord-ai-save-btn');
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
 
@@ -1547,15 +1613,21 @@ async function initDiscordBotDashboard() {
         deniedElement.classList.add('hidden');
     }
     ownedContent.classList.remove('hidden');
+    dashboard.dataset.aiDirty = 'false';
 
     async function refreshControl() {
         try {
             const control = await fetchDiscordBotControl();
-            renderDiscordBotControl(control);
+            renderDiscordBotControl(control, {
+                preserveAssistantForm: dashboard.dataset.aiDirty === 'true'
+            });
             setDiscordBotStatusMessage('', 'info');
         } catch (error) {
             if (toggleButton) {
                 toggleButton.disabled = true;
+            }
+            if (aiSaveButton) {
+                aiSaveButton.disabled = true;
             }
             setDiscordBotStatusMessage(error.message || 'Failed to load Discord bot status.', 'error');
         }
@@ -1578,6 +1650,41 @@ async function initDiscordBotDashboard() {
                 setDiscordBotStatusMessage(error.message || 'Failed to update Discord bot.', 'error');
             } finally {
                 toggleButton.disabled = false;
+            }
+        });
+    }
+
+    function markAssistantFormDirty() {
+        dashboard.dataset.aiDirty = 'true';
+    }
+
+    if (aiEnabledCheckbox) {
+        aiEnabledCheckbox.addEventListener('change', markAssistantFormDirty);
+    }
+    if (ticketCategoryInput) {
+        ticketCategoryInput.addEventListener('input', markAssistantFormDirty);
+    }
+    if (ownerRoleInput) {
+        ownerRoleInput.addEventListener('input', markAssistantFormDirty);
+    }
+
+    if (aiSaveButton) {
+        aiSaveButton.addEventListener('click', async () => {
+            aiSaveButton.disabled = true;
+            setDiscordBotStatusMessage('Saving AI ticket assistant settings...', 'info');
+
+            try {
+                const control = await saveDiscordBotAssistantConfig({
+                    enabled: aiEnabledCheckbox && aiEnabledCheckbox.checked,
+                    ticketCategoryId: ticketCategoryInput ? ticketCategoryInput.value : '',
+                    ownerRoleId: ownerRoleInput ? ownerRoleInput.value : ''
+                });
+                dashboard.dataset.aiDirty = 'false';
+                renderDiscordBotControl(control);
+                setDiscordBotStatusMessage('AI ticket assistant settings saved.', 'success');
+            } catch (error) {
+                aiSaveButton.disabled = false;
+                setDiscordBotStatusMessage(error.message || 'Failed to save AI ticket assistant settings.', 'error');
             }
         });
     }
