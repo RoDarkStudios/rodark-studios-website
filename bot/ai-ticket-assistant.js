@@ -26,7 +26,11 @@ const ASSISTANT_INSTRUCTIONS = [
     'You are the RoDark Studios AI Ticket Assistant.',
     'RoDark Studios makes Roblox games, so act like a Roblox game support assistant, not a generic helpdesk agent.',
     'Your job is to briefly triage Discord support tickets and gather only the most important missing details.',
-    'Be concise, direct, and useful. One short message is preferred. Ask only the highest-signal next question or at most two very short questions.',
+    'Be concise, direct, and useful. One short message is preferred.',
+    'If the user has not clearly explained the issue yet, ask only one plain clarifying question, such as asking what the problem is.',
+    'Do not ask multiple diagnostic questions until the user has actually described the issue.',
+    'When the issue description is still vague, prefer one broad clarifying question over specific troubleshooting questions.',
+    'Once the user has described the issue, ask only the single highest-signal next question.',
     'Prefer practical Roblox-specific questions that help isolate the problem quickly.',
     'For bug or performance reports, prioritize things like platform, device type, whether it happens every time, whether it started recently, and the exact action that triggered it.',
     'For missing item or purchase reports, prioritize things like what item they expected, whether currency was deducted, whether rejoining fixed it, and whether other similar purchases worked.',
@@ -40,6 +44,45 @@ const ASSISTANT_INSTRUCTIONS = [
     'If the user attached images, use them.',
     'Return JSON only that matches the provided schema.'
 ].join(' ');
+
+function normalizeMessageText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function isLowDetailOpeningMessage(messageText) {
+    const normalized = normalizeMessageText(messageText);
+    if (!normalized) {
+        return true;
+    }
+
+    const words = normalized.split(' ').filter(Boolean);
+    const genericOpeners = [
+        'i have problem',
+        'i have a problem',
+        'i got a problem',
+        'i have issue',
+        'i have an issue',
+        'i need help',
+        'help me',
+        'can you help me',
+        'i have a question',
+        'i need support'
+    ];
+
+    if (genericOpeners.includes(normalized)) {
+        return true;
+    }
+
+    if (words.length <= 4 && /(problem|issue|help|support|question)/.test(normalized)) {
+        return true;
+    }
+
+    return false;
+}
 
 function hasOpenAiConfig() {
     return Boolean(OPENAI_API_KEY && OPENAI_MODEL);
@@ -179,15 +222,26 @@ function extractResponseText(payload) {
 }
 
 async function decideTicketResponse(options) {
-    if (!hasOpenAiConfig()) {
-        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
-    }
-
     const historyMessages = Array.isArray(options && options.historyMessages) ? options.historyMessages : [];
     const triggerMessage = options && options.triggerMessage ? options.triggerMessage : null;
     const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
     const ownerRoleId = options && options.ownerRoleId ? String(options.ownerRoleId) : null;
     const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
+    const triggerText = triggerMessage && typeof triggerMessage.cleanContent === 'string'
+        ? triggerMessage.cleanContent
+        : '';
+
+    if (isLowDetailOpeningMessage(triggerText)) {
+        return {
+            action: 'reply',
+            reply: 'What\'s the problem?',
+            handoffReason: ''
+        };
+    }
+
+    if (!hasOpenAiConfig()) {
+        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
+    }
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
     const triggerSummary = triggerMessage
