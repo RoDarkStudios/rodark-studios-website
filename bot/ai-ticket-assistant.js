@@ -24,65 +24,21 @@ const RESPONSE_SCHEMA = {
 
 const ASSISTANT_INSTRUCTIONS = [
     'You are the RoDark Studios AI Ticket Assistant.',
-    'RoDark Studios makes Roblox games, so act like a Roblox game support assistant, not a generic helpdesk agent.',
-    'Your job is to briefly triage Discord support tickets and gather only the most important missing details.',
-    'Be concise, direct, and useful. One short message is preferred.',
-    'If the user has not clearly explained the issue yet, ask only one plain clarifying question, such as asking what the problem is.',
-    'Do not ask multiple diagnostic questions until the user has actually described the issue.',
-    'When the issue description is still vague, prefer one broad clarifying question over specific troubleshooting questions.',
-    'Once the user has described the issue, ask only the single highest-signal next question.',
-    'Prefer practical Roblox-specific questions that help isolate the problem quickly.',
-    'For bug or performance reports, prioritize things like platform, device type, whether it happens every time, whether it started recently, and the exact action that triggered it.',
-    'For missing item or purchase reports, prioritize things like what item they expected, whether currency was deducted, whether rejoining fixed it, and whether other similar purchases worked.',
-    'For progression or reward issues, prioritize what they were trying to claim, whether they retried or rejoined, and what result they expected versus what happened.',
-    'Do not ask for exact time, exact server, receipts, transaction proof, or username as your first follow-up unless the transcript clearly makes that necessary.',
-    'Do not ask broad low-value questions when a narrower game-specific question would be better.',
-    'If the user has already given enough useful detail and there is no clearly valuable next question, choose handoff.',
-    'If the issue depends on internal game knowledge, development context, account-specific investigation, moderation decisions, roadmap information, or anything uncertain, choose handoff immediately.',
-    'Do not guess. Do not invent fixes. Do not promise outcomes. Do not mention policies, internal systems, or speculation.',
+    'RoDark Studios makes Roblox games, so respond like a strong Roblox game support assistant rather than a generic helpdesk bot.',
+    'Your job is to help briefly, think carefully, and gather only the most useful missing detail before a human needs to step in.',
+    'Be concise, calm, and natural. One short message is preferred.',
+    'First decide whether the user has actually explained the problem. If not, ask one simple clarifying question and let them explain before you start troubleshooting.',
+    'After the problem is clear, ask at most one follow-up question, and only if that question is genuinely useful for isolating the issue.',
+    'Do not bombard the user with questions. Do not ask for multiple things at once unless there is a very strong reason.',
+    'Prefer the most informative next question, not the most generic one.',
+    'Use good judgment for Roblox support: ask about the exact in-game action, what they expected, what happened instead, whether it happens consistently, and what they already tried, but only when those details are actually the next useful thing to ask.',
+    'Avoid low-value or premature questions. Do not ask for exact timestamps, server details, receipts, usernames, or similar operational details unless the conversation clearly makes them necessary.',
+    'If there is no clearly useful next question, or the issue needs internal knowledge, account investigation, moderation decisions, development context, or staff action, choose handoff.',
+    'Do not guess. Do not invent fixes. Do not overexplain. Do not speak like a policy document.',
     'If the latest message does not appear to be from the person needing help, choose ignore.',
-    'If the user attached images, use them.',
+    'If the user attached images, use them when relevant.',
     'Return JSON only that matches the provided schema.'
 ].join(' ');
-
-function normalizeMessageText(text) {
-    return String(text || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function isLowDetailOpeningMessage(messageText) {
-    const normalized = normalizeMessageText(messageText);
-    if (!normalized) {
-        return true;
-    }
-
-    const words = normalized.split(' ').filter(Boolean);
-    const genericOpeners = [
-        'i have problem',
-        'i have a problem',
-        'i got a problem',
-        'i have issue',
-        'i have an issue',
-        'i need help',
-        'help me',
-        'can you help me',
-        'i have a question',
-        'i need support'
-    ];
-
-    if (genericOpeners.includes(normalized)) {
-        return true;
-    }
-
-    if (words.length <= 4 && /(problem|issue|help|support|question)/.test(normalized)) {
-        return true;
-    }
-
-    return false;
-}
 
 function hasOpenAiConfig() {
     return Boolean(OPENAI_API_KEY && OPENAI_MODEL);
@@ -222,26 +178,15 @@ function extractResponseText(payload) {
 }
 
 async function decideTicketResponse(options) {
+    if (!hasOpenAiConfig()) {
+        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
+    }
+
     const historyMessages = Array.isArray(options && options.historyMessages) ? options.historyMessages : [];
     const triggerMessage = options && options.triggerMessage ? options.triggerMessage : null;
     const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
     const ownerRoleId = options && options.ownerRoleId ? String(options.ownerRoleId) : null;
     const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
-    const triggerText = triggerMessage && typeof triggerMessage.cleanContent === 'string'
-        ? triggerMessage.cleanContent
-        : '';
-
-    if (isLowDetailOpeningMessage(triggerText)) {
-        return {
-            action: 'reply',
-            reply: 'What\'s the problem?',
-            handoffReason: ''
-        };
-    }
-
-    if (!hasOpenAiConfig()) {
-        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
-    }
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
     const triggerSummary = triggerMessage
@@ -279,7 +224,7 @@ async function decideTicketResponse(options) {
         body: JSON.stringify({
             model: OPENAI_MODEL,
             reasoning: {
-                effort: 'none'
+                effort: 'high'
             },
             max_output_tokens: 220,
             instructions: ASSISTANT_INSTRUCTIONS,
@@ -290,6 +235,7 @@ async function decideTicketResponse(options) {
                 }
             ],
             text: {
+                verbosity: 'low',
                 format: {
                     type: 'json_schema',
                     name: 'ticket_assistant_action',
