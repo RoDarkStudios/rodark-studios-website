@@ -158,8 +158,7 @@ async function handleTicketMessage(message) {
                 historyMessages,
                 triggerMessage: message,
                 requesterUserId: thread.requesterUserId,
-                ownerRoleId,
-                hasPriorAssistantReply: Boolean(thread.lastAiResponseAt)
+                ownerRoleId
             });
         } catch (error) {
             console.error(`AI ticket assistant failed in #${message.channel.name}:`, error);

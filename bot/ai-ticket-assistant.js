@@ -26,52 +26,14 @@ const ASSISTANT_INSTRUCTIONS = [
     'You are the RoDark Studios AI Ticket Assistant.',
     'Your job is to briefly triage Discord support tickets and gather only the most important missing details.',
     'Be concise, direct, and useful. One short message is preferred. Two short sentences or a very short question list is the upper bound unless absolutely necessary.',
-    'If the user has not explained the issue yet, reply with a short clarifying question instead of handing off.',
-    'Lack of detail alone is not a reason to hand off.',
-    'Only choose handoff when the user needs internal game knowledge, development context, account-specific investigation, moderation action, roadmap information, staff intervention, or when a human owner clearly needs to take over.',
+    'If the issue depends on internal game knowledge, development context, account-specific investigation, moderation decisions, roadmap information, or anything uncertain, choose handoff immediately.',
+    'If you are in any doubt at all, choose handoff.',
     'Do not guess. Do not invent fixes. Do not promise outcomes. Do not mention policies, internal systems, or speculation.',
     'If the latest message does not appear to be from the person needing help, choose ignore.',
     'If the user already gave enough actionable diagnostic detail, ask at most the single most important next question.',
-    'If the user only says hello, says they have a question, or asks for help without details, reply briefly asking what they need help with.',
     'If the user attached images, use them.',
     'Return JSON only that matches the provided schema.'
 ].join(' ');
-
-function normalizeMessageText(text) {
-    return String(text || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function isVagueOpeningMessage(messageText) {
-    const normalized = normalizeMessageText(messageText);
-    if (!normalized) {
-        return true;
-    }
-
-    const vaguePatterns = [
-        /^(hi|hello|hey|yo|sup)$/,
-        /^(hi|hello|hey)\s+(there|team|support)$/,
-        /^i have a question$/,
-        /^i have question$/,
-        /^got a question$/,
-        /^can you help$/,
-        /^need help$/,
-        /^help$/,
-        /^support$/,
-        /^hi i have a question$/,
-        /^hello i have a question$/,
-        /^hey i have a question$/,
-        /^i need help$/,
-        /^i need some help$/,
-        /^can someone help$/,
-        /^can anyone help$/
-    ];
-
-    return vaguePatterns.some((pattern) => pattern.test(normalized));
-}
 
 function hasOpenAiConfig() {
     return Boolean(OPENAI_API_KEY && OPENAI_MODEL);
@@ -220,18 +182,6 @@ async function decideTicketResponse(options) {
     const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
     const ownerRoleId = options && options.ownerRoleId ? String(options.ownerRoleId) : null;
     const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
-    const hasPriorAssistantReply = Boolean(options && options.hasPriorAssistantReply);
-    const triggerText = triggerMessage && typeof triggerMessage.cleanContent === 'string'
-        ? triggerMessage.cleanContent
-        : '';
-
-    if (!hasPriorAssistantReply && isVagueOpeningMessage(triggerText)) {
-        return {
-            action: 'reply',
-            reply: 'What do you need help with?',
-            handoffReason: ''
-        };
-    }
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
     const triggerSummary = triggerMessage
