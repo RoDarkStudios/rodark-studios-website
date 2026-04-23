@@ -168,6 +168,70 @@ function getRecentImageUrls(historyMessages, requesterUserId) {
     return urls.reverse();
 }
 
+function getLatestRequesterMessage(historyMessages, requesterUserId) {
+    if (!Array.isArray(historyMessages) || !historyMessages.length) {
+        return null;
+    }
+
+    for (let index = historyMessages.length - 1; index >= 0; index -= 1) {
+        const message = historyMessages[index];
+        if (!message || !message.author) {
+            continue;
+        }
+
+        if (requesterUserId && message.author.id !== requesterUserId) {
+            continue;
+        }
+
+        return message;
+    }
+
+    return historyMessages[historyMessages.length - 1] || null;
+}
+
+function getLatestRequesterText(historyMessages, requesterUserId) {
+    const latestRequesterMessage = getLatestRequesterMessage(historyMessages, requesterUserId);
+    if (!latestRequesterMessage || typeof latestRequesterMessage.cleanContent !== 'string') {
+        return '';
+    }
+
+    return latestRequesterMessage.cleanContent.trim();
+}
+
+function tokenizeRequesterText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(/\s+/)
+        .filter((token) => token.length >= 2);
+}
+
+function shouldRequireRepoInvestigation(text, toolsAvailable) {
+    if (!toolsAvailable) {
+        return false;
+    }
+
+    const normalizedText = String(text || '').trim().toLowerCase();
+    if (!normalizedText) {
+        return false;
+    }
+
+    const tokens = tokenizeRequesterText(normalizedText);
+    if (!tokens.length) {
+        return false;
+    }
+
+    if (tokens.length >= 3) {
+        return true;
+    }
+
+    if (normalizedText.length >= 14) {
+        return true;
+    }
+
+    return /^(can|how|what|when|where|why|is|are|does|do|did|will|would|should)\b/.test(normalizedText);
+}
+
 function extractResponseText(payload) {
     if (payload && typeof payload.output_text === 'string' && payload.output_text.trim()) {
         return payload.output_text.trim();
@@ -418,6 +482,8 @@ async function decideTicketResponse(options) {
     const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
     const tools = buildRepoTools();
     const repoSummary = hasGameRepoConfig() ? getGameRepoSummary() : null;
+    const latestRequesterText = getLatestRequesterText(historyMessages, requesterUserId);
+    const requireRepoInvestigation = shouldRequireRepoInvestigation(latestRequesterText, tools.length > 0);
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
     const triggerSummary = triggerMessage
@@ -435,6 +501,9 @@ async function decideTicketResponse(options) {
                 repoSummary
                     ? `Repo tools are available for ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Safe scope is limited to: ${repoSummary.safePathPrefixes.join(', ')}.`
                     : 'Repo tools are not available for this question.',
+                requireRepoInvestigation
+                    ? 'This looks like a substantive game question. You must inspect repo evidence before handing off or answering.'
+                    : 'If the user is still vague, ask one simple clarifying question before investigating.',
                 'Conversation transcript:',
                 transcript || '[no transcript available]'
             ].join('\n\n')
@@ -468,6 +537,7 @@ async function decideTicketResponse(options) {
             input: nextInput,
             previous_response_id: previousResponseId || undefined,
             tools: tools.length ? tools : undefined,
+            tool_choice: requireRepoInvestigation && stepIndex === 0 && tools.length ? 'required' : 'auto',
             text: {
                 verbosity: 'low'
             }
@@ -480,6 +550,34 @@ async function decideTicketResponse(options) {
             functionCallCount: functionCalls.length,
             hasOutputText: Boolean(payload && typeof payload.output_text === 'string' && payload.output_text.trim())
         });
+
+        if (requireRepoInvestigation && !functionCalls.length && stepIndex === 0 && tools.length) {
+            const bootstrapSearch = await searchRepo(latestRequesterText || transcript, 5);
+            console.log('[ticket-ai-agent] bootstrap_search', {
+                query: latestRequesterText || '[transcript fallback]',
+                resultCount: Array.isArray(bootstrapSearch && bootstrapSearch.results) ? bootstrapSearch.results.length : 0
+            });
+            previousResponseId = payload && payload.id ? payload.id : null;
+            nextInput = [
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'input_text',
+                            text: [
+                                'You did not inspect the repo yet.',
+                                'Use the repo tools before deciding.',
+                                `Bootstrap search results for "${latestRequesterText || 'latest requester message'}":`,
+                                JSON.stringify(bootstrapSearch, null, 2),
+                                'Now either use more repo tools or return a decision JSON backed by the repo evidence above.'
+                            ].join('\n\n')
+                        }
+                    ]
+                }
+            ];
+            continue;
+        }
+
         if (functionCalls.length) {
             const toolOutputs = [];
 

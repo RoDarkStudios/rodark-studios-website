@@ -184,6 +184,12 @@ function normalizeWhitespace(text) {
         .trim();
 }
 
+function collapseSearchText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+}
+
 function tokenize(text) {
     return Array.from(new Set(
         String(text || '')
@@ -294,12 +300,14 @@ async function loadRepoIndex() {
             });
             const content = normalizeWhitespace(decodeGitHubContent(contentPayload));
             const searchText = `${filePath}\n${content}`.toLowerCase();
+            const collapsedSearchText = collapseSearchText(`${filePath}\n${content}`);
 
             return {
                 path: filePath,
                 pathLower: filePath.toLowerCase(),
                 content,
-                searchText
+                searchText,
+                collapsedSearchText
             };
         }, 8);
 
@@ -335,6 +343,15 @@ function scoreFile(entry, queryTokens) {
 
         const matchCount = countTokenOccurrences(entry.searchText, token);
         score += Math.min(matchCount, 8) * 3;
+
+        const collapsedToken = collapseSearchText(token);
+        if (collapsedToken && collapsedToken !== token) {
+            const collapsedMatchCount = countTokenOccurrences(entry.collapsedSearchText, collapsedToken);
+            score += Math.min(collapsedMatchCount, 8) * 2;
+        } else if (collapsedToken) {
+            const collapsedMatchCount = countTokenOccurrences(entry.collapsedSearchText, collapsedToken);
+            score += Math.min(collapsedMatchCount, 8);
+        }
     }
 
     if (entry.pathLower.endsWith('/c.luau') || entry.pathLower.endsWith('default.project.json')) {
