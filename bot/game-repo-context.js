@@ -14,6 +14,36 @@ const MAX_SEARCH_RESULTS = 8;
 const MAX_LIST_RESULTS = 60;
 const MAX_READ_FILE_CHARS = 12000;
 const MAX_READ_CHUNK_LINES = 220;
+const PUBLIC_PATH_HINTS = [
+    'config',
+    'constant',
+    'constants',
+    'shared',
+    'data',
+    'ui',
+    'shop',
+    'market',
+    'stock',
+    'redeem',
+    'code',
+    'codes'
+];
+const QUERY_SYNONYMS = new Map([
+    ['code', ['codes', 'redeem', 'redeemcode', 'redeemcodes', 'promo', 'promocode', 'promocodes']],
+    ['codes', ['code', 'redeem', 'redeemcode', 'redeemcodes', 'promo', 'promocode', 'promocodes']],
+    ['redeem', ['code', 'codes', 'promocode', 'redeemcode']],
+    ['promocode', ['code', 'codes', 'promo', 'redeemcode']],
+    ['promocodes', ['code', 'codes', 'promo', 'redeemcodes']],
+    ['stockmarket', ['stock', 'market']],
+    ['stock', ['stockmarket', 'market']],
+    ['market', ['stockmarket', 'stock']],
+    ['timer', ['timers', 'cooldown', 'cooldowns', 'interval']],
+    ['schedule', ['timer', 'timing', 'interval', 'reset']],
+    ['open', ['opens', 'opening', 'available']],
+    ['sprint', ['sprinting', 'run', 'running']],
+    ['pc', ['computer']],
+    ['lag', ['stutter', 'latency', 'freeze', 'freezing']]
+]);
 
 const SAFE_PATH_PREFIXES = [
     'src/ReplicatedFirst/',
@@ -184,6 +214,22 @@ function normalizeWhitespace(text) {
         .trim();
 }
 
+function collapseSearchText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function splitIdentifierTokens(text) {
+    return String(text || '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(/\s+/)
+        .filter((token) => token.length >= 3 && !STOP_WORDS.has(token));
+}
+
 function tokenize(text) {
     return Array.from(new Set(
         String(text || '')
@@ -192,6 +238,48 @@ function tokenize(text) {
             .split(/\s+/)
             .filter((token) => token.length >= 3 && !STOP_WORDS.has(token))
     ));
+}
+
+function pluralizeToken(token) {
+    if (!token || token.length < 3) {
+        return [];
+    }
+
+    if (token.endsWith('s')) {
+        return token.length > 4 ? [token.slice(0, -1)] : [];
+    }
+
+    if (token.endsWith('y') && token.length > 3) {
+        return [`${token.slice(0, -1)}ies`, `${token}s`];
+    }
+
+    return [`${token}s`];
+}
+
+function buildQueryFeatures(query) {
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const baseTokens = tokenize(normalizedQuery);
+    const expandedTokenSet = new Set(baseTokens);
+
+    for (const token of baseTokens) {
+        for (const variant of pluralizeToken(token)) {
+            expandedTokenSet.add(variant);
+        }
+
+        const synonyms = QUERY_SYNONYMS.get(token) || [];
+        for (const synonym of synonyms) {
+            expandedTokenSet.add(synonym);
+        }
+    }
+
+    const expandedTokens = Array.from(expandedTokenSet).filter((token) => token.length >= 3);
+    return {
+        raw: String(query || '').trim(),
+        normalizedQuery,
+        collapsedQuery: collapseSearchText(normalizedQuery),
+        tokens: baseTokens,
+        expandedTokens
+    };
 }
 
 function countTokenOccurrences(text, token) {
@@ -294,12 +382,16 @@ async function loadRepoIndex() {
             });
             const content = normalizeWhitespace(decodeGitHubContent(contentPayload));
             const searchText = `${filePath}\n${content}`.toLowerCase();
+            const collapsedSearchText = collapseSearchText(searchText);
+            const pathTokens = Array.from(new Set(splitIdentifierTokens(filePath)));
 
             return {
                 path: filePath,
                 pathLower: filePath.toLowerCase(),
                 content,
-                searchText
+                searchText,
+                collapsedSearchText,
+                pathTokens
             };
         }, 8);
 
@@ -322,19 +414,43 @@ async function loadRepoIndex() {
     }
 }
 
-function scoreFile(entry, queryTokens) {
-    if (!entry || !queryTokens.length) {
+function scoreFile(entry, queryFeatures) {
+    if (!entry || !queryFeatures || !queryFeatures.expandedTokens.length) {
         return 0;
     }
 
     let score = 0;
-    for (const token of queryTokens) {
+    for (const token of queryFeatures.expandedTokens) {
         if (entry.pathLower.includes(token)) {
             score += 12;
         }
 
         const matchCount = countTokenOccurrences(entry.searchText, token);
         score += Math.min(matchCount, 8) * 3;
+
+        const collapsedToken = collapseSearchText(token);
+        if (collapsedToken) {
+            const collapsedMatchCount = countTokenOccurrences(entry.collapsedSearchText, collapsedToken);
+            score += Math.min(collapsedMatchCount, 8) * 2;
+        }
+
+        if (Array.isArray(entry.pathTokens) && entry.pathTokens.includes(token)) {
+            score += 10;
+        }
+    }
+
+    if (queryFeatures.normalizedQuery && entry.searchText.includes(queryFeatures.normalizedQuery)) {
+        score += 18;
+    }
+
+    if (queryFeatures.collapsedQuery && entry.collapsedSearchText.includes(queryFeatures.collapsedQuery)) {
+        score += 14;
+    }
+
+    for (const pathHint of PUBLIC_PATH_HINTS) {
+        if (entry.pathLower.includes(pathHint) && queryFeatures.expandedTokens.includes(pathHint)) {
+            score += 8;
+        }
     }
 
     if (entry.pathLower.endsWith('/c.luau') || entry.pathLower.endsWith('default.project.json')) {
@@ -344,17 +460,30 @@ function scoreFile(entry, queryTokens) {
     return score;
 }
 
-function buildSnippets(entry, queryTokens) {
+function buildSnippets(entry, queryFeatures) {
     const lines = String(entry && entry.content || '').split('\n');
     const windows = [];
 
     for (let index = 0; index < lines.length; index += 1) {
         const lineLower = lines[index].toLowerCase();
         let lineScore = 0;
-        for (const token of queryTokens) {
+        for (const token of queryFeatures.expandedTokens) {
             if (lineLower.includes(token)) {
                 lineScore += 1;
             }
+
+            const collapsedToken = collapseSearchText(token);
+            if (collapsedToken && collapseSearchText(lineLower).includes(collapsedToken)) {
+                lineScore += 1;
+            }
+        }
+
+        if (queryFeatures.normalizedQuery && lineLower.includes(queryFeatures.normalizedQuery)) {
+            lineScore += 3;
+        }
+
+        if (queryFeatures.collapsedQuery && collapseSearchText(lineLower).includes(queryFeatures.collapsedQuery)) {
+            lineScore += 2;
         }
 
         if (!lineScore) {
@@ -385,8 +514,8 @@ function buildSnippets(entry, queryTokens) {
         .map((window) => window.text.slice(0, MAX_SNIPPET_CHARS));
 }
 
-function describeSearchHit(entry, queryTokens) {
-    const snippets = buildSnippets(entry, queryTokens);
+function describeSearchHit(entry, queryFeatures) {
+    const snippets = buildSnippets(entry, queryFeatures);
     return {
         path: entry.path,
         preview: snippets.length ? snippets[0] : trimText(entry.content, 320)
@@ -418,9 +547,9 @@ async function getGameRepoContext(options) {
     const historyMessages = Array.isArray(options && options.historyMessages) ? options.historyMessages : [];
     const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
     const questionText = buildQuestionText(historyMessages, requesterUserId);
-    const queryTokens = tokenize(questionText);
+    const queryFeatures = buildQueryFeatures(questionText);
 
-    if (!queryTokens.length) {
+    if (!queryFeatures.expandedTokens.length) {
         return null;
     }
 
@@ -432,7 +561,7 @@ async function getGameRepoContext(options) {
     const candidates = repoIndex.files
         .map((entry) => ({
             entry,
-            score: scoreFile(entry, queryTokens)
+            score: scoreFile(entry, queryFeatures)
         }))
         .filter((candidate) => candidate.score > 0)
         .sort((left, right) => right.score - left.score)
@@ -444,7 +573,7 @@ async function getGameRepoContext(options) {
 
     const snippets = [];
     for (const candidate of candidates) {
-        const excerptBlocks = buildSnippets(candidate.entry, queryTokens);
+        const excerptBlocks = buildSnippets(candidate.entry, queryFeatures);
         if (!excerptBlocks.length) {
             continue;
         }
@@ -476,8 +605,8 @@ async function searchRepo(query, limit) {
         };
     }
 
-    const queryTokens = tokenize(query);
-    if (!queryTokens.length) {
+    const queryFeatures = buildQueryFeatures(query);
+    if (!queryFeatures.expandedTokens.length) {
         return {
             branch: repoIndex.branch,
             results: []
@@ -491,14 +620,14 @@ async function searchRepo(query, limit) {
     const results = repoIndex.files
         .map((entry) => ({
             entry,
-            score: scoreFile(entry, queryTokens)
+            score: scoreFile(entry, queryFeatures)
         }))
         .filter((candidate) => candidate.score > 0)
         .sort((left, right) => right.score - left.score)
         .slice(0, maxResults)
         .map((candidate) => ({
             score: candidate.score,
-            ...describeSearchHit(candidate.entry, queryTokens)
+            ...describeSearchHit(candidate.entry, queryFeatures)
         }));
 
     return {
