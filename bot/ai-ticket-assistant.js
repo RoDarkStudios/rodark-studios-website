@@ -299,49 +299,21 @@ async function executeRepoToolCall(toolCall) {
     const toolName = toolCall && toolCall.name ? String(toolCall.name) : '';
     const rawArguments = toolCall && typeof toolCall.arguments === 'string' ? toolCall.arguments : '{}';
     const args = JSON.parse(rawArguments);
-    console.log('[ticket-ai-agent] tool_call', {
-        toolName,
-        args
-    });
 
     if (toolName === 'search_repo') {
-        const result = await searchRepo(args.query, args.limit);
-        console.log('[ticket-ai-agent] tool_result', {
-            toolName,
-            resultCount: Array.isArray(result && result.results) ? result.results.length : 0
-        });
-        return result;
+        return searchRepo(args.query, args.limit);
     }
 
     if (toolName === 'list_paths') {
-        const result = await listRepoPaths(args.prefix, args.limit);
-        console.log('[ticket-ai-agent] tool_result', {
-            toolName,
-            resultCount: Array.isArray(result && result.paths) ? result.paths.length : 0
-        });
-        return result;
+        return listRepoPaths(args.prefix, args.limit);
     }
 
     if (toolName === 'read_file') {
-        const result = await readRepoFile(args.path);
-        console.log('[ticket-ai-agent] tool_result', {
-            toolName,
-            found: Boolean(result && result.found),
-            path: result && result.path ? result.path : args.path
-        });
-        return result;
+        return readRepoFile(args.path);
     }
 
     if (toolName === 'read_file_chunk') {
-        const result = await readRepoFileChunk(args.path, args.start_line, args.end_line);
-        console.log('[ticket-ai-agent] tool_result', {
-            toolName,
-            found: Boolean(result && result.found),
-            path: result && result.path ? result.path : args.path,
-            startLine: result && result.startLine ? result.startLine : args.start_line,
-            endLine: result && result.endLine ? result.endLine : args.end_line
-        });
-        return result;
+        return readRepoFileChunk(args.path, args.start_line, args.end_line);
     }
 
     throw new Error(`Unsupported repo tool: ${toolName}`);
@@ -474,12 +446,6 @@ async function decideTicketResponse(options) {
         });
 
         const functionCalls = getFunctionCalls(payload);
-        console.log('[ticket-ai-agent] step', {
-            stepIndex,
-            responseId: payload && payload.id ? payload.id : null,
-            functionCallCount: functionCalls.length,
-            hasOutputText: Boolean(payload && typeof payload.output_text === 'string' && payload.output_text.trim())
-        });
         if (functionCalls.length) {
             const toolOutputs = [];
 
@@ -502,8 +468,6 @@ async function decideTicketResponse(options) {
         if (!parsed) {
             throw new Error('OpenAI returned no valid ticket assistant decision JSON');
         }
-
-        console.log('[ticket-ai-agent] final_decision', parsed);
 
         return parsed;
     }
