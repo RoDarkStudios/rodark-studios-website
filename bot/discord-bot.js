@@ -11,12 +11,13 @@ const {
     setDiscordBotTicketThreadRequester
 } = require('../api/_lib/discord-bot-control-store');
 const { getPostgresPool } = require('../api/_lib/postgres');
-const { decideTicketResponse } = require('./ai-ticket-assistant');
+const { decideTicketResponse, isPublicHelpQuestion } = require('./ai-ticket-assistant');
 
 const POLL_INTERVAL_MS = Number.parseInt(process.env.DISCORD_BOT_POLL_INTERVAL_MS || '5000', 10);
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const TICKET_GREETING = "You've contacted support. How can I help?";
 const HISTORY_FETCH_LIMIT = 15;
+const PUBLIC_HELP_FALLBACK_REPLY = 'Can you tell me a bit more about what you are trying to do in-game?';
 
 let client = null;
 let connecting = false;
@@ -111,6 +112,15 @@ async function isLatestRequesterMessage(channel, requesterUserId, messageId) {
     return !latestRequesterMessage || latestRequesterMessage.id === messageId;
 }
 
+function getLatestRequesterTextFromHistory(historyMessages, requesterUserId) {
+    const latestRequesterMessage = getLatestRequesterHistoryMessage(historyMessages, requesterUserId);
+    if (!latestRequesterMessage || typeof latestRequesterMessage.cleanContent !== 'string') {
+        return '';
+    }
+
+    return latestRequesterMessage.cleanContent.trim();
+}
+
 async function sendReplyOrChannelMessage(message, payload) {
     if (message && typeof message.reply === 'function') {
         try {
@@ -193,6 +203,8 @@ async function handleTicketMessage(message) {
         if (latestRequesterMessage && latestRequesterMessage.id !== message.id) {
             return;
         }
+        const latestRequesterText = getLatestRequesterTextFromHistory(historyMessages, thread.requesterUserId);
+        const publicHelpQuestion = isPublicHelpQuestion(latestRequesterText);
 
         let decision;
         try {
@@ -206,6 +218,13 @@ async function handleTicketMessage(message) {
         } catch (error) {
             console.error(`AI ticket assistant failed in #${message.channel.name}:`, error);
             if (!await isLatestRequesterMessage(message.channel, thread.requesterUserId, message.id)) {
+                return;
+            }
+            if (publicHelpQuestion) {
+                await sendReplyOrChannelMessage(message, {
+                    content: PUBLIC_HELP_FALLBACK_REPLY
+                });
+                await markDiscordBotTicketThreadAiResponded(threadIdentity);
                 return;
             }
             await sendOwnerHandoffMessage(message, ownerRoleId);
@@ -225,6 +244,13 @@ async function handleTicketMessage(message) {
         }
 
         if (decision.action === 'handoff') {
+            if (publicHelpQuestion) {
+                await sendReplyOrChannelMessage(message, {
+                    content: PUBLIC_HELP_FALLBACK_REPLY
+                });
+                await markDiscordBotTicketThreadAiResponded(threadIdentity);
+                return;
+            }
             await sendOwnerHandoffMessage(message, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(
                 threadIdentity,
@@ -234,6 +260,13 @@ async function handleTicketMessage(message) {
         }
 
         if (!decision.reply) {
+            if (publicHelpQuestion) {
+                await sendReplyOrChannelMessage(message, {
+                    content: PUBLIC_HELP_FALLBACK_REPLY
+                });
+                await markDiscordBotTicketThreadAiResponded(threadIdentity);
+                return;
+            }
             await sendOwnerHandoffMessage(message, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(threadIdentity, 'assistant_empty_reply');
             return;

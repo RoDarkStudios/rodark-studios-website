@@ -242,6 +242,10 @@ function isPublicHelpQuestion(text) {
         return false;
     }
 
+    if (/\b(exploit|exploiting|hack|hacking|cheat|cheating|dupe|duping|glitch|admin|owner|moderator|bypass|script|autofarm|auto farm|macro|anti.?cheat)\b/.test(normalizedText)) {
+        return false;
+    }
+
     if (/\b(how to|how do i|how can i|where do i|where can i|get|unlock|upgrade|use|find|available|obtain|access|open|start)\b/.test(normalizedText)) {
         return true;
     }
@@ -580,5 +584,6 @@ async function decideTicketResponse(options) {
 
 module.exports = {
     decideTicketResponse,
-    hasOpenAiConfig
+    hasOpenAiConfig,
+    isPublicHelpQuestion
 };
