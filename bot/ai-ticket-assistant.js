@@ -45,6 +45,11 @@ const ASSISTANT_INSTRUCTIONS = [
     'Use good judgment for Roblox support: ask about the exact in-game action, what they expected, what happened instead, whether it happens consistently, and what they already tried, but only when those details are actually the next useful thing to ask.',
     'Avoid low-value or premature questions. Do not ask for exact timestamps, server details, receipts, usernames, or similar operational details unless the conversation clearly makes them necessary.',
     'If repo context is provided, treat it as the main evidence for game-specific answers and use it carefully.',
+    'Safe repo scope includes client/shared code such as ReplicatedStorage, ReplicatedFirst, StarterPlayerScripts, and public constants or config exposed there.',
+    'Public, player-facing questions are allowed. Examples include visible UI behavior, public schedules, public redeem codes, item behavior, client-side features, and constants that do not expose hidden or competitive-advantage information.',
+    'For allowed public gameplay questions, do not handoff just because the answer is game-specific. Investigate the safe repo tools first and answer if the evidence is good enough.',
+    'If a public question is still ambiguous after reading the repo, ask one short clarifying question instead of handing off when possible.',
+    'A question like "what are the codes" should usually be treated as a likely question about public redeem codes, so clarify briefly if needed instead of escalating immediately.',
     'Never answer questions about server-side systems, exploits, hidden admin/debug behavior, security-sensitive logic, or anything that could give a competitive advantage or advance the game too quickly.',
     'If repo context is missing, weak, or does not clearly support the answer, and the question needs internal game knowledge, choose handoff.',
     'If there is no clearly useful next question, or the issue needs account investigation, moderation decisions, development context, or staff action, choose handoff.',
@@ -166,6 +171,70 @@ function getRecentImageUrls(historyMessages, requesterUserId) {
     }
 
     return urls.reverse();
+}
+
+function getLatestRequesterMessage(historyMessages, requesterUserId) {
+    if (!Array.isArray(historyMessages) || !historyMessages.length) {
+        return null;
+    }
+
+    for (let index = historyMessages.length - 1; index >= 0; index -= 1) {
+        const message = historyMessages[index];
+        if (!message || !message.author) {
+            continue;
+        }
+
+        if (requesterUserId && message.author.id !== requesterUserId) {
+            continue;
+        }
+
+        return message;
+    }
+
+    return historyMessages[historyMessages.length - 1] || null;
+}
+
+function getLatestRequesterText(historyMessages, requesterUserId) {
+    const latestRequesterMessage = getLatestRequesterMessage(historyMessages, requesterUserId);
+    if (!latestRequesterMessage || typeof latestRequesterMessage.cleanContent !== 'string') {
+        return '';
+    }
+
+    return latestRequesterMessage.cleanContent.trim();
+}
+
+function tokenizeRequesterText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(/\s+/)
+        .filter((token) => token.length >= 2);
+}
+
+function shouldRequireRepoInvestigation(text, toolsAvailable) {
+    if (!toolsAvailable) {
+        return false;
+    }
+
+    const normalizedText = String(text || '').trim().toLowerCase();
+    if (!normalizedText) {
+        return false;
+    }
+
+    const tokens = tokenizeRequesterText(normalizedText);
+    if (!tokens.length) {
+        return false;
+    }
+
+    if (tokens.length >= 3) {
+        return true;
+    }
+
+    if (normalizedText.length >= 14) {
+        return true;
+    }
+
+    return /^(can|how|what|when|where|why|is|are|does|do|did|will|would|should)\b/.test(normalizedText);
 }
 
 function extractResponseText(payload) {
@@ -390,6 +459,8 @@ async function decideTicketResponse(options) {
     const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
     const tools = buildRepoTools();
     const repoSummary = hasGameRepoConfig() ? getGameRepoSummary() : null;
+    const latestRequesterText = getLatestRequesterText(historyMessages, requesterUserId);
+    const requireRepoInvestigation = shouldRequireRepoInvestigation(latestRequesterText, tools.length > 0);
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
     const triggerSummary = triggerMessage
@@ -407,6 +478,9 @@ async function decideTicketResponse(options) {
                 repoSummary
                     ? `Repo tools are available for ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Safe scope is limited to: ${repoSummary.safePathPrefixes.join(', ')}.`
                     : 'Repo tools are not available for this question.',
+                requireRepoInvestigation
+                    ? 'This looks like a substantive gameplay/support question. Use repo tools before answering or handing off.'
+                    : 'If the user is still vague, ask one simple clarifying question before investigating.',
                 'Conversation transcript:',
                 transcript || '[no transcript available]'
             ].join('\n\n')
@@ -440,6 +514,7 @@ async function decideTicketResponse(options) {
             input: nextInput,
             previous_response_id: previousResponseId || undefined,
             tools: tools.length ? tools : undefined,
+            tool_choice: requireRepoInvestigation && stepIndex === 0 && tools.length ? 'required' : 'auto',
             text: {
                 verbosity: 'low'
             }
