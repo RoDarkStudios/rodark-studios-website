@@ -51,26 +51,31 @@ function isVagueOpeningMessage(messageText) {
         return true;
     }
 
-    const vaguePatterns = [
-        /^(hi|hello|hey|yo|sup)$/,
-        /^(hi|hello|hey)\s+(there|team|support)$/,
-        /^i have a question$/,
-        /^i have question$/,
-        /^got a question$/,
-        /^can you help$/,
-        /^need help$/,
-        /^help$/,
-        /^support$/,
-        /^hi i have a question$/,
-        /^hello i have a question$/,
-        /^hey i have a question$/,
-        /^i need help$/,
-        /^i need some help$/,
-        /^can someone help$/,
-        /^can anyone help$/
-    ];
+    const words = normalized.split(' ').filter(Boolean);
+    const hasGreeting = /^(hi|hello|hey|yo|sup)$/.test(words[0] || '');
+    const startsWithNeedHelp = /^(i need help|i need some help|need help|help me|can you help|can someone help|can anyone help)$/.test(normalized);
+    const startsWithQuestion = /^(i have a question|i have question|got a question|can i ask a question)$/.test(normalized);
 
-    return vaguePatterns.some((pattern) => pattern.test(normalized));
+    if (startsWithNeedHelp || startsWithQuestion) {
+        return true;
+    }
+
+    if (hasGreeting && words.length <= 6) {
+        const withoutGreeting = words.slice(1).join(' ');
+        if (
+            !withoutGreeting ||
+            /^(there|team|support)$/.test(withoutGreeting) ||
+            /^(i need help|need help|help|i have a question|have a question|question)$/.test(withoutGreeting)
+        ) {
+            return true;
+        }
+    }
+
+    if (words.length <= 4 && /(help|question|support)/.test(normalized)) {
+        return true;
+    }
+
+    return false;
 }
 
 function hasOpenAiConfig() {
