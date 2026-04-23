@@ -17,6 +17,7 @@ const POLL_INTERVAL_MS = Number.parseInt(process.env.DISCORD_BOT_POLL_INTERVAL_M
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const TICKET_GREETING = "You've contacted support. How can I help?";
 const HISTORY_FETCH_LIMIT = 15;
+const REQUESTER_MESSAGE_COALESCE_MS = Number.parseInt(process.env.DISCORD_BOT_REQUESTER_MESSAGE_COALESCE_MS || '2000', 10);
 
 let client = null;
 let connecting = false;
@@ -88,6 +89,27 @@ async function withChannelLock(channelId, callback) {
 async function fetchTicketHistory(channel) {
     const collection = await channel.messages.fetch({ limit: HISTORY_FETCH_LIMIT });
     return Array.from(collection.values()).sort((left, right) => left.createdTimestamp - right.createdTimestamp);
+}
+
+function delay(ms) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+function getLatestRequesterHistoryMessage(historyMessages, requesterUserId) {
+    if (!Array.isArray(historyMessages) || !historyMessages.length || !requesterUserId) {
+        return null;
+    }
+
+    for (let index = historyMessages.length - 1; index >= 0; index -= 1) {
+        const historyMessage = historyMessages[index];
+        if (historyMessage && historyMessage.author && historyMessage.author.id === requesterUserId) {
+            return historyMessage;
+        }
+    }
+
+    return null;
 }
 
 async function sendReplyOrChannelMessage(message, payload) {
@@ -167,7 +189,18 @@ async function handleTicketMessage(message) {
             return;
         }
 
+        const coalesceDelayMs = Number.isFinite(REQUESTER_MESSAGE_COALESCE_MS) && REQUESTER_MESSAGE_COALESCE_MS >= 0
+            ? REQUESTER_MESSAGE_COALESCE_MS
+            : 2000;
+        if (coalesceDelayMs > 0) {
+            await delay(coalesceDelayMs);
+        }
+
         const historyMessages = await fetchTicketHistory(message.channel);
+        const latestRequesterMessage = getLatestRequesterHistoryMessage(historyMessages, thread.requesterUserId);
+        if (latestRequesterMessage && latestRequesterMessage.id !== message.id) {
+            return;
+        }
 
         let decision;
         try {
