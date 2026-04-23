@@ -41,6 +41,14 @@ function isOwnerMessage(message, ownerRoleId) {
     );
 }
 
+function getMemberRoleIds(message) {
+    if (!message || !message.member || !message.member.roles || !message.member.roles.cache) {
+        return [];
+    }
+
+    return Array.from(message.member.roles.cache.keys());
+}
+
 function isAiAssistantConfigured(control) {
     return Boolean(
         control &&
@@ -136,6 +144,13 @@ async function handleTicketMessage(message) {
         }
 
         if (isOwnerMessage(message, ownerRoleId)) {
+            console.log('[ticket-ai] handoff reason=owner_joined', {
+                channelId: message.channel.id,
+                userId: message.author.id,
+                username: message.author.username,
+                ownerRoleId,
+                memberRoleIds: getMemberRoleIds(message)
+            });
             await markDiscordBotTicketThreadHandedOff(threadIdentity, 'owner_joined');
             return;
         }
@@ -163,6 +178,14 @@ async function handleTicketMessage(message) {
             });
         } catch (error) {
             console.error(`AI ticket assistant failed in #${message.channel.name}:`, error);
+            console.log('[ticket-ai] handoff reason=assistant_error', {
+                channelId: message.channel.id,
+                userId: message.author.id,
+                username: message.author.username,
+                ownerRoleId,
+                memberRoleIds: getMemberRoleIds(message),
+                error: String(error && error.message ? error.message : error)
+            });
             await sendOwnerHandoffMessage(message.channel, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(
                 threadIdentity,
@@ -176,6 +199,14 @@ async function handleTicketMessage(message) {
         }
 
         if (decision.action === 'handoff') {
+            console.log('[ticket-ai] handoff reason=model_handoff', {
+                channelId: message.channel.id,
+                userId: message.author.id,
+                username: message.author.username,
+                ownerRoleId,
+                memberRoleIds: getMemberRoleIds(message),
+                modelReason: decision.handoffReason || 'assistant_handoff'
+            });
             await sendOwnerHandoffMessage(message.channel, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(
                 threadIdentity,
@@ -185,6 +216,13 @@ async function handleTicketMessage(message) {
         }
 
         if (!decision.reply) {
+            console.log('[ticket-ai] handoff reason=assistant_empty_reply', {
+                channelId: message.channel.id,
+                userId: message.author.id,
+                username: message.author.username,
+                ownerRoleId,
+                memberRoleIds: getMemberRoleIds(message)
+            });
             await sendOwnerHandoffMessage(message.channel, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(threadIdentity, 'assistant_empty_reply');
             return;
