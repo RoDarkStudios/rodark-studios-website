@@ -1,8 +1,19 @@
+const {
+    getGameRepoSummary,
+    hasGameRepoConfig,
+    listRepoPaths,
+    readRepoFile,
+    readRepoFileChunk,
+    searchRepo
+} = require('./game-repo-context');
+
 const OPENAI_API_URL = 'https://api.openai.com/v1/responses';
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-5.4-mini').trim();
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim();
 const MAX_HISTORY_MESSAGES = 15;
 const MAX_IMAGE_INPUTS = 3;
+const MAX_AGENT_STEPS = 8;
+const OPENAI_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.OPENAI_TICKET_AGENT_TIMEOUT_MS || '90000', 10);
 
 const RESPONSE_SCHEMA = {
     type: 'object',
@@ -40,7 +51,9 @@ const ASSISTANT_INSTRUCTIONS = [
     'Do not guess. Do not invent fixes. Do not overexplain. Do not speak like a policy document.',
     'If the latest message does not appear to be from the person needing help, choose ignore.',
     'If the user attached images, use them when relevant.',
-    'Return JSON only that matches the provided schema.'
+    'If repo tools are available, use them for game-specific questions. Search, inspect files, refine your search, and read chunks as needed before deciding.',
+    'Do not rely on repo memory. For game-specific questions, investigate with tools first unless the user has not explained the issue yet.',
+    'Final output must be a raw JSON object with keys action, reply, and handoffReason.'
 ].join(' ');
 
 function hasOpenAiConfig() {
@@ -180,83 +193,178 @@ function extractResponseText(payload) {
     return parts.join('\n').trim();
 }
 
-async function decideTicketResponse(options) {
-    if (!hasOpenAiConfig()) {
-        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
+function getFunctionCalls(payload) {
+    if (!payload || !Array.isArray(payload.output)) {
+        return [];
     }
 
-    const historyMessages = Array.isArray(options && options.historyMessages) ? options.historyMessages : [];
-    const triggerMessage = options && options.triggerMessage ? options.triggerMessage : null;
-    const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
-    const ownerRoleId = options && options.ownerRoleId ? String(options.ownerRoleId) : null;
-    const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
-    const repoContext = options && options.repoContext && typeof options.repoContext === 'object'
-        ? options.repoContext
-        : null;
+    return payload.output.filter((item) => item && item.type === 'function_call');
+}
 
-    const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
-    const triggerSummary = triggerMessage
-        ? `Latest triggering message author: ${triggerMessage.author ? triggerMessage.author.username : 'unknown'} (${triggerMessage.author ? triggerMessage.author.id : 'unknown'})`
-        : 'Latest triggering message author: unknown';
-    const content = [
+function buildRepoTools() {
+    if (!hasGameRepoConfig()) {
+        return [];
+    }
+
+    const repoSummary = getGameRepoSummary();
+    const safeScopeText = repoSummary.safePathPrefixes.join(', ');
+
+    return [
         {
-            type: 'input_text',
-            text: [
-                `Discord ticket channel: ${channelName}`,
-                `Known requester user ID: ${requesterUserId || 'unknown'}`,
-                `Owner role ID: ${ownerRoleId || 'unknown'}`,
-                triggerSummary,
-                'Decide whether to reply, handoff, or ignore.',
-                repoContext
-                    ? `Repo context is available from ${repoContext.owner}/${repoContext.repo} on branch ${repoContext.branch} at commit ${repoContext.headCommitSha}.`
-                    : 'Repo context is not available for this question.',
-                'Conversation transcript:',
-                transcript || '[no transcript available]',
-                repoContext && Array.isArray(repoContext.snippets) && repoContext.snippets.length
-                    ? `Relevant repo snippets:\n${repoContext.snippets.join('\n\n---\n\n')}`
-                    : 'Relevant repo snippets: [none]'
-            ].join('\n\n')
+            type: 'function',
+            name: 'search_repo',
+            description: `Search the safe client/shared side of ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Safe scope: ${safeScopeText}. Use this first for most game-specific questions.`,
+            parameters: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    query: {
+                        type: 'string',
+                        description: 'Search query describing gameplay systems, UI, item names, mechanics, or related concepts.'
+                    },
+                    limit: {
+                        type: 'integer',
+                        minimum: 1,
+                        maximum: 8
+                    }
+                },
+                required: ['query']
+            }
+        },
+        {
+            type: 'function',
+            name: 'list_paths',
+            description: `List safe file paths within ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Use this to inspect likely directories or discover relevant modules.`,
+            parameters: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    prefix: {
+                        type: 'string',
+                        description: 'Optional repo path prefix such as src/ReplicatedStorage/ or src/StarterPlayerScripts/.'
+                    },
+                    limit: {
+                        type: 'integer',
+                        minimum: 1,
+                        maximum: 60
+                    }
+                },
+                required: []
+            }
+        },
+        {
+            type: 'function',
+            name: 'read_file',
+            description: `Read a safe repo file from ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Use after search_repo or list_paths identifies a promising file.`,
+            parameters: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    path: {
+                        type: 'string',
+                        description: 'Exact repo path to read.'
+                    }
+                },
+                required: ['path']
+            }
+        },
+        {
+            type: 'function',
+            name: 'read_file_chunk',
+            description: `Read specific line ranges from a safe repo file in ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Use this after read_file when you need deeper evidence from a subsection.`,
+            parameters: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    path: {
+                        type: 'string',
+                        description: 'Exact repo path to read.'
+                    },
+                    start_line: {
+                        type: 'integer',
+                        minimum: 1
+                    },
+                    end_line: {
+                        type: 'integer',
+                        minimum: 1
+                    }
+                },
+                required: ['path', 'start_line', 'end_line']
+            }
         }
     ];
+}
 
-    for (const imageUrl of getRecentImageUrls(historyMessages, requesterUserId)) {
-        content.push({
-            type: 'input_image',
-            image_url: imageUrl,
-            detail: 'auto'
-        });
+async function executeRepoToolCall(toolCall) {
+    const toolName = toolCall && toolCall.name ? String(toolCall.name) : '';
+    const rawArguments = toolCall && typeof toolCall.arguments === 'string' ? toolCall.arguments : '{}';
+    const args = JSON.parse(rawArguments);
+
+    if (toolName === 'search_repo') {
+        return searchRepo(args.query, args.limit);
     }
 
+    if (toolName === 'list_paths') {
+        return listRepoPaths(args.prefix, args.limit);
+    }
+
+    if (toolName === 'read_file') {
+        return readRepoFile(args.path);
+    }
+
+    if (toolName === 'read_file_chunk') {
+        return readRepoFileChunk(args.path, args.start_line, args.end_line);
+    }
+
+    throw new Error(`Unsupported repo tool: ${toolName}`);
+}
+
+function parseDecisionText(rawText) {
+    const text = String(rawText || '').trim();
+    if (!text) {
+        return null;
+    }
+
+    const candidates = [text];
+    const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fencedMatch && fencedMatch[1]) {
+        candidates.push(fencedMatch[1].trim());
+    }
+
+    const objectMatch = text.match(/\{[\s\S]*\}/);
+    if (objectMatch) {
+        candidates.push(objectMatch[0]);
+    }
+
+    for (const candidate of candidates) {
+        try {
+            const parsed = JSON.parse(candidate);
+            return {
+                action: typeof parsed.action === 'string' ? parsed.action : 'handoff',
+                reply: typeof parsed.reply === 'string' ? parsed.reply.trim() : '',
+                handoffReason: typeof parsed.handoffReason === 'string' ? parsed.handoffReason.trim() : ''
+            };
+        } catch (error) {
+            continue;
+        }
+    }
+
+    return null;
+}
+
+async function requestOpenAiResponse(body) {
     const response = await fetch(OPENAI_API_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${OPENAI_API_KEY}`
         },
-        body: JSON.stringify({
-            model: OPENAI_MODEL,
-            reasoning: {
-                effort: 'high'
-            },
-            max_output_tokens: 220,
-            instructions: ASSISTANT_INSTRUCTIONS,
-            input: [
-                {
-                    role: 'user',
-                    content
-                }
-            ],
-            text: {
-                verbosity: 'low',
-                format: {
-                    type: 'json_schema',
-                    name: 'ticket_assistant_action',
-                    strict: true,
-                    schema: RESPONSE_SCHEMA
-                }
-            }
-        }),
-        signal: AbortSignal.timeout(30000)
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(
+            Number.isFinite(OPENAI_REQUEST_TIMEOUT_MS) && OPENAI_REQUEST_TIMEOUT_MS >= 15000
+                ? OPENAI_REQUEST_TIMEOUT_MS
+                : 90000
+        )
     });
 
     const payload = await response.json().catch(() => ({}));
@@ -267,16 +375,107 @@ async function decideTicketResponse(options) {
         throw new Error(errorMessage);
     }
 
-    const rawText = extractResponseText(payload);
-    if (!rawText) {
-        throw new Error('OpenAI returned no structured ticket assistant output');
+    return payload;
+}
+
+async function decideTicketResponse(options) {
+    if (!hasOpenAiConfig()) {
+        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
     }
 
-    const parsed = JSON.parse(rawText);
+    const historyMessages = Array.isArray(options && options.historyMessages) ? options.historyMessages : [];
+    const triggerMessage = options && options.triggerMessage ? options.triggerMessage : null;
+    const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
+    const ownerRoleId = options && options.ownerRoleId ? String(options.ownerRoleId) : null;
+    const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
+    const tools = buildRepoTools();
+    const repoSummary = hasGameRepoConfig() ? getGameRepoSummary() : null;
+
+    const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
+    const triggerSummary = triggerMessage
+        ? `Latest triggering message author: ${triggerMessage.author ? triggerMessage.author.username : 'unknown'} (${triggerMessage.author ? triggerMessage.author.id : 'unknown'})`
+        : 'Latest triggering message author: unknown';
+    const initialContent = [
+        {
+            type: 'input_text',
+            text: [
+                `Discord ticket channel: ${channelName}`,
+                `Known requester user ID: ${requesterUserId || 'unknown'}`,
+                `Owner role ID: ${ownerRoleId || 'unknown'}`,
+                triggerSummary,
+                'Decide whether to reply, handoff, or ignore. Investigate first when the question is game-specific and repo tools are available.',
+                repoSummary
+                    ? `Repo tools are available for ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Safe scope is limited to: ${repoSummary.safePathPrefixes.join(', ')}.`
+                    : 'Repo tools are not available for this question.',
+                'Conversation transcript:',
+                transcript || '[no transcript available]'
+            ].join('\n\n')
+        }
+    ];
+
+    for (const imageUrl of getRecentImageUrls(historyMessages, requesterUserId)) {
+        initialContent.push({
+            type: 'input_image',
+            image_url: imageUrl,
+            detail: 'auto'
+        });
+    }
+
+    let previousResponseId = null;
+    let nextInput = [
+        {
+            role: 'user',
+            content: initialContent
+        }
+    ];
+
+    for (let stepIndex = 0; stepIndex < MAX_AGENT_STEPS; stepIndex += 1) {
+        const payload = await requestOpenAiResponse({
+            model: OPENAI_MODEL,
+            reasoning: {
+                effort: 'high'
+            },
+            max_output_tokens: 900,
+            instructions: ASSISTANT_INSTRUCTIONS,
+            input: nextInput,
+            previous_response_id: previousResponseId || undefined,
+            tools: tools.length ? tools : undefined,
+            text: {
+                verbosity: 'low'
+            }
+        });
+
+        const functionCalls = getFunctionCalls(payload);
+        if (functionCalls.length) {
+            const toolOutputs = [];
+
+            for (const functionCall of functionCalls) {
+                const result = await executeRepoToolCall(functionCall);
+                toolOutputs.push({
+                    type: 'function_call_output',
+                    call_id: functionCall.call_id,
+                    output: JSON.stringify(result)
+                });
+            }
+
+            previousResponseId = payload.id;
+            nextInput = toolOutputs;
+            continue;
+        }
+
+        const rawText = extractResponseText(payload);
+        const parsed = parseDecisionText(rawText);
+        if (!parsed) {
+            throw new Error('OpenAI returned no valid ticket assistant decision JSON');
+        }
+
+        return parsed;
+    }
+
     return {
-        action: typeof parsed.action === 'string' ? parsed.action : 'handoff',
-        reply: typeof parsed.reply === 'string' ? parsed.reply.trim() : '',
-        handoffReason: typeof parsed.handoffReason === 'string' ? parsed.handoffReason.trim() : ''
+        action: 'handoff',
+        reply: '',
+        handoffReason: 'repo_agent_step_limit'
     };
 }
 

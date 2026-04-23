@@ -10,6 +10,10 @@ const MAX_INDEXED_FILES = Number.parseInt(process.env.SUPPORT_GAME_REPO_MAX_FILE
 const MAX_INDEXED_FILE_SIZE_BYTES = Number.parseInt(process.env.SUPPORT_GAME_REPO_MAX_FILE_SIZE_BYTES || '150000', 10);
 const MAX_SNIPPETS = 4;
 const MAX_SNIPPET_CHARS = 1400;
+const MAX_SEARCH_RESULTS = 8;
+const MAX_LIST_RESULTS = 60;
+const MAX_READ_FILE_CHARS = 12000;
+const MAX_READ_CHUNK_LINES = 220;
 
 const SAFE_PATH_PREFIXES = [
     'src/ReplicatedFirst/',
@@ -95,6 +99,15 @@ function hasGameRepoConfig() {
     return Boolean(REPO_OWNER && REPO_NAME && REPO_BRANCH && GITHUB_TOKEN);
 }
 
+function getGameRepoSummary() {
+    return {
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        branch: REPO_BRANCH,
+        safePathPrefixes: [...SAFE_PATH_PREFIXES]
+    };
+}
+
 function buildApiUrl(pathname, searchParams) {
     const url = new URL(`${GITHUB_API_BASE_URL}${pathname}`);
     if (searchParams && typeof searchParams === 'object') {
@@ -151,6 +164,19 @@ function decodeGitHubContent(payload) {
     return Buffer.from(payload.content.replace(/\n/g, ''), 'base64').toString('utf8');
 }
 
+function findIndexedFile(repoIndex, repoPath) {
+    if (!repoIndex || !Array.isArray(repoIndex.files)) {
+        return null;
+    }
+
+    const normalizedPath = String(repoPath || '').trim().replace(/\\/g, '/');
+    if (!normalizedPath) {
+        return null;
+    }
+
+    return repoIndex.files.find((entry) => entry && entry.path === normalizedPath) || null;
+}
+
 function normalizeWhitespace(text) {
     return String(text || '')
         .replace(/\r/g, '')
@@ -186,6 +212,15 @@ function countTokenOccurrences(text, token) {
     }
 
     return count;
+}
+
+function trimText(text, maxChars) {
+    const value = String(text || '');
+    if (value.length <= maxChars) {
+        return value;
+    }
+
+    return `${value.slice(0, Math.max(0, maxChars - 21))}\n... [truncated]`;
 }
 
 async function runWithConcurrency(items, worker, concurrency) {
@@ -350,6 +385,14 @@ function buildSnippets(entry, queryTokens) {
         .map((window) => window.text.slice(0, MAX_SNIPPET_CHARS));
 }
 
+function describeSearchHit(entry, queryTokens) {
+    const snippets = buildSnippets(entry, queryTokens);
+    return {
+        path: entry.path,
+        preview: snippets.length ? snippets[0] : trimText(entry.content, 320)
+    };
+}
+
 function buildQuestionText(historyMessages, requesterUserId) {
     const relevantMessages = historyMessages.filter((message) => (
         message &&
@@ -424,7 +467,125 @@ async function getGameRepoContext(options) {
     };
 }
 
+async function searchRepo(query, limit) {
+    const repoIndex = await loadRepoIndex();
+    if (!repoIndex || !Array.isArray(repoIndex.files) || !repoIndex.files.length) {
+        return {
+            branch: REPO_BRANCH,
+            results: []
+        };
+    }
+
+    const queryTokens = tokenize(query);
+    if (!queryTokens.length) {
+        return {
+            branch: repoIndex.branch,
+            results: []
+        };
+    }
+
+    const maxResults = Number.isFinite(limit) && limit > 0
+        ? Math.min(Math.trunc(limit), MAX_SEARCH_RESULTS)
+        : MAX_SEARCH_RESULTS;
+
+    const results = repoIndex.files
+        .map((entry) => ({
+            entry,
+            score: scoreFile(entry, queryTokens)
+        }))
+        .filter((candidate) => candidate.score > 0)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, maxResults)
+        .map((candidate) => ({
+            score: candidate.score,
+            ...describeSearchHit(candidate.entry, queryTokens)
+        }));
+
+    return {
+        branch: repoIndex.branch,
+        results
+    };
+}
+
+async function listRepoPaths(prefix, limit) {
+    const repoIndex = await loadRepoIndex();
+    if (!repoIndex || !Array.isArray(repoIndex.files) || !repoIndex.files.length) {
+        return {
+            branch: REPO_BRANCH,
+            paths: []
+        };
+    }
+
+    const normalizedPrefix = String(prefix || '').trim().replace(/\\/g, '/').toLowerCase();
+    const maxResults = Number.isFinite(limit) && limit > 0
+        ? Math.min(Math.trunc(limit), MAX_LIST_RESULTS)
+        : MAX_LIST_RESULTS;
+
+    const paths = repoIndex.files
+        .map((entry) => entry.path)
+        .filter((repoPath) => !normalizedPrefix || repoPath.toLowerCase().startsWith(normalizedPrefix))
+        .sort((left, right) => left.localeCompare(right))
+        .slice(0, maxResults);
+
+    return {
+        branch: repoIndex.branch,
+        paths
+    };
+}
+
+async function readRepoFile(repoPath) {
+    const repoIndex = await loadRepoIndex();
+    const entry = findIndexedFile(repoIndex, repoPath);
+    if (!entry) {
+        return {
+            path: String(repoPath || ''),
+            found: false
+        };
+    }
+
+    const lines = entry.content.split('\n');
+    return {
+        path: entry.path,
+        found: true,
+        lineCount: lines.length,
+        content: trimText(entry.content, MAX_READ_FILE_CHARS)
+    };
+}
+
+async function readRepoFileChunk(repoPath, startLine, endLine) {
+    const repoIndex = await loadRepoIndex();
+    const entry = findIndexedFile(repoIndex, repoPath);
+    if (!entry) {
+        return {
+            path: String(repoPath || ''),
+            found: false
+        };
+    }
+
+    const lines = entry.content.split('\n');
+    const boundedStart = Math.max(1, Math.trunc(Number(startLine) || 1));
+    const boundedEnd = Math.min(
+        lines.length,
+        Math.max(boundedStart, Math.trunc(Number(endLine) || boundedStart)),
+        boundedStart + MAX_READ_CHUNK_LINES - 1
+    );
+
+    return {
+        path: entry.path,
+        found: true,
+        startLine: boundedStart,
+        endLine: boundedEnd,
+        content: lines.slice(boundedStart - 1, boundedEnd).join('\n')
+    };
+}
+
 module.exports = {
+    getGameRepoSummary,
     getGameRepoContext,
-    hasGameRepoConfig
+    hasGameRepoConfig,
+    listRepoPaths,
+    loadRepoIndex,
+    readRepoFile,
+    readRepoFileChunk,
+    searchRepo
 };
