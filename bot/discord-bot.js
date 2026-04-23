@@ -90,10 +90,28 @@ async function fetchTicketHistory(channel) {
     return Array.from(collection.values()).sort((left, right) => left.createdTimestamp - right.createdTimestamp);
 }
 
-async function sendOwnerHandoffMessage(channel, ownerRoleId) {
-    await channel.send({
+async function sendReplyOrChannelMessage(message, payload) {
+    if (message && typeof message.reply === 'function') {
+        try {
+            await message.reply(payload);
+            return;
+        } catch (error) {
+            console.warn('Falling back to channel.send after reply failed:', error.message);
+        }
+    }
+
+    if (!message || !message.channel || typeof message.channel.send !== 'function') {
+        throw new Error('Could not send Discord message');
+    }
+
+    await message.channel.send(payload);
+}
+
+async function sendOwnerHandoffMessage(message, ownerRoleId) {
+    await sendReplyOrChannelMessage(message, {
         content: `This needs an owner to take over. <@&${ownerRoleId}>`,
         allowedMentions: {
+            repliedUser: true,
             roles: [ownerRoleId]
         }
     });
@@ -162,7 +180,7 @@ async function handleTicketMessage(message) {
             });
         } catch (error) {
             console.error(`AI ticket assistant failed in #${message.channel.name}:`, error);
-            await sendOwnerHandoffMessage(message.channel, ownerRoleId);
+            await sendOwnerHandoffMessage(message, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(
                 threadIdentity,
                 `assistant_error:${String(error.message || 'unknown').slice(0, 180)}`
@@ -175,7 +193,7 @@ async function handleTicketMessage(message) {
         }
 
         if (decision.action === 'handoff') {
-            await sendOwnerHandoffMessage(message.channel, ownerRoleId);
+            await sendOwnerHandoffMessage(message, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(
                 threadIdentity,
                 decision.handoffReason || 'assistant_handoff'
@@ -184,12 +202,12 @@ async function handleTicketMessage(message) {
         }
 
         if (!decision.reply) {
-            await sendOwnerHandoffMessage(message.channel, ownerRoleId);
+            await sendOwnerHandoffMessage(message, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(threadIdentity, 'assistant_empty_reply');
             return;
         }
 
-        await message.channel.send({
+        await sendReplyOrChannelMessage(message, {
             content: decision.reply.slice(0, 1900)
         });
         await markDiscordBotTicketThreadAiResponded(threadIdentity);
