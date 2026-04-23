@@ -50,6 +50,7 @@ Required for the Discord bot worker:
 DISCORD_BOT_TOKEN
 DATABASE_URL
 OPENAI_API_KEY
+GITHUB_TOKEN
 ```
 
 Optional for the Discord bot worker:
@@ -57,12 +58,18 @@ Optional for the Discord bot worker:
 ```txt
 OPENAI_MODEL
 DISCORD_BOT_POLL_INTERVAL_MS
+SUPPORT_GAME_REPO_OWNER
+SUPPORT_GAME_REPO_NAME
+SUPPORT_GAME_REPO_BRANCH
+SUPPORT_GAME_REPO_REFRESH_MS
 ```
 
 ## Discord Bot Notes
 
 - Enable the Discord privileged `Message Content Intent` for the bot application, otherwise ticket message content and image context will not be available to the AI assistant.
 - The AI ticket assistant is configured from `/admin/discord-bot` and currently supports one monitored ticket category plus one owner role mention target.
+- The AI ticket assistant can enrich answers from a private GitHub game repo. The current defaults target `RoDarkStudios/build-a-business` on branch `dev`.
+- Repo retrieval is intentionally limited to safe client/shared paths (`ReplicatedFirst`, `ReplicatedStorage`, and `StarterPlayerScripts`) and excludes `ServerScriptService`.
 
 ## Database
 

@@ -33,7 +33,10 @@ const ASSISTANT_INSTRUCTIONS = [
     'Prefer the most informative next question, not the most generic one.',
     'Use good judgment for Roblox support: ask about the exact in-game action, what they expected, what happened instead, whether it happens consistently, and what they already tried, but only when those details are actually the next useful thing to ask.',
     'Avoid low-value or premature questions. Do not ask for exact timestamps, server details, receipts, usernames, or similar operational details unless the conversation clearly makes them necessary.',
-    'If there is no clearly useful next question, or the issue needs internal knowledge, account investigation, moderation decisions, development context, or staff action, choose handoff.',
+    'If repo context is provided, treat it as the main evidence for game-specific answers and use it carefully.',
+    'Never answer questions about server-side systems, exploits, hidden admin/debug behavior, security-sensitive logic, or anything that could give a competitive advantage or advance the game too quickly.',
+    'If repo context is missing, weak, or does not clearly support the answer, and the question needs internal game knowledge, choose handoff.',
+    'If there is no clearly useful next question, or the issue needs account investigation, moderation decisions, development context, or staff action, choose handoff.',
     'Do not guess. Do not invent fixes. Do not overexplain. Do not speak like a policy document.',
     'If the latest message does not appear to be from the person needing help, choose ignore.',
     'If the user attached images, use them when relevant.',
@@ -187,6 +190,9 @@ async function decideTicketResponse(options) {
     const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
     const ownerRoleId = options && options.ownerRoleId ? String(options.ownerRoleId) : null;
     const channelName = options && options.channelName ? String(options.channelName) : 'unknown-channel';
+    const repoContext = options && options.repoContext && typeof options.repoContext === 'object'
+        ? options.repoContext
+        : null;
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
     const triggerSummary = triggerMessage
@@ -201,8 +207,14 @@ async function decideTicketResponse(options) {
                 `Owner role ID: ${ownerRoleId || 'unknown'}`,
                 triggerSummary,
                 'Decide whether to reply, handoff, or ignore.',
+                repoContext
+                    ? `Repo context is available from ${repoContext.owner}/${repoContext.repo} on branch ${repoContext.branch} at commit ${repoContext.headCommitSha}.`
+                    : 'Repo context is not available for this question.',
                 'Conversation transcript:',
-                transcript || '[no transcript available]'
+                transcript || '[no transcript available]',
+                repoContext && Array.isArray(repoContext.snippets) && repoContext.snippets.length
+                    ? `Relevant repo snippets:\n${repoContext.snippets.join('\n\n---\n\n')}`
+                    : 'Relevant repo snippets: [none]'
             ].join('\n\n')
         }
     ];

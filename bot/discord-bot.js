@@ -12,6 +12,7 @@ const {
 } = require('../api/_lib/discord-bot-control-store');
 const { getPostgresPool } = require('../api/_lib/postgres');
 const { decideTicketResponse } = require('./ai-ticket-assistant');
+const { getGameRepoContext } = require('./game-repo-context');
 
 const POLL_INTERVAL_MS = Number.parseInt(process.env.DISCORD_BOT_POLL_INTERVAL_MS || '5000', 10);
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
@@ -150,6 +151,17 @@ async function handleTicketMessage(message) {
         }
 
         const historyMessages = await fetchTicketHistory(message.channel);
+        let repoContext = null;
+
+        try {
+            repoContext = await getGameRepoContext({
+                historyMessages,
+                requesterUserId: thread.requesterUserId
+            });
+        } catch (error) {
+            console.error(`Game repo context lookup failed in #${message.channel.name}:`, error);
+            repoContext = null;
+        }
 
         let decision;
         try {
@@ -158,7 +170,8 @@ async function handleTicketMessage(message) {
                 historyMessages,
                 triggerMessage: message,
                 requesterUserId: thread.requesterUserId,
-                ownerRoleId
+                ownerRoleId,
+                repoContext
             });
         } catch (error) {
             console.error(`AI ticket assistant failed in #${message.channel.name}:`, error);
