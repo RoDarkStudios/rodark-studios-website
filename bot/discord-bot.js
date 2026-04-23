@@ -17,7 +17,6 @@ const POLL_INTERVAL_MS = Number.parseInt(process.env.DISCORD_BOT_POLL_INTERVAL_M
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const TICKET_GREETING = "You've contacted support. How can I help?";
 const HISTORY_FETCH_LIMIT = 15;
-const REQUESTER_MESSAGE_COALESCE_MS = Number.parseInt(process.env.DISCORD_BOT_REQUESTER_MESSAGE_COALESCE_MS || '2000', 10);
 
 let client = null;
 let connecting = false;
@@ -91,12 +90,6 @@ async function fetchTicketHistory(channel) {
     return Array.from(collection.values()).sort((left, right) => left.createdTimestamp - right.createdTimestamp);
 }
 
-function delay(ms) {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
-}
-
 function getLatestRequesterHistoryMessage(historyMessages, requesterUserId) {
     if (!Array.isArray(historyMessages) || !historyMessages.length || !requesterUserId) {
         return null;
@@ -110,6 +103,12 @@ function getLatestRequesterHistoryMessage(historyMessages, requesterUserId) {
     }
 
     return null;
+}
+
+async function isLatestRequesterMessage(channel, requesterUserId, messageId) {
+    const latestHistory = await fetchTicketHistory(channel);
+    const latestRequesterMessage = getLatestRequesterHistoryMessage(latestHistory, requesterUserId);
+    return !latestRequesterMessage || latestRequesterMessage.id === messageId;
 }
 
 async function sendReplyOrChannelMessage(message, payload) {
@@ -189,13 +188,6 @@ async function handleTicketMessage(message) {
             return;
         }
 
-        const coalesceDelayMs = Number.isFinite(REQUESTER_MESSAGE_COALESCE_MS) && REQUESTER_MESSAGE_COALESCE_MS >= 0
-            ? REQUESTER_MESSAGE_COALESCE_MS
-            : 2000;
-        if (coalesceDelayMs > 0) {
-            await delay(coalesceDelayMs);
-        }
-
         const historyMessages = await fetchTicketHistory(message.channel);
         const latestRequesterMessage = getLatestRequesterHistoryMessage(historyMessages, thread.requesterUserId);
         if (latestRequesterMessage && latestRequesterMessage.id !== message.id) {
@@ -213,6 +205,9 @@ async function handleTicketMessage(message) {
             });
         } catch (error) {
             console.error(`AI ticket assistant failed in #${message.channel.name}:`, error);
+            if (!await isLatestRequesterMessage(message.channel, thread.requesterUserId, message.id)) {
+                return;
+            }
             await sendOwnerHandoffMessage(message, ownerRoleId);
             await markDiscordBotTicketThreadHandedOff(
                 threadIdentity,
@@ -222,6 +217,10 @@ async function handleTicketMessage(message) {
         }
 
         if (!decision || decision.action === 'ignore') {
+            return;
+        }
+
+        if (!await isLatestRequesterMessage(message.channel, thread.requesterUserId, message.id)) {
             return;
         }
 
