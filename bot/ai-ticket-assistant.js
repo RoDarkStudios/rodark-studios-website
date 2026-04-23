@@ -216,6 +216,10 @@ function extractResponseText(payload) {
 }
 
 async function decideTicketResponse(options) {
+    if (!hasOpenAiConfig()) {
+        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
+    }
+
     const historyMessages = Array.isArray(options && options.historyMessages) ? options.historyMessages : [];
     const triggerMessage = options && options.triggerMessage ? options.triggerMessage : null;
     const requesterUserId = options && options.requesterUserId ? String(options.requesterUserId) : null;
@@ -232,10 +236,6 @@ async function decideTicketResponse(options) {
             reply: 'What do you need help with?',
             handoffReason: ''
         };
-    }
-
-    if (!hasOpenAiConfig()) {
-        throw new Error('OPENAI_API_KEY must be set for the AI ticket assistant');
     }
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
