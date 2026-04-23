@@ -239,6 +239,19 @@ function shouldRequireRepoInvestigation(text, toolsAvailable) {
     return /^(can|how|what|when|where|why|is|are|does|do|did|will|would|should)\b/.test(normalizedText);
 }
 
+function isPublicHelpQuestion(text) {
+    const normalizedText = String(text || '').trim().toLowerCase();
+    if (!normalizedText) {
+        return false;
+    }
+
+    if (/\b(how to|how do i|how can i|where do i|where can i|get|unlock|upgrade|use|find|available|employees?|office|building|feature|item)\b/.test(normalizedText)) {
+        return true;
+    }
+
+    return /^(how|what|where|can)\b/.test(normalizedText);
+}
+
 function extractResponseText(payload) {
     if (payload && typeof payload.output_text === 'string' && payload.output_text.trim()) {
         return payload.output_text.trim();
@@ -463,6 +476,7 @@ async function decideTicketResponse(options) {
     const repoSummary = hasGameRepoConfig() ? getGameRepoSummary() : null;
     const latestRequesterText = getLatestRequesterText(historyMessages, requesterUserId);
     const requireRepoInvestigation = shouldRequireRepoInvestigation(latestRequesterText, tools.length > 0);
+    const publicHelpQuestion = isPublicHelpQuestion(latestRequesterText);
 
     const transcript = buildTranscript(historyMessages, requesterUserId, ownerRoleId);
     const triggerSummary = triggerMessage
@@ -480,6 +494,9 @@ async function decideTicketResponse(options) {
                 repoSummary
                     ? `Repo tools are available for ${repoSummary.owner}/${repoSummary.repo} on branch ${repoSummary.branch}. Safe scope is limited to: ${repoSummary.safePathPrefixes.join(', ')}.`
                     : 'Repo tools are not available for this question.',
+                publicHelpQuestion
+                    ? 'This appears to be a normal public gameplay/help question. Prefer a repo-backed answer, or ask one short clarifying question instead of handing off if evidence is still thin.'
+                    : 'If the question is unsafe or about non-public internals, handoff is allowed.',
                 requireRepoInvestigation
                     ? 'This looks like a substantive gameplay/support question. Use repo tools before answering or handing off.'
                     : 'If the user is still vague, ask one simple clarifying question before investigating.',
@@ -544,6 +561,14 @@ async function decideTicketResponse(options) {
         const parsed = parseDecisionText(rawText);
         if (!parsed) {
             throw new Error('OpenAI returned no valid ticket assistant decision JSON');
+        }
+
+        if (publicHelpQuestion && parsed.action === 'handoff') {
+            return {
+                action: 'reply',
+                reply: 'Can you tell me a bit more about what you are trying to do in-game?',
+                handoffReason: ''
+            };
         }
 
         return parsed;
