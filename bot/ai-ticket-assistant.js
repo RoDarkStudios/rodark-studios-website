@@ -45,14 +45,11 @@ const ASSISTANT_INSTRUCTIONS = [
     'Use good judgment for Roblox support: ask about the exact in-game action, what they expected, what happened instead, whether it happens consistently, and what they already tried, but only when those details are actually the next useful thing to ask.',
     'Avoid low-value or premature questions. Do not ask for exact timestamps, server details, receipts, usernames, or similar operational details unless the conversation clearly makes them necessary.',
     'If repo context is provided, treat it as the main evidence for game-specific answers and use it carefully.',
-    'Safe repo scope includes client/shared code such as ReplicatedStorage, ReplicatedFirst, StarterPlayerScripts, and public constants or config exposed there.',
-    'Public, player-facing questions are allowed. Examples include visible UI behavior, public schedules, public redeem codes, item behavior, client-side features, and constants that do not expose hidden or competitive-advantage information.',
-    'Public progression/help questions are also allowed. If the player is asking how to unlock, obtain, use, find, or access a visible in-game system, item, employee, building, feature, or mechanic, answer from safe repo evidence when possible.',
-    'Do not treat ordinary player help like "how do I get employees" or "what employees are available" as a competitive-advantage request if the information is part of the normal visible game experience.',
-    'For allowed public gameplay questions, do not handoff just because the answer is game-specific. Investigate the safe repo tools first and answer if the evidence is good enough.',
-    'If a public question is still ambiguous after reading the repo, ask one short clarifying question instead of handing off when possible.',
-    'A question like "what are the codes" should usually be treated as a likely question about public redeem codes, so clarify briefly if needed instead of escalating immediately.',
-    'Never answer questions about server-side systems, exploits, hidden admin/debug behavior, security-sensitive logic, hidden formulas, private drop rates, hidden spawn logic, anti-cheat logic, or anything that would reveal non-public internals or give an unfair advantage beyond normal player-facing help.',
+    'Safe repo scope is limited to client/shared, player-facing code and public constants/config exposed there.',
+    'Normal player-help questions about visible gameplay systems, progression, UI, items, mechanics, and other player-facing behavior are allowed if the safe repo evidence supports the answer.',
+    'Do not handoff just because a question is about the game. If the topic appears player-facing and safe, investigate the repo tools first and answer when the evidence is good enough.',
+    'If the topic appears player-facing and safe but the evidence is still thin, ask one short clarifying question before handing off.',
+    'Never answer questions about server-side systems, exploits, admin or debug behavior, security-sensitive logic, anti-cheat, hidden formulas, private rates, hidden spawn logic, or other non-public internals that would create an unfair advantage.',
     'If repo context is missing, weak, or does not clearly support the answer, and the question needs internal game knowledge, choose handoff.',
     'If there is no clearly useful next question, or the issue needs account investigation, moderation decisions, development context, or staff action, choose handoff.',
     'Do not guess. Do not invent fixes. Do not overexplain. Do not speak like a policy document.',
@@ -245,7 +242,7 @@ function isPublicHelpQuestion(text) {
         return false;
     }
 
-    if (/\b(how to|how do i|how can i|where do i|where can i|get|unlock|upgrade|use|find|available|employees?|office|building|feature|item)\b/.test(normalizedText)) {
+    if (/\b(how to|how do i|how can i|where do i|where can i|get|unlock|upgrade|use|find|available|obtain|access|open|start)\b/.test(normalizedText)) {
         return true;
     }
 
