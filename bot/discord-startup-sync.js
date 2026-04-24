@@ -23,6 +23,11 @@ const CUSTOM_EMOJI_SPECS = {
         filename: 'Roblox.png',
         fallback: '🎮'
     },
+    Robux: {
+        name: 'Robux',
+        filename: 'Robux.png',
+        fallback: '💸'
+    },
     RoDarkStudios: {
         name: 'RoDarkStudios',
         filename: 'RoDarkStudios.png',
@@ -333,7 +338,7 @@ async function syncStaffInfoChannel(channel) {
     await editMessageWithEmbed(message, embed);
 }
 
-async function syncGameTestInfoChannel(channel) {
+async function syncGameTestInfoChannel(channel, customEmojis) {
     const message = await getOrCreateMainMessage(channel);
     const guild = channel.guild;
     const embed = new EmbedBuilder()
@@ -368,11 +373,11 @@ async function syncGameTestInfoChannel(channel) {
                 inline: false
             },
             {
-                name: 'Rewards',
+                name: 'Robux Rewards',
                 value: [
-                    'Minor bug: **50 Robux**',
-                    'Medium bug: **200 Robux**',
-                    'Critical bug: **5,000 Robux**'
+                    `Minor bug: **50** ${customEmojis.Robux}`,
+                    `Medium bug: **200** ${customEmojis.Robux}`,
+                    `Critical bug: **5,000** ${customEmojis.Robux}`
                 ].join('\n'),
                 inline: false
             },
@@ -416,7 +421,7 @@ async function runStartupSync(client, control) {
     }
 
     if (channels.gameTestInfo) {
-        await syncGameTestInfoChannel(channels.gameTestInfo);
+        await syncGameTestInfoChannel(channels.gameTestInfo, customEmojis);
     }
 
     console.log('[discord-startup-sync] Startup channel sync completed.');
