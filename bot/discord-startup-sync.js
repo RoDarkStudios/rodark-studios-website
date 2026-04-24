@@ -45,6 +45,7 @@ const CHANNEL_IMAGE_FILENAMES = {
     info: 'Info.png',
     roles: 'Roles.png'
 };
+const BUG_REPORT_CHANNEL_ID = '1208767046184345610';
 
 const FALLBACK_CUSTOM_EMOJIS = Object.fromEntries(
     Object.entries(CUSTOM_EMOJI_SPECS).map(([label, spec]) => [label, spec.fallback])
@@ -350,7 +351,7 @@ async function syncGameTestInfoChannel(channel) {
             {
                 name: 'Bug Reports',
                 value: [
-                    'If you find a bug in either version, create a bug report with as much detail as possible.',
+                    `If you find a bug in either version, create a bug report in <#${BUG_REPORT_CHANNEL_ID}> with as much detail as possible.`,
                     'Include what happened, how to reproduce it, a screenshot of the in-game console, and preferably a video.'
                 ].join('\n'),
                 inline: false
