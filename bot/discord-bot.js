@@ -11,14 +11,14 @@ const {
     setDiscordBotTicketThreadRequester
 } = require('../api/_lib/discord-bot-control-store');
 const { getPostgresPool } = require('../api/_lib/postgres');
-const { decideTicketResponse, isPublicHelpQuestion } = require('./ai-ticket-assistant');
+const { decideTicketResponse, isPublicHelpQuestion, isUnsafeAdvantageQuestion } = require('./ai-ticket-assistant');
 const { runStartupSync } = require('./discord-startup-sync');
 
 const POLL_INTERVAL_MS = Number.parseInt(process.env.DISCORD_BOT_POLL_INTERVAL_MS || '5000', 10);
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const TICKET_GREETING = "You've contacted support. How can I help?";
 const HISTORY_FETCH_LIMIT = 15;
-const PUBLIC_HELP_FALLBACK_REPLY = 'Can you tell me a bit more about what you are trying to do in-game?';
+const PUBLIC_HELP_FALLBACK_REPLY = 'What exactly are you trying to do in-game, or what happened?';
 
 let client = null;
 let connecting = false;
@@ -206,6 +206,8 @@ async function handleTicketMessage(message) {
         }
         const latestRequesterText = getLatestRequesterTextFromHistory(historyMessages, thread.requesterUserId);
         const publicHelpQuestion = isPublicHelpQuestion(latestRequesterText);
+        const unsafeAdvantageQuestion = isUnsafeAdvantageQuestion(latestRequesterText);
+        const protectFromHandoff = publicHelpQuestion && !unsafeAdvantageQuestion;
 
         let decision;
         try {
@@ -221,7 +223,7 @@ async function handleTicketMessage(message) {
             if (!await isLatestRequesterMessage(message.channel, thread.requesterUserId, message.id)) {
                 return;
             }
-            if (publicHelpQuestion) {
+            if (protectFromHandoff) {
                 await sendReplyOrChannelMessage(message, {
                     content: PUBLIC_HELP_FALLBACK_REPLY
                 });
@@ -245,7 +247,7 @@ async function handleTicketMessage(message) {
         }
 
         if (decision.action === 'handoff') {
-            if (publicHelpQuestion) {
+            if (protectFromHandoff) {
                 await sendReplyOrChannelMessage(message, {
                     content: PUBLIC_HELP_FALLBACK_REPLY
                 });
@@ -261,7 +263,7 @@ async function handleTicketMessage(message) {
         }
 
         if (!decision.reply) {
-            if (publicHelpQuestion) {
+            if (protectFromHandoff) {
                 await sendReplyOrChannelMessage(message, {
                     content: PUBLIC_HELP_FALLBACK_REPLY
                 });

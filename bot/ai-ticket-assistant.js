@@ -58,6 +58,8 @@ const ASSISTANT_INSTRUCTIONS = [
     'If repo context is provided, treat it as the main evidence for game-specific answers and use it carefully.',
     'Safe repo scope is limited to client/shared, player-facing code and public constants/config exposed there.',
     'Normal player-help questions about visible gameplay systems, progression, UI, items, mechanics, and other player-facing behavior are allowed if the safe repo evidence supports the answer.',
+    'Default toward helping with visible gameplay, progression, unlocks, upgrades, items, movement, UI, timings, and other player-facing systems.',
+    'Do not handoff merely because a question is about how the game works or how to do something in-game.',
     'Do not handoff just because a question is about the game. If the topic appears player-facing and safe, investigate the repo tools first and answer when the evidence is good enough.',
     'If the topic appears player-facing and safe but the evidence is still thin, ask one short clarifying question before handing off.',
     'Never answer questions about server-side systems, exploits, admin or debug behavior, security-sensitive logic, anti-cheat, hidden formulas, private rates, hidden spawn logic, or other non-public internals that would create an unfair advantage.',
@@ -253,15 +255,32 @@ function isPublicHelpQuestion(text) {
         return false;
     }
 
-    if (/\b(exploit|exploiting|hack|hacking|cheat|cheating|dupe|duping|glitch|admin|owner|moderator|bypass|script|autofarm|auto farm|macro|anti.?cheat)\b/.test(normalizedText)) {
+    if (isUnsafeAdvantageQuestion(normalizedText)) {
         return false;
     }
 
-    if (/\b(how to|how do i|how can i|where do i|where can i|get|unlock|upgrade|use|find|available|obtain|access|open|start)\b/.test(normalizedText)) {
+    if (/\b(report|reported|ban|banned|appeal|appealed|moderation|moderator|staff application|staff app|partnership|sponsorship|sponsor)\b/.test(normalizedText)) {
+        return false;
+    }
+
+    if (/\b(how to|how do i|how can i|where do i|where can i|get|unlock|upgrade|use|find|available|obtain|access|open|start|buy|claim|equip|redeem|join|fix|build|place|spawn|earn|make|collect|complete)\b/.test(normalizedText)) {
         return true;
     }
 
-    return /^(how|what|where|can)\b/.test(normalizedText);
+    if (/\b(issue|problem|bug|broken|stuck|missing|not working|doesn't work|doesnt work|can't|cant|cannot|won't|wont|lag|slow|freeze|freezing)\b/.test(normalizedText)) {
+        return true;
+    }
+
+    return /^(how|what|where|when|why|can|is|are|does|do|did|will|would|should)\b/.test(normalizedText);
+}
+
+function isUnsafeAdvantageQuestion(text) {
+    const normalizedText = String(text || '').trim().toLowerCase();
+    if (!normalizedText) {
+        return false;
+    }
+
+    return /\b(exploit|exploiting|hack|hacking|cheat|cheating|dupe|duping|bypass|script executor|executor|autofarm|auto farm|macro|anti.?cheat|hidden formula|private rate|drop rate|spawn rate|seed|rng|random seed|internal|server.?side|serverside|server code|admin|owner commands|moderator commands|debug|backend|datastore|remote event|remote function)\b/.test(normalizedText);
 }
 
 function extractResponseText(payload) {
@@ -661,7 +680,7 @@ async function decideTicketResponse(options) {
 
             return {
                 action: 'reply',
-                reply: 'What exactly are you trying to get or unlock in-game?',
+                reply: 'What exactly are you trying to do in-game, or what happened?',
                 handoffReason: ''
             };
         }
@@ -670,14 +689,15 @@ async function decideTicketResponse(options) {
     }
 
     return {
-        action: 'handoff',
-        reply: '',
-        handoffReason: 'repo_agent_step_limit'
+        action: publicHelpQuestion ? 'reply' : 'handoff',
+        reply: publicHelpQuestion ? 'What exactly are you trying to do in-game, or what happened?' : '',
+        handoffReason: publicHelpQuestion ? '' : 'repo_agent_step_limit'
     };
 }
 
 module.exports = {
     decideTicketResponse,
     hasOpenAiConfig,
-    isPublicHelpQuestion
+    isPublicHelpQuestion,
+    isUnsafeAdvantageQuestion
 };
