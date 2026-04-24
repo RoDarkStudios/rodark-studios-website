@@ -375,9 +375,9 @@ async function syncGameTestInfoChannel(channel, customEmojis) {
             {
                 name: 'Robux Rewards',
                 value: [
-                    `Minor bug: **50** ${customEmojis.Robux}`,
-                    `Medium bug: **200** ${customEmojis.Robux}`,
-                    `Critical bug: **5,000** ${customEmojis.Robux}`
+                    `Minor bug: ${customEmojis.Robux} **50**`,
+                    `Medium bug: ${customEmojis.Robux} **200**`,
+                    `Critical bug: ${customEmojis.Robux} **5,000**`
                 ].join('\n'),
                 inline: false
             },
