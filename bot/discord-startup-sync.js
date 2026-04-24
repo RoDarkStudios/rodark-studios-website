@@ -46,6 +46,7 @@ const CHANNEL_IMAGE_FILENAMES = {
     roles: 'Roles.png'
 };
 const BUG_REPORT_CHANNEL_ID = '1208767046184345610';
+const TESTING_BUG_REPORT_CHANNEL_ID = '1207367656609423360';
 
 const FALLBACK_CUSTOM_EMOJIS = Object.fromEntries(
     Object.entries(CUSTOM_EMOJI_SPECS).map(([label, spec]) => [label, spec.fallback])
@@ -338,7 +339,11 @@ async function syncGameTestInfoChannel(channel) {
     const embed = new EmbedBuilder()
         .setTitle('Game Testing')
         .setColor(0x06b6d4)
-        .setDescription('Anyone is welcome to help test Coding Simulator 2.')
+        .setDescription([
+            'Anyone is welcome to help test Coding Simulator 2.',
+            '',
+            'Test server: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>'
+        ].join('\n'))
         .addFields(
             {
                 name: 'Game Versions',
@@ -351,7 +356,8 @@ async function syncGameTestInfoChannel(channel) {
             {
                 name: 'Bug Reports',
                 value: [
-                    `If you find a bug in either version, create a bug report in <#${BUG_REPORT_CHANNEL_ID}> with as much detail as possible.`,
+                    `If you find a bug in the **test game**, report it in <#${TESTING_BUG_REPORT_CHANNEL_ID}>.`,
+                    `If you find a bug in the **live game**, report it in <#${BUG_REPORT_CHANNEL_ID}>.`,
                     'Include what happened, how to reproduce it, a screenshot of the in-game console, and preferably a video.'
                 ].join('\n'),
                 inline: false
@@ -379,11 +385,6 @@ async function syncGameTestInfoChannel(channel) {
                 ].join('\n'),
                 inline: false
             },
-            {
-                name: 'Links',
-                value: 'Test game: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>',
-                inline: false
-            }
         );
 
     await editMessageWithEmbed(message, embed);
