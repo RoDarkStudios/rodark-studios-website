@@ -1638,10 +1638,41 @@ function resolveDiscordChannelInputValue(input, channelMaps) {
     return rawValue;
 }
 
+function clearDiscordChannelSearchState(input) {
+    if (!input) {
+        return;
+    }
+
+    delete input.dataset.searchMode;
+    delete input.dataset.searchRestoreId;
+    delete input.dataset.searchRestoreLabel;
+    delete input.dataset.searchRestoreValue;
+}
+
 function bindDiscordChannelAutocompleteInput(input, getChannelMaps) {
     if (!input) {
         return;
     }
+
+    input.addEventListener('focus', () => {
+        const channelMaps = typeof getChannelMaps === 'function'
+            ? getChannelMaps()
+            : { byId: new Map(), labelToId: new Map() };
+        const currentValue = String(input.value || '').trim();
+        const selectedId = input.dataset.selectedId ? String(input.dataset.selectedId) : '';
+        const selectedLabel = input.dataset.selectedLabel ? String(input.dataset.selectedLabel) : '';
+        const hasKnownSelectedChannel = selectedId && selectedLabel && channelMaps && channelMaps.byId && channelMaps.byId.has(selectedId);
+
+        if (!hasKnownSelectedChannel || !currentValue || currentValue.toLowerCase() !== selectedLabel.toLowerCase()) {
+            return;
+        }
+
+        input.dataset.searchMode = 'true';
+        input.dataset.searchRestoreId = selectedId;
+        input.dataset.searchRestoreLabel = selectedLabel;
+        input.dataset.searchRestoreValue = currentValue;
+        input.value = '';
+    });
 
     input.addEventListener('input', () => {
         const channelMaps = typeof getChannelMaps === 'function'
@@ -1651,12 +1682,18 @@ function bindDiscordChannelAutocompleteInput(input, getChannelMaps) {
         if (resolvedId && channelMaps && channelMaps.byId && channelMaps.byId.has(resolvedId)) {
             input.dataset.selectedId = resolvedId;
             input.dataset.selectedLabel = formatDiscordChannelOptionLabel(channelMaps.byId.get(resolvedId));
+            clearDiscordChannelSearchState(input);
             return;
         }
 
         if (!String(input.value || '').trim()) {
+            if (input.dataset.searchMode === 'true') {
+                return;
+            }
+
             input.dataset.selectedId = '';
             input.dataset.selectedLabel = '';
+            clearDiscordChannelSearchState(input);
         }
     });
 
@@ -1666,6 +1703,24 @@ function bindDiscordChannelAutocompleteInput(input, getChannelMaps) {
             : { byId: new Map(), labelToId: new Map() };
         const resolvedId = resolveDiscordChannelInputValue(input, channelMaps);
         setDiscordChannelInputDisplayValue(input, resolvedId, channelMaps);
+        clearDiscordChannelSearchState(input);
+    });
+
+    input.addEventListener('blur', () => {
+        const hasValue = String(input.value || '').trim();
+        if (hasValue || input.dataset.searchMode !== 'true') {
+            clearDiscordChannelSearchState(input);
+            return;
+        }
+
+        const restoreValue = input.dataset.searchRestoreValue ? String(input.dataset.searchRestoreValue) : '';
+        const restoreId = input.dataset.searchRestoreId ? String(input.dataset.searchRestoreId) : '';
+        const restoreLabel = input.dataset.searchRestoreLabel ? String(input.dataset.searchRestoreLabel) : restoreValue;
+
+        input.value = restoreValue;
+        input.dataset.selectedId = restoreId;
+        input.dataset.selectedLabel = restoreLabel;
+        clearDiscordChannelSearchState(input);
     });
 }
 
