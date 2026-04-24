@@ -301,15 +301,34 @@ async function syncRolesChannel(channel) {
 async function syncStaffInfoChannel(channel) {
     const message = await getOrCreateMainMessage(channel);
     const guild = channel.guild;
+    const embed = new EmbedBuilder()
+        .setTitle('Moderator Info')
+        .setColor(0xf59e0b)
+        .setDescription(`${getRoleMention(guild, 'Moderator')} responsibilities and expectations.`)
+        .addFields(
+            {
+                name: 'Responsibilities',
+                value: 'Help members, answer questions and tickets, and enforce the rules, including timeouts when needed.',
+                inline: false
+            },
+            {
+                name: 'Game Knowledge',
+                value: 'Stay up to date on how the game works and on new updates so you can answer player questions accurately.',
+                inline: false
+            },
+            {
+                name: 'Escalation',
+                value: `If you are unsure how to handle something, ask an ${getRoleMention(guild, 'Owner')}.`,
+                inline: false
+            },
+            {
+                name: 'Permissions',
+                value: 'Do not use moderator permissions for personal reasons or jokes. Permission abuse will result in the role being revoked.',
+                inline: false
+            }
+        );
 
-    await editMessageWithContent(message, [
-        `## ${getRoleMention(guild, 'Moderator')}`,
-        'Moderators help members, answer questions and tickets, and enforce the server rules, including timing members out when needed.',
-        'Stay up to date on how the game works and on new updates so you can answer player questions accurately.',
-        '',
-        `If you are unsure how to handle something, ask an ${getRoleMention(guild, 'Owner')}.`,
-        'Permission abuse will result in the role being revoked.'
-    ].join('\n'));
+    await editMessageWithEmbed(message, embed);
 }
 
 async function syncGameTestInfoChannel(channel) {
