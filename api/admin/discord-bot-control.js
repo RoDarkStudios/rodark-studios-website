@@ -33,15 +33,11 @@ async function discordApiGet(pathname) {
 }
 
 function getGuildDiscoveryChannelIds(control) {
-    const ai = control && control.aiTicketAssistant && typeof control.aiTicketAssistant === 'object'
-        ? control.aiTicketAssistant
-        : {};
     const startup = control && control.startupContentSync && typeof control.startupContentSync === 'object'
         ? control.startupContentSync
         : {};
 
     return [
-        ai.ticketCategoryId,
         startup.rulesChannelId,
         startup.infoChannelId,
         startup.rolesChannelId,
@@ -199,9 +195,6 @@ module.exports = async (req, res) => {
         }
 
         const body = await readJsonBody(req);
-        const assistantConfig = body && typeof body.aiTicketAssistant === 'object' && body.aiTicketAssistant
-            ? body.aiTicketAssistant
-            : null;
         const startupContentSync = body && typeof body.startupContentSync === 'object' && body.startupContentSync
             ? body.startupContentSync
             : null;
@@ -213,18 +206,6 @@ module.exports = async (req, res) => {
 
         if (body && Object.prototype.hasOwnProperty.call(body, 'guildId')) {
             patch.guildId = body.guildId;
-        }
-
-        if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'enabled')) {
-            patch.aiTicketAssistantEnabled = Boolean(assistantConfig.enabled);
-        }
-
-        if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'ticketCategoryId')) {
-            patch.aiTicketCategoryId = assistantConfig.ticketCategoryId;
-        }
-
-        if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'ownerRoleId')) {
-            patch.aiTicketOwnerRoleId = assistantConfig.ownerRoleId;
         }
 
         if (startupContentSync && Object.prototype.hasOwnProperty.call(startupContentSync, 'rulesChannelId')) {
