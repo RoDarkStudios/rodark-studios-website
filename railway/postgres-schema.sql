@@ -14,6 +14,7 @@ create table if not exists discord_bot_control (
     runtime_status text not null default 'offline',
     last_seen_at timestamptz,
     last_error text,
+    guild_id text,
     ai_ticket_assistant_enabled boolean not null default false,
     ai_ticket_category_id text,
     ai_ticket_owner_role_id text,

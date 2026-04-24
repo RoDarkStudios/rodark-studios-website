@@ -50,6 +50,10 @@ function getGuildDiscoveryChannelIds(control) {
 }
 
 async function resolveDiscordGuildId(control) {
+    if (control && control.guildId) {
+        return String(control.guildId);
+    }
+
     const configuredGuildId = String(process.env.DISCORD_BOT_GUILD_ID || '').trim();
     if (configuredGuildId) {
         return configuredGuildId;
@@ -163,6 +167,10 @@ module.exports = async (req, res) => {
 
         if (body && Object.prototype.hasOwnProperty.call(body, 'desiredEnabled')) {
             patch.desiredEnabled = Boolean(body.desiredEnabled);
+        }
+
+        if (body && Object.prototype.hasOwnProperty.call(body, 'guildId')) {
+            patch.guildId = body.guildId;
         }
 
         if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'enabled')) {

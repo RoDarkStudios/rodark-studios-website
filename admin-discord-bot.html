@@ -66,6 +66,37 @@
                                     Connect bot
                                 </button>
 
+                                <section class="admin-discord-feature-card" aria-labelledby="discord-server-title">
+                                    <div class="admin-discord-feature-head">
+                                        <div>
+                                            <h2 id="discord-server-title" class="admin-tool-title">Discord Server</h2>
+                                            <p class="admin-tool-note">
+                                                Set the one Discord server this bot should manage so channel pickers can load without relying on environment variables.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <label class="admin-field">
+                                        <span class="admin-label">Server ID</span>
+                                        <input
+                                            id="discord-guild-id"
+                                            class="admin-input"
+                                            type="text"
+                                            inputmode="numeric"
+                                            autocomplete="off"
+                                            placeholder="Discord server ID"
+                                        >
+                                    </label>
+
+                                    <p id="discord-guild-summary" class="admin-tool-note">
+                                        No Discord server configured yet.
+                                    </p>
+
+                                    <button id="discord-guild-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
+                                        Save server ID
+                                    </button>
+                                </section>
+
                                 <section class="admin-discord-feature-card" aria-labelledby="discord-ai-assistant-title">
                                     <div class="admin-discord-feature-head">
                                         <div>

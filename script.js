@@ -1513,6 +1513,14 @@ function formatDiscordAiSummary(control) {
     return `Enabled. ${categoryLabel}${ownerLabel}`;
 }
 
+function formatDiscordGuildSummary(control) {
+    if (control && control.guildId) {
+        return `Server configured: ${control.guildId}.`;
+    }
+
+    return 'No Discord server configured yet.';
+}
+
 function getDiscordChannelLookup(payload) {
     const channelLookup = payload && payload.channelLookup && typeof payload.channelLookup === 'object'
         ? payload.channelLookup
@@ -1687,6 +1695,9 @@ function renderDiscordBotControl(control, options) {
     const statusTitle = document.getElementById('discord-bot-status-title');
     const statusDetail = document.getElementById('discord-bot-status-detail');
     const toggleButton = document.getElementById('discord-bot-toggle-btn');
+    const guildIdInput = document.getElementById('discord-guild-id');
+    const guildSummary = document.getElementById('discord-guild-summary');
+    const guildSaveButton = document.getElementById('discord-guild-save-btn');
     const aiEnabledCheckbox = document.getElementById('discord-ai-enabled');
     const ticketCategoryInput = document.getElementById('discord-ticket-category-id');
     const ownerRoleInput = document.getElementById('discord-owner-role-id');
@@ -1701,6 +1712,7 @@ function renderDiscordBotControl(control, options) {
     const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
     const channelLookupSummary = document.getElementById('discord-channel-lookup-summary');
     const formatted = formatDiscordBotStatus(control);
+    const preserveGuildForm = Boolean(options && options.preserveGuildForm);
     const preserveAssistantForm = Boolean(options && options.preserveAssistantForm);
     const preserveStartupSyncForm = Boolean(options && options.preserveStartupSyncForm);
     const aiControl = getDiscordAiAssistantControl(control);
@@ -1727,6 +1739,15 @@ function renderDiscordBotControl(control, options) {
         toggleButton.textContent = formatted.buttonText;
         toggleButton.dataset.desiredEnabled = formatted.desiredEnabled ? 'true' : 'false';
         toggleButton.disabled = false;
+    }
+    if (!preserveGuildForm && guildIdInput) {
+        guildIdInput.value = control && control.guildId ? control.guildId : '';
+    }
+    if (!preserveGuildForm && guildSummary) {
+        guildSummary.textContent = formatDiscordGuildSummary(control);
+    }
+    if (guildSaveButton) {
+        guildSaveButton.disabled = false;
     }
     if (!preserveAssistantForm && aiEnabledCheckbox) {
         aiEnabledCheckbox.checked = aiControl.enabled;
@@ -1816,6 +1837,17 @@ async function setDiscordBotDesiredState(desiredEnabled) {
     };
 }
 
+async function saveDiscordBotGuildConfig(guildId) {
+    const payload = await postJson('/api/admin/discord-bot-control', {
+        guildId: guildId ? String(guildId).trim() : ''
+    });
+
+    return {
+        control: payload.control || null,
+        channelLookup: getDiscordChannelLookup(payload)
+    };
+}
+
 async function saveDiscordBotAssistantConfig(config) {
     const payload = await postJson('/api/admin/discord-bot-control', {
         aiTicketAssistant: {
@@ -1857,6 +1889,8 @@ async function initDiscordBotDashboard() {
 
     const deniedElement = document.getElementById('admin-access-denied');
     const toggleButton = document.getElementById('discord-bot-toggle-btn');
+    const guildIdInput = document.getElementById('discord-guild-id');
+    const guildSaveButton = document.getElementById('discord-guild-save-btn');
     const aiEnabledCheckbox = document.getElementById('discord-ai-enabled');
     const ticketCategoryInput = document.getElementById('discord-ticket-category-id');
     const ownerRoleInput = document.getElementById('discord-owner-role-id');
@@ -1882,6 +1916,7 @@ async function initDiscordBotDashboard() {
         deniedElement.classList.add('hidden');
     }
     ownedContent.classList.remove('hidden');
+    dashboard.dataset.guildDirty = 'false';
     dashboard.dataset.aiDirty = 'false';
     dashboard.dataset.startupSyncDirty = 'false';
 
@@ -1889,6 +1924,7 @@ async function initDiscordBotDashboard() {
         try {
             const control = await fetchDiscordBotControl();
             renderDiscordBotControl(control.control, {
+                preserveGuildForm: dashboard.dataset.guildDirty === 'true',
                 preserveAssistantForm: dashboard.dataset.aiDirty === 'true',
                 preserveStartupSyncForm: dashboard.dataset.startupSyncDirty === 'true',
                 channelLookup: control.channelLookup
@@ -1903,6 +1939,9 @@ async function initDiscordBotDashboard() {
             }
             if (startupSyncSaveButton) {
                 startupSyncSaveButton.disabled = true;
+            }
+            if (guildSaveButton) {
+                guildSaveButton.disabled = true;
             }
             setDiscordBotStatusMessage(error.message || 'Failed to load Discord bot status.', 'error');
         }
@@ -1935,6 +1974,10 @@ async function initDiscordBotDashboard() {
         dashboard.dataset.aiDirty = 'true';
     }
 
+    function markGuildFormDirty() {
+        dashboard.dataset.guildDirty = 'true';
+    }
+
     function markStartupSyncFormDirty() {
         dashboard.dataset.startupSyncDirty = 'true';
     }
@@ -1943,6 +1986,9 @@ async function initDiscordBotDashboard() {
         return buildDiscordChannelLookupMaps(discordChannelLookupState);
     }
 
+    if (guildIdInput) {
+        guildIdInput.addEventListener('input', markGuildFormDirty);
+    }
     if (aiEnabledCheckbox) {
         aiEnabledCheckbox.addEventListener('change', markAssistantFormDirty);
     }
@@ -1973,6 +2019,25 @@ async function initDiscordBotDashboard() {
     bindDiscordChannelAutocompleteInput(startupRolesChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(startupStaffInfoChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(startupGameTestInfoChannelInput, getCurrentDiscordChannelMaps);
+
+    if (guildSaveButton) {
+        guildSaveButton.addEventListener('click', async () => {
+            guildSaveButton.disabled = true;
+            setDiscordBotStatusMessage('Saving Discord server ID...', 'info');
+
+            try {
+                const control = await saveDiscordBotGuildConfig(guildIdInput ? guildIdInput.value : '');
+                dashboard.dataset.guildDirty = 'false';
+                renderDiscordBotControl(control.control, {
+                    channelLookup: control.channelLookup
+                });
+                setDiscordBotStatusMessage('Discord server ID saved.', 'success');
+            } catch (error) {
+                guildSaveButton.disabled = false;
+                setDiscordBotStatusMessage(error.message || 'Failed to save Discord server ID.', 'error');
+            }
+        });
+    }
 
     if (aiSaveButton) {
         aiSaveButton.addEventListener('click', async () => {

@@ -58,6 +58,11 @@ async function ensureDiscordBotControlSchema() {
 
     await postgresQuery(`
         alter table discord_bot_control
+        add column if not exists guild_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
         add column if not exists ai_ticket_category_id text
     `);
 
@@ -128,6 +133,7 @@ function mapRowToDiscordBotControl(row) {
         updatedAt: toIsoString(row.updated_at),
         updatedByUserId: row.updated_by_user_id ? String(row.updated_by_user_id) : null,
         updatedByUsername: row.updated_by_username ? String(row.updated_by_username) : null,
+        guildId: row.guild_id ? String(row.guild_id) : null,
         aiTicketAssistant: {
             enabled: Boolean(row.ai_ticket_assistant_enabled),
             ticketCategoryId: row.ai_ticket_category_id ? String(row.ai_ticket_category_id) : null,
@@ -176,6 +182,7 @@ async function getDiscordBotControl() {
             updated_at,
             updated_by_user_id,
             updated_by_username,
+            guild_id,
             ai_ticket_assistant_enabled,
             ai_ticket_category_id,
             ai_ticket_owner_role_id,
@@ -203,6 +210,9 @@ async function updateDiscordBotControl(patch, user) {
     const desiredEnabled = patch && Object.prototype.hasOwnProperty.call(patch, 'desiredEnabled')
         ? Boolean(patch.desiredEnabled)
         : currentControl.desiredEnabled;
+    const guildId = patch && Object.prototype.hasOwnProperty.call(patch, 'guildId')
+        ? normalizeOptionalSnowflake(patch.guildId, 'Discord server ID')
+        : (currentControl.guildId ? String(currentControl.guildId) : null);
     const aiTicketAssistantEnabled = patch && Object.prototype.hasOwnProperty.call(patch, 'aiTicketAssistantEnabled')
         ? Boolean(patch.aiTicketAssistantEnabled)
         : Boolean(currentControl.aiTicketAssistant && currentControl.aiTicketAssistant.enabled);
@@ -254,17 +264,18 @@ async function updateDiscordBotControl(patch, user) {
         update discord_bot_control
         set
             desired_enabled = $2,
-            ai_ticket_assistant_enabled = $3,
-            ai_ticket_category_id = $4,
-            ai_ticket_owner_role_id = $5,
-            content_rules_channel_id = $6,
-            content_info_channel_id = $7,
-            content_roles_channel_id = $8,
-            content_staff_info_channel_id = $9,
-            content_game_test_info_channel_id = $10,
+            guild_id = $3,
+            ai_ticket_assistant_enabled = $4,
+            ai_ticket_category_id = $5,
+            ai_ticket_owner_role_id = $6,
+            content_rules_channel_id = $7,
+            content_info_channel_id = $8,
+            content_roles_channel_id = $9,
+            content_staff_info_channel_id = $10,
+            content_game_test_info_channel_id = $11,
             updated_at = now(),
-            updated_by_user_id = $11,
-            updated_by_username = $12,
+            updated_by_user_id = $12,
+            updated_by_username = $13,
             last_error = case when $2 = false then null else last_error end
         where id = $1
         returning
@@ -275,6 +286,7 @@ async function updateDiscordBotControl(patch, user) {
             updated_at,
             updated_by_user_id,
             updated_by_username,
+            guild_id,
             ai_ticket_assistant_enabled,
             ai_ticket_category_id,
             ai_ticket_owner_role_id,
@@ -286,6 +298,7 @@ async function updateDiscordBotControl(patch, user) {
     `, [
         CONTROL_ID,
         desiredEnabled,
+        guildId,
         aiTicketAssistantEnabled,
         aiTicketCategoryId,
         aiTicketOwnerRoleId,
@@ -323,6 +336,7 @@ async function setDiscordBotRuntimeStatus(runtimeStatus, lastError) {
             updated_at,
             updated_by_user_id,
             updated_by_username,
+            guild_id,
             ai_ticket_assistant_enabled,
             ai_ticket_category_id,
             ai_ticket_owner_role_id,
