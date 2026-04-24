@@ -26,6 +26,17 @@ const PUBLIC_HELP_RESCUE_SCHEMA = {
     required: ['reply']
 };
 
+const AMBIGUITY_CLARIFIER_SCHEMA = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        reply: {
+            type: 'string'
+        }
+    },
+    required: ['reply']
+};
+
 const RESPONSE_SCHEMA = {
     type: 'object',
     additionalProperties: false,
@@ -51,6 +62,8 @@ const ASSISTANT_INSTRUCTIONS = [
     'Be concise, calm, and natural. One short message is preferred.',
     'First decide whether the user has actually explained the problem. If not, ask one simple clarifying question and let them explain before you start troubleshooting.',
     'After the problem is clear, ask at most one follow-up question, and only if that question is genuinely useful for isolating the issue.',
+    'If the user wording could reasonably mean more than one thing, ask one clarifying question instead of answering multiple interpretations.',
+    'Do not answer two possible meanings in one reply. Do not use phrasing like "if you mean X" and then also answer "if you mean Y".',
     'Do not bombard the user with questions. Do not ask for multiple things at once unless there is a very strong reason.',
     'Prefer the most informative next question, not the most generic one.',
     'Use good judgment for Roblox support: ask about the exact in-game action, what they expected, what happened instead, whether it happens consistently, and what they already tried, but only when those details are actually the next useful thing to ask.',
@@ -467,6 +480,15 @@ function parseDecisionText(rawText) {
     return null;
 }
 
+function replyLooksAmbiguous(reply) {
+    const normalizedReply = String(reply || '').trim().toLowerCase();
+    if (!normalizedReply) {
+        return false;
+    }
+
+    return /\bif you mean\b|\bif instead\b|\balternatively\b|\bon the other hand\b|\bif you're asking about\b/.test(normalizedReply);
+}
+
 async function requestOpenAiResponse(body) {
     const response = await fetch(OPENAI_API_URL, {
         method: 'POST',
@@ -526,6 +548,7 @@ async function buildPublicHelpRescueReply(options) {
         instructions: [
             'You are rescuing a failed support-bot response for a Roblox game support ticket.',
             'Use only the provided safe client/shared repo evidence.',
+            'If the player question is ambiguous or could refer to more than one in-game system, ask one clarifying question instead of answering multiple interpretations.',
             'Answer the player directly if the evidence supports a reasonable answer.',
             'If the evidence is still thin, ask one short, specific clarifying question tied to the player request.',
             'Do not hand off. Do not mention repo limitations. Be concise and natural.'
@@ -561,6 +584,73 @@ async function buildPublicHelpRescueReply(options) {
     }
 
     return typeof parsed.reply === 'string' ? parsed.reply.trim() : '';
+}
+
+async function buildAmbiguityClarifier(options) {
+    const latestRequesterText = String(options && options.latestRequesterText || '').trim();
+    if (!latestRequesterText) {
+        return '';
+    }
+
+    const repoContext = await getGameRepoContext({
+        historyMessages: options && Array.isArray(options.historyMessages) ? options.historyMessages : [],
+        requesterUserId: options && options.requesterUserId ? String(options.requesterUserId) : null
+    }).catch(() => null);
+
+    const ambiguityPayload = await requestOpenAiResponse({
+        model: OPENAI_MODEL,
+        reasoning: {
+            effort: 'medium'
+        },
+        max_output_tokens: 160,
+        text: {
+            verbosity: 'low',
+            format: {
+                type: 'json_schema',
+                name: 'ambiguity_clarifier',
+                schema: AMBIGUITY_CLARIFIER_SCHEMA,
+                strict: true
+            }
+        },
+        instructions: [
+            'You are writing one clarifying question for a Roblox game support ticket.',
+            'The player question is ambiguous and could refer to more than one in-game system or meaning.',
+            'Ask exactly one short clarifying question.',
+            'Do not answer the question.',
+            'Do not provide multiple solutions.',
+            'Do not use bullets or explain your reasoning.'
+        ].join(' '),
+        input: [
+            {
+                role: 'user',
+                content: [
+                    {
+                        type: 'input_text',
+                        text: [
+                            `Player question: ${latestRequesterText}`,
+                            repoContext && Array.isArray(repoContext.snippets) && repoContext.snippets.length
+                                ? `Relevant safe repo evidence:\n${repoContext.snippets.join('\n\n---\n\n')}`
+                                : 'No extra repo evidence is available.'
+                        ].join('\n\n')
+                    }
+                ]
+            }
+        ]
+    });
+
+    const parsed = parseDecisionText(extractResponseText(ambiguityPayload)) || (() => {
+        try {
+            return JSON.parse(extractResponseText(ambiguityPayload));
+        } catch (error) {
+            return null;
+        }
+    })();
+
+    if (!parsed || typeof parsed.reply !== 'string') {
+        return '';
+    }
+
+    return parsed.reply.trim();
 }
 
 async function decideTicketResponse(options) {
@@ -681,6 +771,20 @@ async function decideTicketResponse(options) {
             return {
                 action: 'reply',
                 reply: 'What exactly are you trying to do in-game, or what happened?',
+                handoffReason: ''
+            };
+        }
+
+        if (parsed.action === 'reply' && replyLooksAmbiguous(parsed.reply)) {
+            const clarifierReply = await buildAmbiguityClarifier({
+                historyMessages,
+                requesterUserId,
+                latestRequesterText
+            });
+
+            return {
+                action: 'reply',
+                reply: clarifierReply || 'Can you clarify exactly what you mean so I point you to the right thing?',
                 handoffReason: ''
             };
         }
