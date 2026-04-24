@@ -380,10 +380,7 @@ async function syncGameTestInfoChannel(channel) {
             },
             {
                 name: 'Links',
-                value: [
-                    'Test game: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>',
-                    'Live game: <https://www.roblox.com/games/109141895577255/Coding-Simulator-2>'
-                ].join('\n'),
+                value: 'Test game: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>',
                 inline: false
             }
         );
