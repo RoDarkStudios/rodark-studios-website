@@ -342,7 +342,7 @@ async function syncGameTestInfoChannel(channel) {
         .setDescription([
             'Anyone is welcome to help test Coding Simulator 2.',
             '',
-            'Test server: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>'
+            'Test game: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>'
         ].join('\n'))
         .addFields(
             {
