@@ -334,43 +334,61 @@ async function syncStaffInfoChannel(channel) {
 async function syncGameTestInfoChannel(channel) {
     const message = await getOrCreateMainMessage(channel);
     const guild = channel.guild;
+    const embed = new EmbedBuilder()
+        .setTitle('Game Testing')
+        .setColor(0x06b6d4)
+        .setDescription('Anyone is welcome to help test Coding Simulator 2.')
+        .addFields(
+            {
+                name: 'Game Versions',
+                value: [
+                    'The **live game** is the main public version.',
+                    'The **test game** is where upcoming changes can be tried before they are released.'
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Bug Reports',
+                value: [
+                    'If you find a bug in either version, create a bug report with as much detail as possible.',
+                    'Include what happened, how to reproduce it, a screenshot of the in-game console, and preferably a video.'
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Console',
+                value: 'To open the console, press `F9` or type `/console` in the in-game chat.',
+                inline: false
+            },
+            {
+                name: 'Rewards',
+                value: [
+                    'Minor bug: **50 Robux**',
+                    'Medium bug: **200 Robux**',
+                    'Critical bug: **5,000 Robux**'
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Important',
+                value: [
+                    'Only the first valid report for a bug will receive a reward.',
+                    'You must have been in the Roblox group for at least 2 weeks to receive a payout.',
+                    `If your bug report qualifies for a reward, notify an ${getRoleMention(guild, 'Owner')}.`
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: 'Links',
+                value: [
+                    'Test game: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>',
+                    'Live game: <https://www.roblox.com/games/109141895577255/Coding-Simulator-2>'
+                ].join('\n'),
+                inline: false
+            }
+        );
 
-    await editMessageWithContent(message, [
-        '## Game Testing',
-        'Anyone is welcome to help test Coding Simulator 2.',
-        '',
-        'There are two versions of the game:',
-        '- The **live game** is the main public version.',
-        '- The **test game** is where upcoming changes can be tried before they are released to the live game.',
-        '',
-        'If you find a bug in either version, or have feedback on new changes, create a bug report with as much detail as possible.',
-        '',
-        'If you are reporting a bug, include:',
-        '- What happened and how to reproduce it',
-        '- A screenshot of the in-game console immediately after the bug happened',
-        '- Preferably a video of the bug happening',
-        '',
-        'To open the console, press `F9` or type `/console` in the in-game chat.',
-        '',
-        'We review all submissions and may award Robux depending on severity:',
-        '- Minor bug: **50 Robux**',
-        '- Medium bug: **200 Robux**',
-        '- Critical bug: **5,000 Robux**',
-        '',
-        'If multiple people report the same bug, only the first valid report we see will receive a reward.',
-        '',
-        'To receive any Robux payout, you must have been in the Roblox group for at least 2 weeks due to the Roblox group payout system.',
-        `If your bug report qualifies for a reward, notify an ${getRoleMention(guild, 'Owner')} and your payout can be arranged.`,
-        '',
-        'Test game: <https://www.roblox.com/games/94676081033757/Coding-Simulator-2>',
-        'Live game: <https://www.roblox.com/games/109141895577255/Coding-Simulator-2>'
-    ].join('\n'), {
-        allowedMentions: {
-            roles: guild.roles.cache
-                .filter((role) => role.name.toLowerCase() === 'owner')
-                .map((role) => role.id)
-        }
-    });
+    await editMessageWithEmbed(message, embed);
 }
 
 async function runStartupSync(client, control) {
