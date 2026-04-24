@@ -310,7 +310,7 @@ async function syncStaffInfoChannel(channel) {
     const guild = channel.guild;
     const embed = new EmbedBuilder()
         .setTitle('Moderator Info')
-        .setColor(0xf59e0b)
+        .setColor(0x2ecc71)
         .setDescription(`${getRoleMention(guild, 'Moderator')} responsibilities and expectations.`)
         .addFields(
             {
