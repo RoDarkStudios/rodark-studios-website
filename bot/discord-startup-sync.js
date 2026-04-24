@@ -304,11 +304,11 @@ async function syncStaffInfoChannel(channel) {
 
     await editMessageWithContent(message, [
         `## ${getRoleMention(guild, 'Moderator')}`,
-        'Your job is to help members, handle tickets, and enforce the server rules fairly and consistently.',
-        'When moderating, stay calm, use good judgement, and choose the least severe action that reasonably resolves the situation.',
+        'Moderators help members, answer questions and tickets, and enforce the server rules, including timing members out when needed.',
+        'Stay up to date on how the game works and on new updates so you can answer player questions accurately.',
         '',
-        `If a case is unclear, sensitive, or likely to cause issues, consult another staff member or an ${getRoleMention(guild, 'Owner')} before escalating further.`,
-        `Do not abuse your permissions, argue publicly with members, or make server changes without approval from an ${getRoleMention(guild, 'Owner')}.`
+        `If you are unsure how to handle something, ask an ${getRoleMention(guild, 'Owner')}.`,
+        'Permission abuse will result in the role being revoked.'
     ].join('\n'));
 }
 
