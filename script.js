@@ -1551,9 +1551,11 @@ function formatDiscordChannelOptionLabel(channel) {
         return '';
     }
 
-    const prefix = channel.type === 4 ? 'Category' : '#';
-    const parentSuffix = channel.parentName && channel.type !== 4 ? ` (${channel.parentName})` : '';
-    return `${prefix}${channel.name}${parentSuffix} • ${channel.id}`;
+    if (channel.type === 4) {
+        return String(channel.name);
+    }
+
+    return `#${channel.name}`;
 }
 
 function buildDiscordChannelLookupMaps(channelLookup) {
@@ -1734,15 +1736,8 @@ function formatDiscordStartupSyncSummary(control) {
         ['Game-Test-Info', startupSync.gameTestInfoChannelId]
     ];
 
-    const configured = entries
-        .filter(([, value]) => value)
-        .map(([label, value]) => `${label}: ${value}`);
-
-    if (!configured.length) {
-        return 'No startup sync channels configured yet.';
-    }
-
-    return `Configured channels -> ${configured.join(' | ')}`;
+    const configuredCount = entries.filter(([, value]) => value).length;
+    return configuredCount ? '' : 'Startup sync channels are not configured yet.';
 }
 
 function renderDiscordBotControl(control, options) {
@@ -1772,7 +1767,18 @@ function renderDiscordBotControl(control, options) {
     const preserveStartupSyncForm = Boolean(options && options.preserveStartupSyncForm);
     const aiControl = getDiscordAiAssistantControl(control);
     const startupSyncControl = getDiscordStartupSyncControl(control);
-    const channelLookup = getDiscordChannelLookup(options);
+    const requestedChannelLookup = getDiscordChannelLookup(options);
+    const shouldKeepExistingChannelLookup = !requestedChannelLookup.channels.length
+        && Boolean(requestedChannelLookup.error)
+        && Array.isArray(discordChannelLookupState.channels)
+        && discordChannelLookupState.channels.length > 0;
+    const channelLookup = shouldKeepExistingChannelLookup
+        ? {
+            guildId: discordChannelLookupState.guildId,
+            channels: discordChannelLookupState.channels,
+            error: requestedChannelLookup.error
+        }
+        : requestedChannelLookup;
     discordChannelLookupState = channelLookup;
     const channelMaps = buildDiscordChannelLookupMaps(channelLookup);
     const categoryChannels = channelLookup.channels.filter((channel) => channel.type === 4);
@@ -1835,19 +1841,30 @@ function renderDiscordBotControl(control, options) {
         setDiscordChannelInputDisplayValue(startupGameTestInfoChannelInput, startupSyncControl.gameTestInfoChannelId, channelMaps);
     }
     if (!preserveStartupSyncForm && startupSyncSummary) {
-        startupSyncSummary.textContent = formatDiscordStartupSyncSummary(control);
+        const startupSummaryText = formatDiscordStartupSyncSummary(control);
+        startupSyncSummary.textContent = startupSummaryText;
+        startupSyncSummary.classList.toggle('hidden', !startupSummaryText);
     }
     if (startupSyncSaveButton) {
         startupSyncSaveButton.disabled = false;
     }
     if (channelLookupSummary) {
-        if (channelLookup.channels.length) {
-            channelLookupSummary.textContent = `Loaded ${textChannels.length} text channels and ${categoryChannels.length} categories from Discord.`;
-        } else if (channelLookup.error) {
-            channelLookupSummary.textContent = `Channel lookup unavailable. You can still enter IDs manually. (${channelLookup.error})`;
-        } else {
-            channelLookupSummary.textContent = 'Channel lookup unavailable yet. Configure one known channel or set DISCORD_BOT_GUILD_ID on the web service to enable searchable pickers.';
+        let lookupMessage = '';
+
+        if (!channelLookup.channels.length && channelLookup.error) {
+            if (/DISCORD_BOT_TOKEN/i.test(channelLookup.error)) {
+                lookupMessage = 'Channel lookup is unavailable because DISCORD_BOT_TOKEN is not configured on the web service.';
+            } else if (/rate limit/i.test(channelLookup.error)) {
+                lookupMessage = 'Channel lookup is temporarily unavailable. Existing selections are still kept.';
+            } else {
+                lookupMessage = 'Channel lookup is temporarily unavailable. You can still enter IDs manually.';
+            }
+        } else if (!channelLookup.channels.length) {
+            lookupMessage = 'Set the Discord server ID to enable searchable channel pickers.';
         }
+
+        channelLookupSummary.textContent = lookupMessage;
+        channelLookupSummary.classList.toggle('hidden', !lookupMessage);
     }
 }
 

@@ -7,6 +7,9 @@ const {
 
 const DISCORD_API_BASE_URL = 'https://discord.com/api/v10';
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
+const CHANNEL_LOOKUP_CACHE_TTL_MS = 60 * 1000;
+const channelLookupCache = new Map();
+const channelLookupInflight = new Map();
 
 async function discordApiGet(pathname) {
     if (!DISCORD_BOT_TOKEN) {
@@ -119,11 +122,50 @@ async function getDiscordChannelLookup(control) {
             };
         }
 
-        const channels = await discordApiGet(`/guilds/${encodeURIComponent(guildId)}/channels`);
-        return {
-            guildId,
-            channels: buildDiscordChannelLookup(Array.isArray(channels) ? channels : [])
-        };
+        const cached = channelLookupCache.get(guildId);
+        if (cached && (Date.now() - cached.fetchedAt) < CHANNEL_LOOKUP_CACHE_TTL_MS) {
+            return {
+                guildId,
+                channels: cached.channels
+            };
+        }
+
+        if (channelLookupInflight.has(guildId)) {
+            return await channelLookupInflight.get(guildId);
+        }
+
+        const pendingLookup = (async () => {
+            try {
+                const channels = await discordApiGet(`/guilds/${encodeURIComponent(guildId)}/channels`);
+                const mappedChannels = buildDiscordChannelLookup(Array.isArray(channels) ? channels : []);
+                channelLookupCache.set(guildId, {
+                    fetchedAt: Date.now(),
+                    channels: mappedChannels
+                });
+                return {
+                    guildId,
+                    channels: mappedChannels
+                };
+            } catch (error) {
+                if (cached && Array.isArray(cached.channels) && cached.channels.length) {
+                    return {
+                        guildId,
+                        channels: cached.channels
+                    };
+                }
+
+                return {
+                    guildId: '',
+                    channels: [],
+                    error: String(error.message || error)
+                };
+            } finally {
+                channelLookupInflight.delete(guildId);
+            }
+        })();
+
+        channelLookupInflight.set(guildId, pendingLookup);
+        return await pendingLookup;
     } catch (error) {
         return {
             guildId: '',
