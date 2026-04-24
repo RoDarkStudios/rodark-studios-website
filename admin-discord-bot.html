@@ -71,7 +71,7 @@
                                         <div>
                                             <h2 id="discord-server-title" class="admin-tool-title">Discord Server</h2>
                                             <p class="admin-tool-note">
-                                                Set the one Discord server this bot should manage so channel pickers can load without relying on environment variables.
+                                                Set the one Discord server this bot should manage.
                                             </p>
                                         </div>
                                     </div>
@@ -88,10 +88,6 @@
                                         >
                                     </label>
 
-                                    <p id="discord-guild-summary" class="admin-tool-note">
-                                        No Discord server configured yet.
-                                    </p>
-
                                     <button id="discord-guild-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
                                         Save server ID
                                     </button>
@@ -102,8 +98,7 @@
                                         <div>
                                             <h2 id="discord-ai-assistant-title" class="admin-tool-title">AI Ticket Assistant</h2>
                                             <p class="admin-tool-note">
-                                                Greets new tickets in one category, watches the requester, asks concise follow-up questions,
-                                                and hands off to owners whenever it lacks certainty.
+                                                Greets new tickets, asks concise follow-up questions, and hands off to owners when needed.
                                             </p>
                                         </div>
                                     </div>
@@ -139,10 +134,6 @@
                                         </label>
                                     </div>
 
-                                    <p id="discord-ai-summary" class="admin-tool-note">
-                                        Loading AI ticket assistant settings...
-                                    </p>
-
                                     <datalist id="discord-category-channel-options"></datalist>
 
                                     <button id="discord-ai-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
@@ -155,8 +146,7 @@
                                         <div>
                                             <h2 id="discord-startup-sync-title" class="admin-tool-title">Startup Channel Sync</h2>
                                             <p class="admin-tool-note">
-                                                On bot startup, ensure required custom emojis exist from local files and create or update
-                                                the fixed messages for rules, info, roles, staff-info, and game-test-info.
+                                                On startup, sync the fixed rules, info, roles, staff-info, and game-test-info messages.
                                             </p>
                                         </div>
                                     </div>
@@ -223,13 +213,7 @@
                                         </label>
                                     </div>
 
-                                    <p id="discord-startup-sync-summary" class="admin-tool-note">
-                                        Loading startup sync settings...
-                                    </p>
-
-                                    <p id="discord-channel-lookup-summary" class="admin-tool-note">
-                                        Loading Discord channels...
-                                    </p>
+                                    <p id="discord-channel-lookup-summary" class="admin-tool-note hidden"></p>
 
                                     <datalist id="discord-text-channel-options"></datalist>
 

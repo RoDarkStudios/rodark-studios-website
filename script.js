@@ -1501,26 +1501,6 @@ function getDiscordStartupSyncControl(control) {
     };
 }
 
-function formatDiscordAiSummary(control) {
-    const aiControl = getDiscordAiAssistantControl(control);
-    const categoryLabel = aiControl.ticketCategoryId ? `Category: ${aiControl.ticketCategoryId}.` : 'Category ID not set.';
-    const ownerLabel = aiControl.ownerRoleId ? ` Owner role: ${aiControl.ownerRoleId}.` : ' Owner role ID not set.';
-
-    if (!aiControl.enabled) {
-        return `Disabled. ${categoryLabel}${ownerLabel}`;
-    }
-
-    return `Enabled. ${categoryLabel}${ownerLabel}`;
-}
-
-function formatDiscordGuildSummary(control) {
-    if (control && control.guildId) {
-        return `Server configured: ${control.guildId}.`;
-    }
-
-    return 'No Discord server configured yet.';
-}
-
 function getDiscordChannelLookup(payload) {
     const channelLookup = payload && payload.channelLookup && typeof payload.channelLookup === 'object'
         ? payload.channelLookup
@@ -1726,39 +1706,22 @@ function bindDiscordChannelAutocompleteInput(input, getChannelMaps) {
     });
 }
 
-function formatDiscordStartupSyncSummary(control) {
-    const startupSync = getDiscordStartupSyncControl(control);
-    const entries = [
-        ['Rules', startupSync.rulesChannelId],
-        ['Info', startupSync.infoChannelId],
-        ['Roles', startupSync.rolesChannelId],
-        ['Staff-Info', startupSync.staffInfoChannelId],
-        ['Game-Test-Info', startupSync.gameTestInfoChannelId]
-    ];
-
-    const configuredCount = entries.filter(([, value]) => value).length;
-    return configuredCount ? '' : 'Startup sync channels are not configured yet.';
-}
-
 function renderDiscordBotControl(control, options) {
     const statusDot = document.getElementById('discord-bot-status-dot');
     const statusTitle = document.getElementById('discord-bot-status-title');
     const statusDetail = document.getElementById('discord-bot-status-detail');
     const toggleButton = document.getElementById('discord-bot-toggle-btn');
     const guildIdInput = document.getElementById('discord-guild-id');
-    const guildSummary = document.getElementById('discord-guild-summary');
     const guildSaveButton = document.getElementById('discord-guild-save-btn');
     const aiEnabledCheckbox = document.getElementById('discord-ai-enabled');
     const ticketCategoryInput = document.getElementById('discord-ticket-category-id');
     const ownerRoleInput = document.getElementById('discord-owner-role-id');
-    const aiSummary = document.getElementById('discord-ai-summary');
     const aiSaveButton = document.getElementById('discord-ai-save-btn');
     const startupRulesChannelInput = document.getElementById('discord-content-rules-channel-id');
     const startupInfoChannelInput = document.getElementById('discord-content-info-channel-id');
     const startupRolesChannelInput = document.getElementById('discord-content-roles-channel-id');
     const startupStaffInfoChannelInput = document.getElementById('discord-content-staff-info-channel-id');
     const startupGameTestInfoChannelInput = document.getElementById('discord-content-game-test-info-channel-id');
-    const startupSyncSummary = document.getElementById('discord-startup-sync-summary');
     const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
     const channelLookupSummary = document.getElementById('discord-channel-lookup-summary');
     const formatted = formatDiscordBotStatus(control);
@@ -1804,9 +1767,6 @@ function renderDiscordBotControl(control, options) {
     if (!preserveGuildForm && guildIdInput) {
         guildIdInput.value = control && control.guildId ? control.guildId : '';
     }
-    if (!preserveGuildForm && guildSummary) {
-        guildSummary.textContent = formatDiscordGuildSummary(control);
-    }
     if (guildSaveButton) {
         guildSaveButton.disabled = false;
     }
@@ -1818,9 +1778,6 @@ function renderDiscordBotControl(control, options) {
     }
     if (!preserveAssistantForm && ownerRoleInput) {
         ownerRoleInput.value = aiControl.ownerRoleId;
-    }
-    if (!preserveAssistantForm && aiSummary) {
-        aiSummary.textContent = formatDiscordAiSummary(control);
     }
     if (aiSaveButton) {
         aiSaveButton.disabled = false;
@@ -1839,11 +1796,6 @@ function renderDiscordBotControl(control, options) {
     }
     if (!preserveStartupSyncForm && startupGameTestInfoChannelInput) {
         setDiscordChannelInputDisplayValue(startupGameTestInfoChannelInput, startupSyncControl.gameTestInfoChannelId, channelMaps);
-    }
-    if (!preserveStartupSyncForm && startupSyncSummary) {
-        const startupSummaryText = formatDiscordStartupSyncSummary(control);
-        startupSyncSummary.textContent = startupSummaryText;
-        startupSyncSummary.classList.toggle('hidden', !startupSummaryText);
     }
     if (startupSyncSaveButton) {
         startupSyncSaveButton.disabled = false;
