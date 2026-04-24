@@ -1481,6 +1481,26 @@ function getDiscordAiAssistantControl(control) {
     };
 }
 
+function getDiscordStartupSyncControl(control) {
+    if (!control || typeof control !== 'object' || !control.startupContentSync || typeof control.startupContentSync !== 'object') {
+        return {
+            rulesChannelId: '',
+            infoChannelId: '',
+            rolesChannelId: '',
+            staffInfoChannelId: '',
+            gameTestInfoChannelId: ''
+        };
+    }
+
+    return {
+        rulesChannelId: control.startupContentSync.rulesChannelId ? String(control.startupContentSync.rulesChannelId) : '',
+        infoChannelId: control.startupContentSync.infoChannelId ? String(control.startupContentSync.infoChannelId) : '',
+        rolesChannelId: control.startupContentSync.rolesChannelId ? String(control.startupContentSync.rolesChannelId) : '',
+        staffInfoChannelId: control.startupContentSync.staffInfoChannelId ? String(control.startupContentSync.staffInfoChannelId) : '',
+        gameTestInfoChannelId: control.startupContentSync.gameTestInfoChannelId ? String(control.startupContentSync.gameTestInfoChannelId) : ''
+    };
+}
+
 function formatDiscordAiSummary(control) {
     const aiControl = getDiscordAiAssistantControl(control);
     const categoryLabel = aiControl.ticketCategoryId ? `Category: ${aiControl.ticketCategoryId}.` : 'Category ID not set.';
@@ -1493,6 +1513,27 @@ function formatDiscordAiSummary(control) {
     return `Enabled. ${categoryLabel}${ownerLabel}`;
 }
 
+function formatDiscordStartupSyncSummary(control) {
+    const startupSync = getDiscordStartupSyncControl(control);
+    const entries = [
+        ['Rules', startupSync.rulesChannelId],
+        ['Info', startupSync.infoChannelId],
+        ['Roles', startupSync.rolesChannelId],
+        ['Staff-Info', startupSync.staffInfoChannelId],
+        ['Game-Test-Info', startupSync.gameTestInfoChannelId]
+    ];
+
+    const configured = entries
+        .filter(([, value]) => value)
+        .map(([label, value]) => `${label}: ${value}`);
+
+    if (!configured.length) {
+        return 'No startup sync channels configured yet.';
+    }
+
+    return `Configured channels -> ${configured.join(' | ')}`;
+}
+
 function renderDiscordBotControl(control, options) {
     const statusDot = document.getElementById('discord-bot-status-dot');
     const statusTitle = document.getElementById('discord-bot-status-title');
@@ -1503,9 +1544,18 @@ function renderDiscordBotControl(control, options) {
     const ownerRoleInput = document.getElementById('discord-owner-role-id');
     const aiSummary = document.getElementById('discord-ai-summary');
     const aiSaveButton = document.getElementById('discord-ai-save-btn');
+    const startupRulesChannelInput = document.getElementById('discord-content-rules-channel-id');
+    const startupInfoChannelInput = document.getElementById('discord-content-info-channel-id');
+    const startupRolesChannelInput = document.getElementById('discord-content-roles-channel-id');
+    const startupStaffInfoChannelInput = document.getElementById('discord-content-staff-info-channel-id');
+    const startupGameTestInfoChannelInput = document.getElementById('discord-content-game-test-info-channel-id');
+    const startupSyncSummary = document.getElementById('discord-startup-sync-summary');
+    const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
     const formatted = formatDiscordBotStatus(control);
     const preserveAssistantForm = Boolean(options && options.preserveAssistantForm);
+    const preserveStartupSyncForm = Boolean(options && options.preserveStartupSyncForm);
     const aiControl = getDiscordAiAssistantControl(control);
+    const startupSyncControl = getDiscordStartupSyncControl(control);
 
     if (statusDot) {
         statusDot.className = `admin-discord-status-dot ${formatted.dotClass}`.trim();
@@ -1535,6 +1585,27 @@ function renderDiscordBotControl(control, options) {
     }
     if (aiSaveButton) {
         aiSaveButton.disabled = false;
+    }
+    if (!preserveStartupSyncForm && startupRulesChannelInput) {
+        startupRulesChannelInput.value = startupSyncControl.rulesChannelId;
+    }
+    if (!preserveStartupSyncForm && startupInfoChannelInput) {
+        startupInfoChannelInput.value = startupSyncControl.infoChannelId;
+    }
+    if (!preserveStartupSyncForm && startupRolesChannelInput) {
+        startupRolesChannelInput.value = startupSyncControl.rolesChannelId;
+    }
+    if (!preserveStartupSyncForm && startupStaffInfoChannelInput) {
+        startupStaffInfoChannelInput.value = startupSyncControl.staffInfoChannelId;
+    }
+    if (!preserveStartupSyncForm && startupGameTestInfoChannelInput) {
+        startupGameTestInfoChannelInput.value = startupSyncControl.gameTestInfoChannelId;
+    }
+    if (!preserveStartupSyncForm && startupSyncSummary) {
+        startupSyncSummary.textContent = formatDiscordStartupSyncSummary(control);
+    }
+    if (startupSyncSaveButton) {
+        startupSyncSaveButton.disabled = false;
     }
 }
 
@@ -1585,6 +1656,20 @@ async function saveDiscordBotAssistantConfig(config) {
     return payload.control || null;
 }
 
+async function saveDiscordBotStartupSyncConfig(config) {
+    const payload = await postJson('/api/admin/discord-bot-control', {
+        startupContentSync: {
+            rulesChannelId: config && config.rulesChannelId ? String(config.rulesChannelId).trim() : '',
+            infoChannelId: config && config.infoChannelId ? String(config.infoChannelId).trim() : '',
+            rolesChannelId: config && config.rolesChannelId ? String(config.rolesChannelId).trim() : '',
+            staffInfoChannelId: config && config.staffInfoChannelId ? String(config.staffInfoChannelId).trim() : '',
+            gameTestInfoChannelId: config && config.gameTestInfoChannelId ? String(config.gameTestInfoChannelId).trim() : ''
+        }
+    });
+
+    return payload.control || null;
+}
+
 async function initDiscordBotDashboard() {
     const dashboard = document.getElementById('discord-bot-dashboard');
     const ownedContent = document.getElementById('admin-owned-content');
@@ -1598,6 +1683,12 @@ async function initDiscordBotDashboard() {
     const ticketCategoryInput = document.getElementById('discord-ticket-category-id');
     const ownerRoleInput = document.getElementById('discord-owner-role-id');
     const aiSaveButton = document.getElementById('discord-ai-save-btn');
+    const startupRulesChannelInput = document.getElementById('discord-content-rules-channel-id');
+    const startupInfoChannelInput = document.getElementById('discord-content-info-channel-id');
+    const startupRolesChannelInput = document.getElementById('discord-content-roles-channel-id');
+    const startupStaffInfoChannelInput = document.getElementById('discord-content-staff-info-channel-id');
+    const startupGameTestInfoChannelInput = document.getElementById('discord-content-game-test-info-channel-id');
+    const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
 
@@ -1614,12 +1705,14 @@ async function initDiscordBotDashboard() {
     }
     ownedContent.classList.remove('hidden');
     dashboard.dataset.aiDirty = 'false';
+    dashboard.dataset.startupSyncDirty = 'false';
 
     async function refreshControl() {
         try {
             const control = await fetchDiscordBotControl();
             renderDiscordBotControl(control, {
-                preserveAssistantForm: dashboard.dataset.aiDirty === 'true'
+                preserveAssistantForm: dashboard.dataset.aiDirty === 'true',
+                preserveStartupSyncForm: dashboard.dataset.startupSyncDirty === 'true'
             });
             setDiscordBotStatusMessage('', 'info');
         } catch (error) {
@@ -1628,6 +1721,9 @@ async function initDiscordBotDashboard() {
             }
             if (aiSaveButton) {
                 aiSaveButton.disabled = true;
+            }
+            if (startupSyncSaveButton) {
+                startupSyncSaveButton.disabled = true;
             }
             setDiscordBotStatusMessage(error.message || 'Failed to load Discord bot status.', 'error');
         }
@@ -1658,6 +1754,10 @@ async function initDiscordBotDashboard() {
         dashboard.dataset.aiDirty = 'true';
     }
 
+    function markStartupSyncFormDirty() {
+        dashboard.dataset.startupSyncDirty = 'true';
+    }
+
     if (aiEnabledCheckbox) {
         aiEnabledCheckbox.addEventListener('change', markAssistantFormDirty);
     }
@@ -1666,6 +1766,21 @@ async function initDiscordBotDashboard() {
     }
     if (ownerRoleInput) {
         ownerRoleInput.addEventListener('input', markAssistantFormDirty);
+    }
+    if (startupRulesChannelInput) {
+        startupRulesChannelInput.addEventListener('input', markStartupSyncFormDirty);
+    }
+    if (startupInfoChannelInput) {
+        startupInfoChannelInput.addEventListener('input', markStartupSyncFormDirty);
+    }
+    if (startupRolesChannelInput) {
+        startupRolesChannelInput.addEventListener('input', markStartupSyncFormDirty);
+    }
+    if (startupStaffInfoChannelInput) {
+        startupStaffInfoChannelInput.addEventListener('input', markStartupSyncFormDirty);
+    }
+    if (startupGameTestInfoChannelInput) {
+        startupGameTestInfoChannelInput.addEventListener('input', markStartupSyncFormDirty);
     }
 
     if (aiSaveButton) {
@@ -1685,6 +1800,29 @@ async function initDiscordBotDashboard() {
             } catch (error) {
                 aiSaveButton.disabled = false;
                 setDiscordBotStatusMessage(error.message || 'Failed to save AI ticket assistant settings.', 'error');
+            }
+        });
+    }
+
+    if (startupSyncSaveButton) {
+        startupSyncSaveButton.addEventListener('click', async () => {
+            startupSyncSaveButton.disabled = true;
+            setDiscordBotStatusMessage('Saving startup sync settings...', 'info');
+
+            try {
+                const control = await saveDiscordBotStartupSyncConfig({
+                    rulesChannelId: startupRulesChannelInput ? startupRulesChannelInput.value : '',
+                    infoChannelId: startupInfoChannelInput ? startupInfoChannelInput.value : '',
+                    rolesChannelId: startupRolesChannelInput ? startupRolesChannelInput.value : '',
+                    staffInfoChannelId: startupStaffInfoChannelInput ? startupStaffInfoChannelInput.value : '',
+                    gameTestInfoChannelId: startupGameTestInfoChannelInput ? startupGameTestInfoChannelInput.value : ''
+                });
+                dashboard.dataset.startupSyncDirty = 'false';
+                renderDiscordBotControl(control);
+                setDiscordBotStatusMessage('Startup sync settings saved. They will apply on bot startup/reconnect.', 'success');
+            } catch (error) {
+                startupSyncSaveButton.disabled = false;
+                setDiscordBotStatusMessage(error.message || 'Failed to save startup sync settings.', 'error');
             }
         });
     }

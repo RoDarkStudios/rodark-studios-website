@@ -67,6 +67,31 @@ async function ensureDiscordBotControlSchema() {
     `);
 
     await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists content_rules_channel_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists content_info_channel_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists content_roles_channel_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists content_staff_info_channel_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists content_game_test_info_channel_id text
+    `);
+
+    await postgresQuery(`
         create table if not exists discord_bot_ticket_assistant_threads (
             channel_id text primary key,
             guild_id text not null,
@@ -107,6 +132,13 @@ function mapRowToDiscordBotControl(row) {
             enabled: Boolean(row.ai_ticket_assistant_enabled),
             ticketCategoryId: row.ai_ticket_category_id ? String(row.ai_ticket_category_id) : null,
             ownerRoleId: row.ai_ticket_owner_role_id ? String(row.ai_ticket_owner_role_id) : null
+        },
+        startupContentSync: {
+            rulesChannelId: row.content_rules_channel_id ? String(row.content_rules_channel_id) : null,
+            infoChannelId: row.content_info_channel_id ? String(row.content_info_channel_id) : null,
+            rolesChannelId: row.content_roles_channel_id ? String(row.content_roles_channel_id) : null,
+            staffInfoChannelId: row.content_staff_info_channel_id ? String(row.content_staff_info_channel_id) : null,
+            gameTestInfoChannelId: row.content_game_test_info_channel_id ? String(row.content_game_test_info_channel_id) : null
         }
     };
 }
@@ -146,7 +178,12 @@ async function getDiscordBotControl() {
             updated_by_username,
             ai_ticket_assistant_enabled,
             ai_ticket_category_id,
-            ai_ticket_owner_role_id
+            ai_ticket_owner_role_id,
+            content_rules_channel_id,
+            content_info_channel_id,
+            content_roles_channel_id,
+            content_staff_info_channel_id,
+            content_game_test_info_channel_id
         from discord_bot_control
         where id = $1
         limit 1
@@ -179,6 +216,31 @@ async function updateDiscordBotControl(patch, user) {
         : (currentControl.aiTicketAssistant && currentControl.aiTicketAssistant.ownerRoleId
             ? String(currentControl.aiTicketAssistant.ownerRoleId)
             : null);
+    const contentRulesChannelId = patch && Object.prototype.hasOwnProperty.call(patch, 'contentRulesChannelId')
+        ? normalizeOptionalSnowflake(patch.contentRulesChannelId, 'Rules channel ID')
+        : (currentControl.startupContentSync && currentControl.startupContentSync.rulesChannelId
+            ? String(currentControl.startupContentSync.rulesChannelId)
+            : null);
+    const contentInfoChannelId = patch && Object.prototype.hasOwnProperty.call(patch, 'contentInfoChannelId')
+        ? normalizeOptionalSnowflake(patch.contentInfoChannelId, 'Info channel ID')
+        : (currentControl.startupContentSync && currentControl.startupContentSync.infoChannelId
+            ? String(currentControl.startupContentSync.infoChannelId)
+            : null);
+    const contentRolesChannelId = patch && Object.prototype.hasOwnProperty.call(patch, 'contentRolesChannelId')
+        ? normalizeOptionalSnowflake(patch.contentRolesChannelId, 'Roles channel ID')
+        : (currentControl.startupContentSync && currentControl.startupContentSync.rolesChannelId
+            ? String(currentControl.startupContentSync.rolesChannelId)
+            : null);
+    const contentStaffInfoChannelId = patch && Object.prototype.hasOwnProperty.call(patch, 'contentStaffInfoChannelId')
+        ? normalizeOptionalSnowflake(patch.contentStaffInfoChannelId, 'Staff info channel ID')
+        : (currentControl.startupContentSync && currentControl.startupContentSync.staffInfoChannelId
+            ? String(currentControl.startupContentSync.staffInfoChannelId)
+            : null);
+    const contentGameTestInfoChannelId = patch && Object.prototype.hasOwnProperty.call(patch, 'contentGameTestInfoChannelId')
+        ? normalizeOptionalSnowflake(patch.contentGameTestInfoChannelId, 'Game test info channel ID')
+        : (currentControl.startupContentSync && currentControl.startupContentSync.gameTestInfoChannelId
+            ? String(currentControl.startupContentSync.gameTestInfoChannelId)
+            : null);
 
     if (aiTicketAssistantEnabled && !aiTicketCategoryId) {
         throw new Error('AI ticket category ID is required when the AI ticket assistant is enabled');
@@ -195,9 +257,14 @@ async function updateDiscordBotControl(patch, user) {
             ai_ticket_assistant_enabled = $3,
             ai_ticket_category_id = $4,
             ai_ticket_owner_role_id = $5,
+            content_rules_channel_id = $6,
+            content_info_channel_id = $7,
+            content_roles_channel_id = $8,
+            content_staff_info_channel_id = $9,
+            content_game_test_info_channel_id = $10,
             updated_at = now(),
-            updated_by_user_id = $6,
-            updated_by_username = $7,
+            updated_by_user_id = $11,
+            updated_by_username = $12,
             last_error = case when $2 = false then null else last_error end
         where id = $1
         returning
@@ -210,13 +277,23 @@ async function updateDiscordBotControl(patch, user) {
             updated_by_username,
             ai_ticket_assistant_enabled,
             ai_ticket_category_id,
-            ai_ticket_owner_role_id
+            ai_ticket_owner_role_id,
+            content_rules_channel_id,
+            content_info_channel_id,
+            content_roles_channel_id,
+            content_staff_info_channel_id,
+            content_game_test_info_channel_id
     `, [
         CONTROL_ID,
         desiredEnabled,
         aiTicketAssistantEnabled,
         aiTicketCategoryId,
         aiTicketOwnerRoleId,
+        contentRulesChannelId,
+        contentInfoChannelId,
+        contentRolesChannelId,
+        contentStaffInfoChannelId,
+        contentGameTestInfoChannelId,
         user && user.id ? String(user.id) : null,
         user && user.username ? String(user.username) : null
     ]);
@@ -248,7 +325,12 @@ async function setDiscordBotRuntimeStatus(runtimeStatus, lastError) {
             updated_by_username,
             ai_ticket_assistant_enabled,
             ai_ticket_category_id,
-            ai_ticket_owner_role_id
+            ai_ticket_owner_role_id,
+            content_rules_channel_id,
+            content_info_channel_id,
+            content_roles_channel_id,
+            content_staff_info_channel_id,
+            content_game_test_info_channel_id
     `, [
         CONTROL_ID,
         String(runtimeStatus || 'offline'),

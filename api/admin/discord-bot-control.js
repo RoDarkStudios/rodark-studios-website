@@ -28,6 +28,9 @@ module.exports = async (req, res) => {
         const assistantConfig = body && typeof body.aiTicketAssistant === 'object' && body.aiTicketAssistant
             ? body.aiTicketAssistant
             : null;
+        const startupContentSync = body && typeof body.startupContentSync === 'object' && body.startupContentSync
+            ? body.startupContentSync
+            : null;
         const patch = {};
 
         if (body && Object.prototype.hasOwnProperty.call(body, 'desiredEnabled')) {
@@ -44,6 +47,26 @@ module.exports = async (req, res) => {
 
         if (assistantConfig && Object.prototype.hasOwnProperty.call(assistantConfig, 'ownerRoleId')) {
             patch.aiTicketOwnerRoleId = assistantConfig.ownerRoleId;
+        }
+
+        if (startupContentSync && Object.prototype.hasOwnProperty.call(startupContentSync, 'rulesChannelId')) {
+            patch.contentRulesChannelId = startupContentSync.rulesChannelId;
+        }
+
+        if (startupContentSync && Object.prototype.hasOwnProperty.call(startupContentSync, 'infoChannelId')) {
+            patch.contentInfoChannelId = startupContentSync.infoChannelId;
+        }
+
+        if (startupContentSync && Object.prototype.hasOwnProperty.call(startupContentSync, 'rolesChannelId')) {
+            patch.contentRolesChannelId = startupContentSync.rolesChannelId;
+        }
+
+        if (startupContentSync && Object.prototype.hasOwnProperty.call(startupContentSync, 'staffInfoChannelId')) {
+            patch.contentStaffInfoChannelId = startupContentSync.staffInfoChannelId;
+        }
+
+        if (startupContentSync && Object.prototype.hasOwnProperty.call(startupContentSync, 'gameTestInfoChannelId')) {
+            patch.contentGameTestInfoChannelId = startupContentSync.gameTestInfoChannelId;
         }
 
         const control = await updateDiscordBotControl(patch, auth.user);

@@ -17,6 +17,11 @@ create table if not exists discord_bot_control (
     ai_ticket_assistant_enabled boolean not null default false,
     ai_ticket_category_id text,
     ai_ticket_owner_role_id text,
+    content_rules_channel_id text,
+    content_info_channel_id text,
+    content_roles_channel_id text,
+    content_staff_info_channel_id text,
+    content_game_test_info_channel_id text,
     updated_at timestamptz not null default now(),
     updated_by_user_id text,
     updated_by_username text

@@ -12,6 +12,7 @@ const {
 } = require('../api/_lib/discord-bot-control-store');
 const { getPostgresPool } = require('../api/_lib/postgres');
 const { decideTicketResponse, isPublicHelpQuestion } = require('./ai-ticket-assistant');
+const { runStartupSync } = require('./discord-startup-sync');
 
 const POLL_INTERVAL_MS = Number.parseInt(process.env.DISCORD_BOT_POLL_INTERVAL_MS || '5000', 10);
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
@@ -292,6 +293,15 @@ function createClient() {
         const tag = nextClient.user && nextClient.user.tag ? nextClient.user.tag : 'Discord bot';
         console.log(`${tag} is online.`);
         await setDiscordBotRuntimeStatus('online', null);
+
+        try {
+            const control = await getDiscordBotControl();
+            await runStartupSync(nextClient, control);
+            await setDiscordBotRuntimeStatus('online', null);
+        } catch (error) {
+            console.error('Discord startup sync failed:', error);
+            await setDiscordBotRuntimeStatus('online', `Startup sync failed: ${String(error.message || 'unknown error')}`);
+        }
     });
 
     nextClient.on('channelCreate', (channel) => {

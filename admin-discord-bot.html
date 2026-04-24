@@ -117,6 +117,88 @@
                                     </button>
                                 </section>
 
+                                <section class="admin-discord-feature-card" aria-labelledby="discord-startup-sync-title">
+                                    <div class="admin-discord-feature-head">
+                                        <div>
+                                            <h2 id="discord-startup-sync-title" class="admin-tool-title">Startup Channel Sync</h2>
+                                            <p class="admin-tool-note">
+                                                On bot startup, ensure required custom emojis exist from local files and create or update
+                                                the fixed messages for rules, info, roles, staff-info, and game-test-info.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="admin-discord-field-grid">
+                                        <label class="admin-field">
+                                            <span class="admin-label">Rules Channel ID</span>
+                                            <input
+                                                id="discord-content-rules-channel-id"
+                                                class="admin-input"
+                                                type="text"
+                                                inputmode="numeric"
+                                                autocomplete="off"
+                                                placeholder="Discord channel ID"
+                                            >
+                                        </label>
+
+                                        <label class="admin-field">
+                                            <span class="admin-label">Info Channel ID</span>
+                                            <input
+                                                id="discord-content-info-channel-id"
+                                                class="admin-input"
+                                                type="text"
+                                                inputmode="numeric"
+                                                autocomplete="off"
+                                                placeholder="Discord channel ID"
+                                            >
+                                        </label>
+
+                                        <label class="admin-field">
+                                            <span class="admin-label">Roles Channel ID</span>
+                                            <input
+                                                id="discord-content-roles-channel-id"
+                                                class="admin-input"
+                                                type="text"
+                                                inputmode="numeric"
+                                                autocomplete="off"
+                                                placeholder="Discord channel ID"
+                                            >
+                                        </label>
+
+                                        <label class="admin-field">
+                                            <span class="admin-label">Staff-Info Channel ID</span>
+                                            <input
+                                                id="discord-content-staff-info-channel-id"
+                                                class="admin-input"
+                                                type="text"
+                                                inputmode="numeric"
+                                                autocomplete="off"
+                                                placeholder="Discord channel ID"
+                                            >
+                                        </label>
+
+                                        <label class="admin-field">
+                                            <span class="admin-label">Game-Test-Info Channel ID</span>
+                                            <input
+                                                id="discord-content-game-test-info-channel-id"
+                                                class="admin-input"
+                                                type="text"
+                                                inputmode="numeric"
+                                                autocomplete="off"
+                                                placeholder="Discord channel ID"
+                                            >
+                                        </label>
+                                    </div>
+
+                                    <p id="discord-startup-sync-summary" class="admin-tool-note">
+                                        Loading startup sync settings...
+                                    </p>
+
+                                    <button id="discord-startup-sync-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
+                                        Save startup sync settings
+                                    </button>
+                                </section>
+
                                 <p id="discord-bot-status-message" class="admin-status info hidden"></p>
                             </div>
                         </div>
