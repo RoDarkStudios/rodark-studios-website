@@ -319,6 +319,11 @@ async function syncStaffInfoChannel(channel) {
                 inline: false
             },
             {
+                name: 'Ticket Languages',
+                value: 'If a ticket opener does not speak English or asks to use another language, use translation software and let them use their preferred language.',
+                inline: false
+            },
+            {
                 name: 'Game Knowledge',
                 value: 'Stay up to date on how the game works and on new updates so you can answer player questions accurately.',
                 inline: false
