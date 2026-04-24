@@ -89,9 +89,9 @@
                                                 id="discord-ticket-category-id"
                                                 class="admin-input"
                                                 type="text"
-                                                inputmode="numeric"
                                                 autocomplete="off"
-                                                placeholder="Discord category ID"
+                                                list="discord-category-channel-options"
+                                                placeholder="Search Discord categories"
                                             >
                                         </label>
 
@@ -111,6 +111,8 @@
                                     <p id="discord-ai-summary" class="admin-tool-note">
                                         Loading AI ticket assistant settings...
                                     </p>
+
+                                    <datalist id="discord-category-channel-options"></datalist>
 
                                     <button id="discord-ai-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
                                         Save AI assistant settings
@@ -135,9 +137,9 @@
                                                 id="discord-content-rules-channel-id"
                                                 class="admin-input"
                                                 type="text"
-                                                inputmode="numeric"
                                                 autocomplete="off"
-                                                placeholder="Discord channel ID"
+                                                list="discord-text-channel-options"
+                                                placeholder="Search Discord channels"
                                             >
                                         </label>
 
@@ -147,9 +149,9 @@
                                                 id="discord-content-info-channel-id"
                                                 class="admin-input"
                                                 type="text"
-                                                inputmode="numeric"
                                                 autocomplete="off"
-                                                placeholder="Discord channel ID"
+                                                list="discord-text-channel-options"
+                                                placeholder="Search Discord channels"
                                             >
                                         </label>
 
@@ -159,9 +161,9 @@
                                                 id="discord-content-roles-channel-id"
                                                 class="admin-input"
                                                 type="text"
-                                                inputmode="numeric"
                                                 autocomplete="off"
-                                                placeholder="Discord channel ID"
+                                                list="discord-text-channel-options"
+                                                placeholder="Search Discord channels"
                                             >
                                         </label>
 
@@ -171,9 +173,9 @@
                                                 id="discord-content-staff-info-channel-id"
                                                 class="admin-input"
                                                 type="text"
-                                                inputmode="numeric"
                                                 autocomplete="off"
-                                                placeholder="Discord channel ID"
+                                                list="discord-text-channel-options"
+                                                placeholder="Search Discord channels"
                                             >
                                         </label>
 
@@ -183,9 +185,9 @@
                                                 id="discord-content-game-test-info-channel-id"
                                                 class="admin-input"
                                                 type="text"
-                                                inputmode="numeric"
                                                 autocomplete="off"
-                                                placeholder="Discord channel ID"
+                                                list="discord-text-channel-options"
+                                                placeholder="Search Discord channels"
                                             >
                                         </label>
                                     </div>
@@ -193,6 +195,12 @@
                                     <p id="discord-startup-sync-summary" class="admin-tool-note">
                                         Loading startup sync settings...
                                     </p>
+
+                                    <p id="discord-channel-lookup-summary" class="admin-tool-note">
+                                        Loading Discord channels...
+                                    </p>
+
+                                    <datalist id="discord-text-channel-options"></datalist>
 
                                     <button id="discord-startup-sync-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
                                         Save startup sync settings
