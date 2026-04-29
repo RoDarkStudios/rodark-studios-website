@@ -319,6 +319,15 @@ async function syncStaffInfoChannel(channel) {
                 inline: false
             },
             {
+                name: 'Bug Report Follow-up',
+                value: [
+                    `Watch <#${BUG_REPORT_CHANNEL_ID}> and <#${TESTING_BUG_REPORT_CHANNEL_ID}> for unclear bug reports.`,
+                    'If a report is vague, promptly ask for the details developers need: what happened, how to reproduce it, screenshots or video, and an F9 developer console screenshot if errors may be involved.',
+                    'The goal is for owners and developers to understand the issue clearly by the time they review it.'
+                ].join('\n'),
+                inline: false
+            },
+            {
                 name: 'Ticket Languages',
                 value: 'If a ticket opener does not speak English or asks to use another language, use translation software and let them use their preferred language.',
                 inline: false
