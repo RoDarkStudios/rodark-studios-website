@@ -314,32 +314,18 @@ async function syncStaffInfoChannel(channel) {
         .setDescription(`${getRoleMention(guild, 'Moderator')} responsibilities and expectations.`)
         .addFields(
             {
-                name: 'Responsibilities',
-                value: 'Help members, answer questions and tickets, and enforce the rules, including timeouts when needed.',
-                inline: false
-            },
-            {
-                name: 'Bug Report Follow-up',
+                name: 'Moderator Jobs',
                 value: [
-                    `Watch <#${BUG_REPORT_CHANNEL_ID}> and <#${TESTING_BUG_REPORT_CHANNEL_ID}> for unclear bug reports.`,
-                    'If a report is vague, promptly ask for the details developers need: what happened, how to reproduce it, screenshots or video, and an F9 developer console screenshot if errors may be involved.',
-                    'The goal is for owners and developers to understand the issue clearly by the time they review it.'
+                    `1. **Bug report follow-up** - Watch <#${BUG_REPORT_CHANNEL_ID}> and <#${TESTING_BUG_REPORT_CHANNEL_ID}>. If a report is vague, promptly ask for what happened, how to reproduce it, screenshots or video, and an F9 developer console screenshot if errors may be involved.`,
+                    `2. **Tickets and escalation** - Respond to tickets, answer what you can, and ask for clearer details when needed. If a ticket needs owner or developer help, mention an ${getRoleMention(guild, 'Owner')} with a clear summary, then leave it for them.`,
+                    '3. **Community help** - Stay up to date on how the game works, answer general questions, help people out, and keep an active, helpful community presence.',
+                    '4. **Rule enforcement** - Enforce the rules and timeout rule-breakers when needed.'
                 ].join('\n'),
                 inline: false
             },
             {
                 name: 'Ticket Languages',
                 value: 'If a ticket opener does not speak English or asks to use another language, use translation software and let them use their preferred language.',
-                inline: false
-            },
-            {
-                name: 'Game Knowledge',
-                value: 'Stay up to date on how the game works and on new updates so you can answer player questions accurately.',
-                inline: false
-            },
-            {
-                name: 'Escalation',
-                value: `If you are unsure how to handle something, ask an ${getRoleMention(guild, 'Owner')}.`,
                 inline: false
             },
             {
