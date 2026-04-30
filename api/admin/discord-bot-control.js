@@ -4,6 +4,10 @@ const {
     getDiscordBotControl,
     updateDiscordBotControl
 } = require('../_lib/discord-bot-control-store');
+const {
+    getDiscordTicketTranscript,
+    listDiscordTicketTranscripts
+} = require('../_lib/discord-ticket-store');
 
 const DISCORD_API_BASE_URL = 'https://discord.com/api/v10';
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
@@ -274,6 +278,20 @@ module.exports = async (req, res) => {
         }
 
         if (req.method === 'GET') {
+            if (req.query && Object.prototype.hasOwnProperty.call(req.query, 'ticketTranscripts')) {
+                const transcripts = await listDiscordTicketTranscripts(req.query.limit, req.query.offset);
+                return sendJson(res, 200, { transcripts });
+            }
+
+            if (req.query && req.query.ticketTranscriptId) {
+                const transcript = await getDiscordTicketTranscript(req.query.ticketTranscriptId);
+                if (!transcript) {
+                    return sendJson(res, 404, { error: 'Ticket transcript not found' });
+                }
+
+                return sendJson(res, 200, { transcript });
+            }
+
             const control = await getDiscordBotControl();
             const channelLookup = await getDiscordChannelLookup(control);
             const roleLookup = await getDiscordRoleLookup(control);

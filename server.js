@@ -19,7 +19,7 @@ const { getAdminGroupId } = require('./api/_lib/roblox-groups');
 
 const rootDir = __dirname;
 const port = process.env.PORT || 3000;
-const socialPreviewFallbackDescription = '1.1M visits, 3,212 concurrent players, and 327,543 group members.';
+const socialPreviewFallbackDescription = '1.1M visits, 3,212 concurrent players, and 327,543 community members.';
 const socialPreviewCacheTtlMs = 5 * 60 * 1000;
 const socialPreviewFailureTtlMs = 60 * 1000;
 const socialPreviewRequestTimeoutMs = 5000;
@@ -250,7 +250,7 @@ async function fetchSocialPreviewDescription() {
         throw new Error('Roblox group response was missing memberCount');
     }
 
-    return `${formatCompactVisits(totalVisits)} visits, ${formatInteger(totalPlaying)} concurrent players, and ${formatInteger(memberCount)} group members.`;
+    return `${formatCompactVisits(totalVisits)} visits, ${formatInteger(totalPlaying)} concurrent players, and ${formatInteger(memberCount)} community members.`;
 }
 
 async function getSocialPreviewDescription() {

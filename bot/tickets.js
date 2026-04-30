@@ -4,20 +4,29 @@ const {
     ButtonStyle,
     ChannelType,
     EmbedBuilder,
-    PermissionFlagsBits
+    ModalBuilder,
+    PermissionFlagsBits,
+    TextInputBuilder,
+    TextInputStyle
 } = require('discord.js');
 const { setDiscordTicketPanelMessageId } = require('../api/_lib/discord-bot-control-store');
 const {
     closeDiscordTicketRecord,
     createDiscordTicketRecord,
-    reserveDiscordTicketId
+    getOpenDiscordTicketForUser,
+    reserveDiscordTicketId,
+    saveDiscordTicketTranscript
 } = require('../api/_lib/discord-ticket-store');
 
 const OPEN_TICKET_CUSTOM_ID = 'rodark_ticket_open';
 const CLOSE_TICKET_CUSTOM_ID = 'rodark_ticket_close';
+const TICKET_ISSUE_MODAL_CUSTOM_ID = 'rodark_ticket_issue_modal';
+const TICKET_ISSUE_INPUT_CUSTOM_ID = 'rodark_ticket_issue';
 const BUG_REPORT_CHANNEL_ID = '1208767046184345610';
 const TICKET_OPEN_PING_DELETE_DELAY_MS = 1500;
 const TICKET_CLOSE_DELETE_DELAY_MS = 1000;
+const TICKET_TRANSCRIPT_FETCH_LIMIT = 100;
+const pendingTicketOpenUserKeys = new Set();
 
 function getTicketSystemControl(control) {
     const ticketSystem = control && control.ticketSystem && typeof control.ticketSystem === 'object'
@@ -59,7 +68,31 @@ function buildTicketPanelPayload() {
     };
 }
 
-function buildTicketWelcomePayload(openerLabel) {
+function buildTicketIssueModal() {
+    const issueInput = new TextInputBuilder()
+        .setCustomId(TICKET_ISSUE_INPUT_CUSTOM_ID)
+        .setLabel('What do you need help with?')
+        .setPlaceholder('Describe your issue. You can attach images after the ticket opens.')
+        .setStyle(TextInputStyle.Paragraph)
+        .setMinLength(20)
+        .setMaxLength(1000)
+        .setRequired(true);
+
+    return new ModalBuilder()
+        .setCustomId(TICKET_ISSUE_MODAL_CUSTOM_ID)
+        .setTitle('Open a Ticket')
+        .addComponents(new ActionRowBuilder().addComponents(issueInput));
+}
+
+function normalizeTicketIssue(value) {
+    return String(value || '').trim().replace(/\r\n/g, '\n');
+}
+
+function getTicketOpenUserKey(guildId, userId) {
+    return `${String(guildId)}:${String(userId)}`;
+}
+
+function buildTicketWelcomePayload(openerLabel, issueDescription) {
     const embed = new EmbedBuilder()
         .setTitle('Support Ticket')
         .setColor(0x22d3ee)
@@ -68,7 +101,10 @@ function buildTicketWelcomePayload(openerLabel) {
             '',
             'Thank you for contacting support.',
             '',
-            'Please describe your issue and wait for a response.'
+            '**Issue**',
+            issueDescription || 'No issue description provided.',
+            '',
+            'Please add any images or extra details here, then wait for a response.'
         ].join('\n'));
 
     const row = new ActionRowBuilder().addComponents(
@@ -131,6 +167,27 @@ function buildTicketCreatedConfirmationPayload(ticketChannel) {
     };
 }
 
+function buildExistingTicketPayload(ticketChannel) {
+    const embed = new EmbedBuilder()
+        .setTitle('Ticket Already Open')
+        .setColor(0xf97316)
+        .setDescription(`You already have an open ticket: ${ticketChannel.toString()}`);
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setLabel('Go to Ticket')
+            .setEmoji('📩')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://discord.com/channels/${ticketChannel.guild.id}/${ticketChannel.id}`)
+    );
+
+    return {
+        content: '',
+        embeds: [embed],
+        components: [row]
+    };
+}
+
 function buildTicketClosingComponents() {
     return [
         new ActionRowBuilder().addComponents(
@@ -142,6 +199,70 @@ function buildTicketClosingComponents() {
                 .setDisabled(true)
         )
     ];
+}
+
+function serializeMessageEmbed(embed) {
+    return {
+        title: embed.title || '',
+        description: embed.description || '',
+        url: embed.url || '',
+        fields: Array.isArray(embed.fields)
+            ? embed.fields.map((field) => ({
+                name: field && field.name ? String(field.name) : '',
+                value: field && field.value ? String(field.value) : ''
+            }))
+            : []
+    };
+}
+
+function serializeTicketMessage(message) {
+    return {
+        id: String(message.id),
+        createdAt: message.createdAt instanceof Date
+            ? message.createdAt.toISOString()
+            : new Date(Number(message.createdTimestamp) || Date.now()).toISOString(),
+        authorId: message.author && message.author.id ? String(message.author.id) : '',
+        authorTag: message.author && message.author.tag
+            ? String(message.author.tag)
+            : (message.author && message.author.username ? String(message.author.username) : 'Unknown'),
+        bot: Boolean(message.author && message.author.bot),
+        content: String(message.content || ''),
+        attachments: Array.from(message.attachments ? message.attachments.values() : []).map((attachment) => ({
+            id: String(attachment.id || ''),
+            name: String(attachment.name || ''),
+            url: String(attachment.url || ''),
+            contentType: attachment.contentType ? String(attachment.contentType) : '',
+            size: Number(attachment.size) || 0
+        })),
+        embeds: Array.isArray(message.embeds) ? message.embeds.map(serializeMessageEmbed) : []
+    };
+}
+
+async function fetchTicketTranscriptMessages(channel) {
+    const messages = [];
+    let before;
+
+    while (true) {
+        const batch = await channel.messages.fetch({
+            limit: TICKET_TRANSCRIPT_FETCH_LIMIT,
+            before
+        });
+
+        if (!batch.size) {
+            break;
+        }
+
+        messages.push(...Array.from(batch.values()).map(serializeTicketMessage));
+        before = batch.last().id;
+
+        if (batch.size < TICKET_TRANSCRIPT_FETCH_LIMIT) {
+            break;
+        }
+    }
+
+    return messages.sort((left, right) => {
+        return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+    });
 }
 
 async function fetchGuildChannel(client, channelId, label) {
@@ -257,7 +378,7 @@ function buildTicketPermissionOverwrites(guild, categoryChannel, openerUserId, h
     }));
 }
 
-async function createTicketChannel(interaction, control) {
+async function createTicketChannel(interaction, control, issueDescription) {
     const ticketSystem = getTicketSystemControl(control);
     if (!ticketSystem.categoryChannelId || !ticketSystem.panelChannelId) {
         await interaction.editReply('The ticket system is not configured yet.');
@@ -275,33 +396,72 @@ async function createTicketChannel(interaction, control) {
         return;
     }
 
-    const ticketId = await reserveDiscordTicketId();
-    const channelName = `ticket-${ticketId}`;
-    const permissionOverwrites = buildTicketPermissionOverwrites(
-        interaction.guild,
-        categoryChannel,
-        interaction.user.id,
-        ticketSystem.helperRoleIds
-    );
+    const ticketOpenUserKey = getTicketOpenUserKey(interaction.guild.id, interaction.user.id);
+    if (pendingTicketOpenUserKeys.has(ticketOpenUserKey)) {
+        await interaction.editReply('Your ticket request is already being processed.');
+        return;
+    }
 
-    const ticketChannel = await interaction.guild.channels.create({
-        name: channelName,
-        type: ChannelType.GuildText,
-        parent: categoryChannel.id,
-        permissionOverwrites,
-        reason: `Ticket ${ticketId} opened by ${interaction.user.tag || interaction.user.id}`
-    });
+    pendingTicketOpenUserKeys.add(ticketOpenUserKey);
+    try {
+        const existingTicket = await getOpenDiscordTicketForUser(interaction.guild.id, interaction.user.id);
+        if (existingTicket) {
+            const existingChannel = await interaction.guild.channels.fetch(existingTicket.channelId).catch(() => null);
+            if (existingChannel && existingChannel.type === ChannelType.GuildText) {
+                await interaction.editReply(buildExistingTicketPayload(existingChannel));
+                return;
+            }
 
-    await createDiscordTicketRecord({
-        ticketId,
-        guildId: interaction.guild.id,
-        channelId: ticketChannel.id,
-        openerUserId: interaction.user.id
-    });
+            await closeDiscordTicketRecord(existingTicket.channelId, null);
+        }
 
-    await sendTemporaryTicketOpenPing(ticketChannel, interaction.user.id);
-    await ticketChannel.send(buildTicketWelcomePayload(interaction.user.tag || interaction.user.username || 'A member'));
-    await interaction.editReply(buildTicketCreatedConfirmationPayload(ticketChannel));
+        const ticketId = await reserveDiscordTicketId();
+        const channelName = `ticket-${ticketId}`;
+        const permissionOverwrites = buildTicketPermissionOverwrites(
+            interaction.guild,
+            categoryChannel,
+            interaction.user.id,
+            ticketSystem.helperRoleIds
+        );
+
+        const ticketChannel = await interaction.guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            parent: categoryChannel.id,
+            permissionOverwrites,
+            reason: `Ticket ${ticketId} opened by ${interaction.user.tag || interaction.user.id}`
+        });
+
+        try {
+            await createDiscordTicketRecord({
+                ticketId,
+                guildId: interaction.guild.id,
+                channelId: ticketChannel.id,
+                openerUserId: interaction.user.id
+            });
+        } catch (error) {
+            await ticketChannel.delete('Duplicate ticket prevented by one-open-ticket guard').catch(() => {});
+            const duplicateTicket = await getOpenDiscordTicketForUser(interaction.guild.id, interaction.user.id);
+            if (duplicateTicket) {
+                const duplicateChannel = await interaction.guild.channels.fetch(duplicateTicket.channelId).catch(() => null);
+                if (duplicateChannel && duplicateChannel.type === ChannelType.GuildText) {
+                    await interaction.editReply(buildExistingTicketPayload(duplicateChannel));
+                    return;
+                }
+            }
+
+            throw error;
+        }
+
+        await sendTemporaryTicketOpenPing(ticketChannel, interaction.user.id);
+        await ticketChannel.send(buildTicketWelcomePayload(
+            interaction.user.tag || interaction.user.username || 'A member',
+            issueDescription
+        ));
+        await interaction.editReply(buildTicketCreatedConfirmationPayload(ticketChannel));
+    } finally {
+        pendingTicketOpenUserKeys.delete(ticketOpenUserKey);
+    }
 }
 
 async function closeTicketChannel(interaction) {
@@ -311,7 +471,6 @@ async function closeTicketChannel(interaction) {
         return;
     }
 
-    await closeDiscordTicketRecord(channel.id, interaction.user.id);
     if (interaction.message && interaction.message.editable) {
         await interaction.message.edit({ components: buildTicketClosingComponents() }).catch((error) => {
             console.error('Failed to update closing ticket button:', error);
@@ -319,6 +478,27 @@ async function closeTicketChannel(interaction) {
     }
 
     await interaction.editReply('Closing ticket...');
+
+    const closedTicket = await closeDiscordTicketRecord(channel.id, interaction.user.id);
+    if (closedTicket) {
+        try {
+            const transcriptMessages = await fetchTicketTranscriptMessages(channel);
+            await saveDiscordTicketTranscript({
+                ticketId: closedTicket.ticketId,
+                guildId: closedTicket.guildId,
+                channelId: closedTicket.channelId,
+                channelName: channel.name,
+                openerUserId: closedTicket.openerUserId,
+                closedByUserId: closedTicket.closedByUserId,
+                createdAt: closedTicket.createdAt,
+                closedAt: closedTicket.closedAt,
+                messageCount: transcriptMessages.length,
+                messages: transcriptMessages
+            });
+        } catch (error) {
+            console.error('Failed to save ticket transcript:', error);
+        }
+    }
 
     setTimeout(() => {
         channel.delete(`Ticket closed by ${interaction.user.tag || interaction.user.id}`).catch((error) => {
@@ -328,21 +508,50 @@ async function closeTicketChannel(interaction) {
 }
 
 async function handleTicketInteraction(interaction, control) {
-    if (!interaction || !interaction.isButton()) {
+    if (!interaction || (!interaction.isButton() && !interaction.isModalSubmit())) {
         return false;
     }
 
-    if (interaction.customId !== OPEN_TICKET_CUSTOM_ID && interaction.customId !== CLOSE_TICKET_CUSTOM_ID) {
+    if (
+        interaction.customId !== OPEN_TICKET_CUSTOM_ID
+        && interaction.customId !== CLOSE_TICKET_CUSTOM_ID
+        && interaction.customId !== TICKET_ISSUE_MODAL_CUSTOM_ID
+    ) {
         return false;
     }
 
-    await interaction.deferReply({ ephemeral: true });
-
-    if (interaction.customId === OPEN_TICKET_CUSTOM_ID) {
-        await createTicketChannel(interaction, control);
+    if (interaction.isModalSubmit()) {
+        await interaction.deferReply({ ephemeral: true });
+        const issueDescription = normalizeTicketIssue(
+            interaction.fields.getTextInputValue(TICKET_ISSUE_INPUT_CUSTOM_ID)
+        );
+        await createTicketChannel(interaction, control, issueDescription);
         return true;
     }
 
+    if (interaction.customId === OPEN_TICKET_CUSTOM_ID) {
+        const ticketSystem = getTicketSystemControl(control);
+        if (!ticketSystem.categoryChannelId || !ticketSystem.panelChannelId) {
+            await interaction.reply({
+                content: 'The ticket system is not configured yet.',
+                ephemeral: true
+            });
+            return true;
+        }
+
+        if (interaction.channelId !== ticketSystem.panelChannelId) {
+            await interaction.reply({
+                content: 'Use the configured ticket panel channel to open a ticket.',
+                ephemeral: true
+            });
+            return true;
+        }
+
+        await interaction.showModal(buildTicketIssueModal());
+        return true;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
     await closeTicketChannel(interaction);
     return true;
 }

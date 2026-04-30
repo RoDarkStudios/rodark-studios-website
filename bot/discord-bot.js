@@ -50,7 +50,8 @@ function createClient() {
     const nextClient = new Client({
         intents: [
             GatewayIntentBits.Guilds,
-            GatewayIntentBits.GuildMessages
+            GatewayIntentBits.GuildMessages,
+            GatewayIntentBits.MessageContent
         ]
     });
 

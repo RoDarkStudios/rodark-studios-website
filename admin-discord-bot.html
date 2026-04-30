@@ -240,6 +240,34 @@
                                     </button>
                                 </section>
 
+                                <section class="admin-discord-feature-card" aria-labelledby="discord-ticket-transcripts-title">
+                                    <div class="admin-discord-feature-head">
+                                        <div>
+                                            <h2 id="discord-ticket-transcripts-title" class="admin-tool-title">Ticket Transcripts</h2>
+                                            <p class="admin-tool-note">
+                                                Review permanently saved transcripts from closed tickets.
+                                            </p>
+                                        </div>
+                                        <button id="discord-ticket-transcripts-refresh-btn" class="btn btn-secondary admin-compact-btn" type="button">
+                                            Refresh
+                                        </button>
+                                    </div>
+
+                                    <div class="admin-ticket-transcripts-layout">
+                                        <div class="admin-ticket-transcripts-sidebar">
+                                            <div id="discord-ticket-transcripts-list" class="admin-ticket-transcripts-list" aria-live="polite">
+                                                Loading transcripts...
+                                            </div>
+                                            <button id="discord-ticket-transcripts-load-more-btn" class="btn btn-secondary admin-compact-btn hidden" type="button">
+                                                Load more
+                                            </button>
+                                        </div>
+                                        <div id="discord-ticket-transcript-viewer" class="admin-ticket-transcript-viewer">
+                                            Select a transcript to view it.
+                                        </div>
+                                    </div>
+                                </section>
+
                                 <p id="discord-bot-status-message" class="admin-status info hidden"></p>
                             </div>
                         </div>

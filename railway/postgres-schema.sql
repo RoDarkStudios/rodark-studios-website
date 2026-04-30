@@ -51,3 +51,40 @@ create table if not exists discord_bot_tickets (
     closed_at timestamptz,
     closed_by_user_id text
 );
+
+with ranked_open_tickets as (
+    select
+        ticket_id,
+        row_number() over (
+            partition by guild_id, opener_user_id
+            order by created_at asc, ticket_id asc
+        ) as open_rank
+    from discord_bot_tickets
+    where status = 'open'
+)
+update discord_bot_tickets
+set
+    status = 'closed',
+    closed_at = coalesce(closed_at, now())
+where ticket_id in (
+    select ticket_id
+    from ranked_open_tickets
+    where open_rank > 1
+);
+
+create unique index if not exists discord_bot_tickets_one_open_per_user_idx
+on discord_bot_tickets (guild_id, opener_user_id)
+where status = 'open';
+
+create table if not exists discord_bot_ticket_transcripts (
+    ticket_id bigint primary key,
+    guild_id text not null,
+    channel_id text not null,
+    channel_name text not null,
+    opener_user_id text not null,
+    closed_by_user_id text,
+    created_at timestamptz,
+    closed_at timestamptz not null default now(),
+    message_count integer not null default 0,
+    transcript jsonb not null default '[]'::jsonb
+);
