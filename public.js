@@ -299,6 +299,7 @@ function createGameCard(game, index) {
         ? game.description.trim()
         : 'Description unavailable.';
     const visits = Number(game && game.visits);
+    const playing = Number(game && game.playing);
     const isDiscontinued = Boolean(game && game.isDiscontinued);
     const iconUrl = typeof (game && game.iconUrl) === 'string' && game.iconUrl.trim()
         ? game.iconUrl.trim()
@@ -364,6 +365,13 @@ function createGameCard(game, index) {
         Number.isFinite(visits) && visits >= 0 ? formatNumber(Math.trunc(visits)) : 'Unavailable',
         'Total Visits'
     ));
+    if (Number.isFinite(playing) && playing > 1000) {
+        stats.append(createStat(
+            'fas fa-users',
+            formatNumber(Math.trunc(playing)),
+            'Playing Now'
+        ));
+    }
 
     info.append(
         title,

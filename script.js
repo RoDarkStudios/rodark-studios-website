@@ -2834,6 +2834,13 @@ async function fetchAllGameStats() {
                 'Total Visits'
             )
         );
+        if (Number.isFinite(playing) && playing > 1000) {
+            stats.append(createStat(
+                'fas fa-users',
+                formatNumber(Math.trunc(playing)),
+                'Playing Now'
+            ));
+        }
 
         info.append(
             title,
