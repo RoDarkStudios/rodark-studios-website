@@ -452,8 +452,6 @@ body {
 .game-thumbnail {
     position: relative;
     overflow: hidden;
-    align-self: start;
-    aspect-ratio: 1 / 1;
 }
 
 .game-image {
@@ -520,7 +518,7 @@ body {
     color: var(--text-muted);
     margin-bottom: 1.5rem;
     line-height: 1.7;
-    max-height: 13rem;
+    max-height: 22rem;
     overflow: auto;
     padding-right: 0.35rem;
     white-space: pre-line;
@@ -1802,10 +1800,6 @@ body {
     .games-loading {
         min-height: 280px;
         border-radius: 18px;
-    }
-
-    .game-description {
-        max-height: 11rem;
     }
 
     .game-card.featured {
