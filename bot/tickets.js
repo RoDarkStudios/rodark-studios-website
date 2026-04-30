@@ -123,12 +123,17 @@ function buildTicketWelcomePayload(openerLabel, issueDescription) {
     };
 }
 
-async function sendTemporaryTicketOpenPing(ticketChannel, openerUserId) {
+async function sendTemporaryTicketOpenPing(ticketChannel, openerUserId, helperRoleIds) {
+    const roleMentions = (Array.isArray(helperRoleIds) ? helperRoleIds : [])
+        .map((roleId) => String(roleId || '').trim())
+        .filter((roleId) => roleId && ticketChannel.guild.roles.cache.has(roleId))
+        .map((roleId) => `<@&${roleId}>`);
+    const mentionParts = [`<@${openerUserId}>`, ...roleMentions];
     const pingMessage = await ticketChannel.send({
-        content: `<@${openerUserId}>`,
+        content: mentionParts.join(' '),
         allowedMentions: {
             users: [String(openerUserId)],
-            roles: []
+            roles: (Array.isArray(helperRoleIds) ? helperRoleIds : []).map((roleId) => String(roleId)).filter(Boolean)
         }
     }).catch((error) => {
         console.error('Failed to send temporary ticket opener ping:', error);
@@ -316,15 +321,6 @@ function permissionBits(flags) {
 function buildTicketPermissionOverwrites(guild, categoryChannel, openerUserId, helperRoleIds) {
     const overwriteMap = new Map();
 
-    categoryChannel.permissionOverwrites.cache.forEach((overwrite) => {
-        overwriteMap.set(String(overwrite.id), {
-            id: String(overwrite.id),
-            type: overwrite.type,
-            allow: BigInt(overwrite.allow.bitfield || 0),
-            deny: BigInt(overwrite.deny.bitfield || 0)
-        });
-    });
-
     function patchOverwrite(id, type, allowFlags, denyFlags) {
         const key = String(id);
         const current = overwriteMap.get(key) || {
@@ -453,7 +449,7 @@ async function createTicketChannel(interaction, control, issueDescription) {
             throw error;
         }
 
-        await sendTemporaryTicketOpenPing(ticketChannel, interaction.user.id);
+        await sendTemporaryTicketOpenPing(ticketChannel, interaction.user.id, ticketSystem.helperRoleIds);
         await ticketChannel.send(buildTicketWelcomePayload(
             interaction.user.tag || interaction.user.username || 'A member',
             issueDescription
