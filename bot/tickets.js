@@ -17,6 +17,7 @@ const OPEN_TICKET_CUSTOM_ID = 'rodark_ticket_open';
 const CLOSE_TICKET_CUSTOM_ID = 'rodark_ticket_close';
 const BUG_REPORT_CHANNEL_ID = '1208767046184345610';
 const TICKET_OPEN_PING_DELETE_DELAY_MS = 1500;
+const TICKET_CLOSE_DELETE_DELAY_MS = 1000;
 
 function getTicketSystemControl(control) {
     const ticketSystem = control && control.ticketSystem && typeof control.ticketSystem === 'object'
@@ -46,7 +47,7 @@ function buildTicketPanelPayload() {
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(OPEN_TICKET_CUSTOM_ID)
-            .setEmoji('🎫')
+            .setEmoji('📩')
             .setLabel('Open Ticket')
             .setStyle(ButtonStyle.Primary)
     );
@@ -128,6 +129,19 @@ function buildTicketCreatedConfirmationPayload(ticketChannel) {
         embeds: [embed],
         components: [row]
     };
+}
+
+function buildTicketClosingComponents() {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(CLOSE_TICKET_CUSTOM_ID)
+                .setEmoji('⏳')
+                .setLabel('Closing')
+                .setStyle(ButtonStyle.Danger)
+                .setDisabled(true)
+        )
+    ];
 }
 
 async function fetchGuildChannel(client, channelId, label) {
@@ -298,20 +312,19 @@ async function closeTicketChannel(interaction) {
     }
 
     await closeDiscordTicketRecord(channel.id, interaction.user.id);
-    await interaction.editReply('Closing this ticket.');
-    await channel.send({
-        content: `Ticket closed by <@${interaction.user.id}>. This channel will be deleted shortly.`,
-        allowedMentions: {
-            users: [interaction.user.id],
-            roles: []
-        }
-    }).catch(() => null);
+    if (interaction.message && interaction.message.editable) {
+        await interaction.message.edit({ components: buildTicketClosingComponents() }).catch((error) => {
+            console.error('Failed to update closing ticket button:', error);
+        });
+    }
+
+    await interaction.editReply('Closing ticket...');
 
     setTimeout(() => {
         channel.delete(`Ticket closed by ${interaction.user.tag || interaction.user.id}`).catch((error) => {
             console.error('Failed to delete closed ticket channel:', error);
         });
-    }, 5000);
+    }, TICKET_CLOSE_DELETE_DELAY_MS);
 }
 
 async function handleTicketInteraction(interaction, control) {
