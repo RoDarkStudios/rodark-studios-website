@@ -2772,11 +2772,6 @@ async function fetchAllGameStats() {
                 'fas fa-eye',
                 Number.isFinite(visits) && visits >= 0 ? formatNumber(Math.trunc(visits)) : 'Unavailable',
                 'Total Visits'
-            ),
-            createStat(
-                'fas fa-users',
-                Number.isFinite(playing) && playing >= 0 ? formatNumber(Math.trunc(playing)) : 'Unavailable',
-                'Playing Now'
             )
         );
 
