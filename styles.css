@@ -1196,6 +1196,10 @@ body {
     min-height: 140px;
 }
 
+.admin-select-multiple {
+    min-height: 150px;
+}
+
 .admin-discord-control {
     display: flex;
     flex-direction: column;
@@ -1228,6 +1232,10 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
+}
+
+.admin-ticket-role-field {
+    margin-top: 0.9rem;
 }
 
 .admin-discord-status-row {

@@ -10,6 +10,8 @@ const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 const CHANNEL_LOOKUP_CACHE_TTL_MS = 60 * 1000;
 const channelLookupCache = new Map();
 const channelLookupInflight = new Map();
+const roleLookupCache = new Map();
+const roleLookupInflight = new Map();
 
 async function discordApiGet(pathname) {
     if (!DISCORD_BOT_TOKEN) {
@@ -42,7 +44,9 @@ function getGuildDiscoveryChannelIds(control) {
         startup.infoChannelId,
         startup.rolesChannelId,
         startup.staffInfoChannelId,
-        startup.gameTestInfoChannelId
+        startup.gameTestInfoChannelId,
+        control && control.ticketSystem ? control.ticketSystem.categoryChannelId : null,
+        control && control.ticketSystem ? control.ticketSystem.panelChannelId : null
     ]
         .filter(Boolean)
         .map((value) => String(value));
@@ -100,6 +104,27 @@ function buildDiscordChannelLookup(channels) {
 
         if (left.type !== right.type) {
             return left.type - right.type;
+        }
+
+        return left.name.localeCompare(right.name);
+    });
+
+    return mapped;
+}
+
+function buildDiscordRoleLookup(roles, guildId) {
+    const mapped = roles
+        .filter((role) => role && role.id && role.name && String(role.id) !== String(guildId))
+        .map((role) => ({
+            id: String(role.id),
+            name: String(role.name),
+            managed: Boolean(role.managed),
+            position: Number(role.position || 0)
+        }));
+
+    mapped.sort((left, right) => {
+        if (left.position !== right.position) {
+            return right.position - left.position;
         }
 
         return left.name.localeCompare(right.name);
@@ -171,6 +196,69 @@ async function getDiscordChannelLookup(control) {
     }
 }
 
+async function getDiscordRoleLookup(control) {
+    try {
+        const guildId = await resolveDiscordGuildId(control);
+        if (!guildId) {
+            return {
+                guildId: '',
+                roles: []
+            };
+        }
+
+        const cached = roleLookupCache.get(guildId);
+        if (cached && (Date.now() - cached.fetchedAt) < CHANNEL_LOOKUP_CACHE_TTL_MS) {
+            return {
+                guildId,
+                roles: cached.roles
+            };
+        }
+
+        if (roleLookupInflight.has(guildId)) {
+            return await roleLookupInflight.get(guildId);
+        }
+
+        const pendingLookup = (async () => {
+            try {
+                const roles = await discordApiGet(`/guilds/${encodeURIComponent(guildId)}/roles`);
+                const mappedRoles = buildDiscordRoleLookup(Array.isArray(roles) ? roles : [], guildId);
+                roleLookupCache.set(guildId, {
+                    fetchedAt: Date.now(),
+                    roles: mappedRoles
+                });
+                return {
+                    guildId,
+                    roles: mappedRoles
+                };
+            } catch (error) {
+                if (cached && Array.isArray(cached.roles) && cached.roles.length) {
+                    return {
+                        guildId,
+                        roles: cached.roles
+                    };
+                }
+
+                return {
+                    guildId: '',
+                    roles: [],
+                    error: String(error.message || error)
+                };
+            } finally {
+                roleLookupInflight.delete(guildId);
+            }
+        })();
+
+        roleLookupInflight.set(guildId, pendingLookup);
+        return await pendingLookup;
+    } catch (error) {
+        return {
+            guildId: '',
+            roles: [],
+            error: String(error.message || error)
+        };
+    }
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'POST') {
         return methodNotAllowed(req, res, ['GET', 'POST']);
@@ -188,15 +276,20 @@ module.exports = async (req, res) => {
         if (req.method === 'GET') {
             const control = await getDiscordBotControl();
             const channelLookup = await getDiscordChannelLookup(control);
+            const roleLookup = await getDiscordRoleLookup(control);
             return sendJson(res, 200, {
                 control,
-                channelLookup
+                channelLookup,
+                roleLookup
             });
         }
 
         const body = await readJsonBody(req);
         const startupContentSync = body && typeof body.startupContentSync === 'object' && body.startupContentSync
             ? body.startupContentSync
+            : null;
+        const ticketSystem = body && typeof body.ticketSystem === 'object' && body.ticketSystem
+            ? body.ticketSystem
             : null;
         const patch = {};
 
@@ -228,9 +321,22 @@ module.exports = async (req, res) => {
             patch.contentGameTestInfoChannelId = startupContentSync.gameTestInfoChannelId;
         }
 
+        if (ticketSystem && Object.prototype.hasOwnProperty.call(ticketSystem, 'categoryChannelId')) {
+            patch.ticketsCategoryChannelId = ticketSystem.categoryChannelId;
+        }
+
+        if (ticketSystem && Object.prototype.hasOwnProperty.call(ticketSystem, 'panelChannelId')) {
+            patch.ticketsPanelChannelId = ticketSystem.panelChannelId;
+        }
+
+        if (ticketSystem && Object.prototype.hasOwnProperty.call(ticketSystem, 'helperRoleIds')) {
+            patch.ticketsHelperRoleIds = ticketSystem.helperRoleIds;
+        }
+
         const control = await updateDiscordBotControl(patch, auth.user);
         const channelLookup = await getDiscordChannelLookup(control);
-        return sendJson(res, 200, { control, channelLookup });
+        const roleLookup = await getDiscordRoleLookup(control);
+        return sendJson(res, 200, { control, channelLookup, roleLookup });
     } catch (error) {
         const statusCode = /required|valid discord id|must be a valid discord id/i.test(String(error && error.message || ''))
             ? 400

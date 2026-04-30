@@ -2,12 +2,49 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { getDiscordBotControl, setDiscordBotRuntimeStatus } = require('../api/_lib/discord-bot-control-store');
 const { getPostgresPool } = require('../api/_lib/postgres');
 const { runStartupSync } = require('./discord-startup-sync');
+const { ensureTicketPanel, getTicketSystemControl, handleTicketInteraction } = require('./tickets');
 
 const POLL_INTERVAL_MS = Number.parseInt(process.env.DISCORD_BOT_POLL_INTERVAL_MS || '5000', 10);
 const DISCORD_BOT_TOKEN = String(process.env.DISCORD_BOT_TOKEN || '').trim();
 
 let client = null;
 let connecting = false;
+let lastTicketPanelSyncKey = '';
+let lastTicketPanelSyncAt = 0;
+
+function getTicketPanelSyncKey(control) {
+    const ticketSystem = getTicketSystemControl(control);
+    return JSON.stringify({
+        categoryChannelId: ticketSystem.categoryChannelId,
+        panelChannelId: ticketSystem.panelChannelId,
+        panelMessageId: ticketSystem.panelMessageId,
+        helperRoleIds: ticketSystem.helperRoleIds
+    });
+}
+
+async function syncTicketPanelIfNeeded(nextClient, control, options) {
+    if (!nextClient || !nextClient.isReady()) {
+        return;
+    }
+
+    const ticketSystem = getTicketSystemControl(control);
+    if (!ticketSystem.categoryChannelId || !ticketSystem.panelChannelId) {
+        lastTicketPanelSyncKey = '';
+        lastTicketPanelSyncAt = 0;
+        return;
+    }
+
+    const now = Date.now();
+    const syncKey = getTicketPanelSyncKey(control);
+    const force = Boolean(options && options.force);
+    if (!force && syncKey === lastTicketPanelSyncKey && now - lastTicketPanelSyncAt < 5 * 60 * 1000) {
+        return;
+    }
+
+    await ensureTicketPanel(nextClient, control);
+    lastTicketPanelSyncKey = syncKey;
+    lastTicketPanelSyncAt = now;
+}
 
 function createClient() {
     const nextClient = new Client({
@@ -25,10 +62,37 @@ function createClient() {
         try {
             const control = await getDiscordBotControl();
             await runStartupSync(nextClient, control);
+            await syncTicketPanelIfNeeded(nextClient, control, { force: true });
             await setDiscordBotRuntimeStatus('online', null);
         } catch (error) {
             console.error('Discord startup sync failed:', error);
             await setDiscordBotRuntimeStatus('online', `Startup sync failed: ${String(error.message || 'unknown error')}`);
+        }
+    });
+
+    nextClient.on('interactionCreate', async (interaction) => {
+        try {
+            const control = await getDiscordBotControl();
+            const handled = await handleTicketInteraction(interaction, control);
+            if (handled) {
+                await setDiscordBotRuntimeStatus('online', null);
+            }
+        } catch (error) {
+            console.error('Discord ticket interaction failed:', error);
+            await setDiscordBotRuntimeStatus('error', error.message).catch(() => {});
+
+            if (interaction && interaction.isRepliable && interaction.isRepliable()) {
+                const payload = {
+                    content: 'Something went wrong while handling that ticket action.',
+                    ephemeral: true
+                };
+
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply(payload).catch(() => {});
+                } else {
+                    await interaction.reply(payload).catch(() => {});
+                }
+            }
         }
     });
 
@@ -84,6 +148,8 @@ async function disconnectBot() {
     }
 
     await setDiscordBotRuntimeStatus('offline', null);
+    lastTicketPanelSyncKey = '';
+    lastTicketPanelSyncAt = 0;
     console.log('Discord bot is offline.');
 }
 
@@ -91,6 +157,9 @@ async function syncBotState() {
     const control = await getDiscordBotControl();
     if (control && control.desiredEnabled) {
         await connectBot();
+        if (client && client.isReady()) {
+            await syncTicketPanelIfNeeded(client, control);
+        }
         return;
     }
 

@@ -174,6 +174,63 @@
                                     </button>
                                 </section>
 
+                                <section class="admin-discord-feature-card" aria-labelledby="discord-ticket-system-title">
+                                    <div class="admin-discord-feature-head">
+                                        <div>
+                                            <h2 id="discord-ticket-system-title" class="admin-tool-title">Ticket System</h2>
+                                            <p class="admin-tool-note">
+                                                Create a private ticket panel and send new tickets into one category.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="admin-discord-field-grid">
+                                        <label class="admin-field">
+                                            <span class="admin-label">Ticket Category</span>
+                                            <input
+                                                id="discord-ticket-category-channel-id"
+                                                class="admin-input"
+                                                type="text"
+                                                autocomplete="off"
+                                                list="discord-category-channel-options"
+                                                placeholder="Search Discord categories"
+                                            >
+                                        </label>
+
+                                        <label class="admin-field">
+                                            <span class="admin-label">Ticket Panel Channel</span>
+                                            <input
+                                                id="discord-ticket-panel-channel-id"
+                                                class="admin-input"
+                                                type="text"
+                                                autocomplete="off"
+                                                list="discord-text-channel-options"
+                                                placeholder="Search Discord channels"
+                                            >
+                                        </label>
+                                    </div>
+
+                                    <label class="admin-field admin-ticket-role-field">
+                                        <span class="admin-label">Ticket Helper Roles</span>
+                                        <select
+                                            id="discord-ticket-helper-role-ids"
+                                            class="admin-input admin-select-multiple"
+                                            multiple
+                                            size="6"
+                                        ></select>
+                                    </label>
+
+                                    <p class="admin-tool-note">
+                                        Category permissions are copied to new tickets. Select helper roles here only if you want the bot to explicitly grant them ticket access.
+                                    </p>
+
+                                    <datalist id="discord-category-channel-options"></datalist>
+
+                                    <button id="discord-ticket-system-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
+                                        Save ticket settings
+                                    </button>
+                                </section>
+
                                 <p id="discord-bot-status-message" class="admin-status info hidden"></p>
                             </div>
                         </div>

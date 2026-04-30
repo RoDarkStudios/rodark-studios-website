@@ -15,9 +15,20 @@ const adminCopyMonetization = require('./api/admin/roblox-copy-monetization');
 const adminListMonetizationItems = require('./api/admin/roblox-list-monetization-items');
 const adminSyncExperienceConfigs = require('./api/admin/roblox-sync-experience-configs');
 const adminDiscordBotControl = require('./api/admin/discord-bot-control');
+const { getAdminGroupId } = require('./api/_lib/roblox-groups');
 
 const rootDir = __dirname;
 const port = process.env.PORT || 3000;
+const socialPreviewUniverseIds = [9876258060, 5602610435];
+const socialPreviewFallbackDescription = '5.5M+ total Roblox visits and 326K+ group members.';
+const socialPreviewCacheTtlMs = 5 * 60 * 1000;
+const socialPreviewFailureTtlMs = 60 * 1000;
+const socialPreviewRequestTimeoutMs = 5000;
+let socialPreviewCache = {
+    description: socialPreviewFallbackDescription,
+    expiresAt: 0,
+    pending: null
+};
 
 const pageRoutes = {
     '/privacy': 'privacy.html',
@@ -103,6 +114,135 @@ function sendRedirect(res, statusCode, location) {
     res.statusCode = statusCode;
     res.setHeader('Location', location);
     res.end();
+}
+
+function escapeHtmlAttribute(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function formatInteger(value) {
+    return Math.trunc(value).toLocaleString('en-US');
+}
+
+async function fetchRobloxJson(endpoint) {
+    const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+            Accept: 'application/json'
+        },
+        signal: AbortSignal.timeout(socialPreviewRequestTimeoutMs)
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+        throw new Error(`Roblox API returned ${response.status}`);
+    }
+
+    return payload;
+}
+
+async function fetchSocialPreviewDescription() {
+    const gamesEndpoint = new URL('https://games.roblox.com/v1/games');
+    gamesEndpoint.searchParams.set('universeIds', socialPreviewUniverseIds.join(','));
+
+    const groupId = getAdminGroupId();
+    const groupEndpoint = `https://groups.roblox.com/v1/groups/${encodeURIComponent(groupId)}`;
+
+    const [gamesPayload, groupPayload] = await Promise.all([
+        fetchRobloxJson(gamesEndpoint),
+        fetchRobloxJson(groupEndpoint)
+    ]);
+
+    const games = Array.isArray(gamesPayload && gamesPayload.data) ? gamesPayload.data : [];
+    const totalVisits = games.reduce((sum, game) => {
+        const visits = Number(game && game.visits);
+        return Number.isFinite(visits) && visits >= 0 ? sum + Math.trunc(visits) : sum;
+    }, 0);
+    const memberCount = Number(groupPayload && groupPayload.memberCount);
+
+    if (!Number.isFinite(totalVisits) || totalVisits <= 0) {
+        throw new Error('Roblox games response was missing visit counts');
+    }
+
+    if (!Number.isFinite(memberCount) || memberCount < 0) {
+        throw new Error('Roblox group response was missing memberCount');
+    }
+
+    return `${formatInteger(totalVisits)} total Roblox visits and ${formatInteger(memberCount)} group members.`;
+}
+
+async function getSocialPreviewDescription() {
+    const now = Date.now();
+    if (socialPreviewCache.description && socialPreviewCache.expiresAt > now) {
+        return socialPreviewCache.description;
+    }
+
+    if (!socialPreviewCache.pending) {
+        socialPreviewCache.pending = fetchSocialPreviewDescription()
+            .then((description) => {
+                socialPreviewCache = {
+                    description,
+                    expiresAt: Date.now() + socialPreviewCacheTtlMs,
+                    pending: null
+                };
+                return description;
+            })
+            .catch((error) => {
+                console.error('Failed to refresh social preview stats:', error);
+                const description = socialPreviewCache.description || socialPreviewFallbackDescription;
+                socialPreviewCache = {
+                    description,
+                    expiresAt: Date.now() + socialPreviewFailureTtlMs,
+                    pending: null
+                };
+                return description;
+            });
+    }
+
+    return socialPreviewCache.pending;
+}
+
+function injectSocialPreviewDescription(html, description) {
+    const escapedDescription = escapeHtmlAttribute(description);
+    return String(html)
+        .replace(
+            /(<meta\s+name="description"\s+content=")[^"]*(")/i,
+            `$1${escapedDescription}$2`
+        )
+        .replace(
+            /(<meta\s+property="og:description"\s+content=")[^"]*(")/i,
+            `$1${escapedDescription}$2`
+        )
+        .replace(
+            /(<meta\s+name="twitter:description"\s+content=")[^"]*(")/i,
+            `$1${escapedDescription}$2`
+        );
+}
+
+async function sendIndexHtml(req, res) {
+    const filePath = path.join(rootDir, 'index.html');
+    const [html, description] = await Promise.all([
+        fs.promises.readFile(filePath, 'utf8'),
+        getSocialPreviewDescription()
+    ]);
+    const body = injectSocialPreviewDescription(html, description);
+    const buffer = Buffer.from(body, 'utf8');
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+
+    if (req.method === 'HEAD') {
+        res.end();
+        return;
+    }
+
+    res.end(buffer);
 }
 
 function resolveStaticPath(urlPath) {
@@ -206,6 +346,11 @@ async function handleRequest(req, res) {
         return;
     }
 
+    if (routePath === '/' || routePath === '/index.html') {
+        await sendIndexHtml(req, res);
+        return;
+    }
+
     if (routePath.startsWith('/api/')) {
         await handleApi(req, res, routePath);
         return;
@@ -217,7 +362,7 @@ async function handleRequest(req, res) {
         return;
     }
 
-    sendFile(res, 'index.html');
+    await sendIndexHtml(req, res);
 }
 
 const server = http.createServer((req, res) => {

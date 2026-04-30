@@ -27,6 +27,31 @@ function normalizeOptionalSnowflake(value, fieldName) {
     return trimmed;
 }
 
+function normalizeOptionalSnowflakeArray(value, fieldName) {
+    if (value === undefined || value === null) {
+        return [];
+    }
+
+    const rawValues = Array.isArray(value)
+        ? value
+        : String(value).split(',');
+
+    const normalizedValues = [];
+    const seenValues = new Set();
+
+    rawValues.forEach((rawValue) => {
+        const normalizedValue = normalizeOptionalSnowflake(rawValue, fieldName);
+        if (!normalizedValue || seenValues.has(normalizedValue)) {
+            return;
+        }
+
+        seenValues.add(normalizedValue);
+        normalizedValues.push(normalizedValue);
+    });
+
+    return normalizedValues;
+}
+
 async function ensureDiscordBotControlSchema() {
     await postgresQuery(`
         create table if not exists discord_bot_control (
@@ -79,6 +104,49 @@ async function ensureDiscordBotControlSchema() {
 
     await postgresQuery(`
         alter table discord_bot_control
+        add column if not exists tickets_category_channel_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists tickets_panel_channel_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists tickets_panel_message_id text
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
+        add column if not exists tickets_helper_role_ids text[] not null default '{}'
+    `);
+
+    await postgresQuery(`
+        create sequence if not exists discord_bot_ticket_id_seq
+            as bigint
+            start with 1
+            increment by 1
+            no minvalue
+            no maxvalue
+            cache 1
+    `);
+
+    await postgresQuery(`
+        create table if not exists discord_bot_tickets (
+            ticket_id bigint primary key,
+            guild_id text not null,
+            channel_id text unique,
+            opener_user_id text not null,
+            status text not null default 'open',
+            created_at timestamptz not null default now(),
+            closed_at timestamptz,
+            closed_by_user_id text
+        )
+    `);
+
+    await postgresQuery(`
+        alter table discord_bot_control
         drop column if exists ai_ticket_assistant_enabled
     `);
 
@@ -123,6 +191,14 @@ function mapRowToDiscordBotControl(row) {
             rolesChannelId: row.content_roles_channel_id ? String(row.content_roles_channel_id) : null,
             staffInfoChannelId: row.content_staff_info_channel_id ? String(row.content_staff_info_channel_id) : null,
             gameTestInfoChannelId: row.content_game_test_info_channel_id ? String(row.content_game_test_info_channel_id) : null
+        },
+        ticketSystem: {
+            categoryChannelId: row.tickets_category_channel_id ? String(row.tickets_category_channel_id) : null,
+            panelChannelId: row.tickets_panel_channel_id ? String(row.tickets_panel_channel_id) : null,
+            panelMessageId: row.tickets_panel_message_id ? String(row.tickets_panel_message_id) : null,
+            helperRoleIds: Array.isArray(row.tickets_helper_role_ids)
+                ? row.tickets_helper_role_ids.map((value) => String(value)).filter(Boolean)
+                : []
         }
     };
 }
@@ -144,7 +220,11 @@ async function getDiscordBotControl() {
             content_info_channel_id,
             content_roles_channel_id,
             content_staff_info_channel_id,
-            content_game_test_info_channel_id
+            content_game_test_info_channel_id,
+            tickets_category_channel_id,
+            tickets_panel_channel_id,
+            tickets_panel_message_id,
+            tickets_helper_role_ids
         from discord_bot_control
         where id = $1
         limit 1
@@ -192,6 +272,21 @@ async function updateDiscordBotControl(patch, user) {
         : (currentControl.startupContentSync && currentControl.startupContentSync.gameTestInfoChannelId
             ? String(currentControl.startupContentSync.gameTestInfoChannelId)
             : null);
+    const ticketsCategoryChannelId = patch && Object.prototype.hasOwnProperty.call(patch, 'ticketsCategoryChannelId')
+        ? normalizeOptionalSnowflake(patch.ticketsCategoryChannelId, 'Tickets category ID')
+        : (currentControl.ticketSystem && currentControl.ticketSystem.categoryChannelId
+            ? String(currentControl.ticketSystem.categoryChannelId)
+            : null);
+    const ticketsPanelChannelId = patch && Object.prototype.hasOwnProperty.call(patch, 'ticketsPanelChannelId')
+        ? normalizeOptionalSnowflake(patch.ticketsPanelChannelId, 'Ticket panel channel ID')
+        : (currentControl.ticketSystem && currentControl.ticketSystem.panelChannelId
+            ? String(currentControl.ticketSystem.panelChannelId)
+            : null);
+    const ticketsHelperRoleIds = patch && Object.prototype.hasOwnProperty.call(patch, 'ticketsHelperRoleIds')
+        ? normalizeOptionalSnowflakeArray(patch.ticketsHelperRoleIds, 'Ticket helper role ID')
+        : (currentControl.ticketSystem && Array.isArray(currentControl.ticketSystem.helperRoleIds)
+            ? currentControl.ticketSystem.helperRoleIds.map((value) => String(value)).filter(Boolean)
+            : []);
 
     const result = await postgresQuery(`
         update discord_bot_control
@@ -203,9 +298,16 @@ async function updateDiscordBotControl(patch, user) {
             content_roles_channel_id = $6,
             content_staff_info_channel_id = $7,
             content_game_test_info_channel_id = $8,
+            tickets_category_channel_id = $9,
+            tickets_panel_channel_id = $10,
+            tickets_helper_role_ids = $11,
+            tickets_panel_message_id = case
+                when tickets_panel_channel_id is distinct from $10 then null
+                else tickets_panel_message_id
+            end,
             updated_at = now(),
-            updated_by_user_id = $9,
-            updated_by_username = $10,
+            updated_by_user_id = $12,
+            updated_by_username = $13,
             last_error = case when $2 = false then null else last_error end
         where id = $1
         returning
@@ -221,7 +323,11 @@ async function updateDiscordBotControl(patch, user) {
             content_info_channel_id,
             content_roles_channel_id,
             content_staff_info_channel_id,
-            content_game_test_info_channel_id
+            content_game_test_info_channel_id,
+            tickets_category_channel_id,
+            tickets_panel_channel_id,
+            tickets_panel_message_id,
+            tickets_helper_role_ids
     `, [
         CONTROL_ID,
         desiredEnabled,
@@ -231,8 +337,44 @@ async function updateDiscordBotControl(patch, user) {
         contentRolesChannelId,
         contentStaffInfoChannelId,
         contentGameTestInfoChannelId,
+        ticketsCategoryChannelId,
+        ticketsPanelChannelId,
+        ticketsHelperRoleIds,
         user && user.id ? String(user.id) : null,
         user && user.username ? String(user.username) : null
+    ]);
+
+    return mapRowToDiscordBotControl(result.rows[0]);
+}
+
+async function setDiscordTicketPanelMessageId(panelMessageId) {
+    await ensureDiscordBotControlSchema();
+
+    const result = await postgresQuery(`
+        update discord_bot_control
+        set tickets_panel_message_id = $2
+        where id = $1
+        returning
+            desired_enabled,
+            runtime_status,
+            last_seen_at,
+            last_error,
+            updated_at,
+            updated_by_user_id,
+            updated_by_username,
+            guild_id,
+            content_rules_channel_id,
+            content_info_channel_id,
+            content_roles_channel_id,
+            content_staff_info_channel_id,
+            content_game_test_info_channel_id,
+            tickets_category_channel_id,
+            tickets_panel_channel_id,
+            tickets_panel_message_id,
+            tickets_helper_role_ids
+    `, [
+        CONTROL_ID,
+        normalizeOptionalSnowflake(panelMessageId, 'Ticket panel message ID')
     ]);
 
     return mapRowToDiscordBotControl(result.rows[0]);
@@ -261,7 +403,11 @@ async function setDiscordBotRuntimeStatus(runtimeStatus, lastError) {
             content_info_channel_id,
             content_roles_channel_id,
             content_staff_info_channel_id,
-            content_game_test_info_channel_id
+            content_game_test_info_channel_id,
+            tickets_category_channel_id,
+            tickets_panel_channel_id,
+            tickets_panel_message_id,
+            tickets_helper_role_ids
     `, [
         CONTROL_ID,
         String(runtimeStatus || 'offline'),
@@ -275,5 +421,6 @@ module.exports = {
     ensureDiscordBotControlSchema,
     getDiscordBotControl,
     updateDiscordBotControl,
+    setDiscordTicketPanelMessageId,
     setDiscordBotRuntimeStatus
 };

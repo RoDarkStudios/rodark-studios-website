@@ -1485,6 +1485,24 @@ function getDiscordStartupSyncControl(control) {
     };
 }
 
+function getDiscordTicketSystemControl(control) {
+    if (!control || typeof control !== 'object' || !control.ticketSystem || typeof control.ticketSystem !== 'object') {
+        return {
+            categoryChannelId: '',
+            panelChannelId: '',
+            helperRoleIds: []
+        };
+    }
+
+    return {
+        categoryChannelId: control.ticketSystem.categoryChannelId ? String(control.ticketSystem.categoryChannelId) : '',
+        panelChannelId: control.ticketSystem.panelChannelId ? String(control.ticketSystem.panelChannelId) : '',
+        helperRoleIds: Array.isArray(control.ticketSystem.helperRoleIds)
+            ? control.ticketSystem.helperRoleIds.map((roleId) => String(roleId)).filter(Boolean)
+            : []
+    };
+}
+
 function getDiscordChannelLookup(payload) {
     const channelLookup = payload && payload.channelLookup && typeof payload.channelLookup === 'object'
         ? payload.channelLookup
@@ -1504,10 +1522,34 @@ function getDiscordChannelLookup(payload) {
     };
 }
 
+function getDiscordRoleLookup(payload) {
+    const roleLookup = payload && payload.roleLookup && typeof payload.roleLookup === 'object'
+        ? payload.roleLookup
+        : {};
+    const roles = Array.isArray(roleLookup.roles) ? roleLookup.roles : [];
+
+    return {
+        guildId: roleLookup.guildId ? String(roleLookup.guildId) : '',
+        error: roleLookup.error ? String(roleLookup.error) : '',
+        roles: roles.map((role) => ({
+            id: role && role.id ? String(role.id) : '',
+            name: role && role.name ? String(role.name) : '',
+            managed: Boolean(role && role.managed),
+            position: Number(role && role.position)
+        })).filter((role) => role.id && role.name)
+    };
+}
+
 let discordChannelLookupState = {
     guildId: '',
     error: '',
     channels: []
+};
+
+let discordRoleLookupState = {
+    guildId: '',
+    error: '',
+    roles: []
 };
 
 function formatDiscordChannelOptionLabel(channel) {
@@ -1542,6 +1584,34 @@ function fillDiscordChannelDatalist(elementId, channels) {
         option.value = formatDiscordChannelOptionLabel(channel);
         datalist.appendChild(option);
     });
+}
+
+function fillDiscordRoleSelect(elementId, roles, selectedRoleIds) {
+    const select = document.getElementById(elementId);
+    if (!select) {
+        return;
+    }
+
+    const selectedRoleIdSet = new Set((selectedRoleIds || []).map((roleId) => String(roleId)));
+    select.innerHTML = '';
+
+    roles.forEach((role) => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = `@${role.name}`;
+        option.selected = selectedRoleIdSet.has(role.id);
+        select.appendChild(option);
+    });
+}
+
+function getSelectedDiscordRoleIds(select) {
+    if (!select) {
+        return [];
+    }
+
+    return Array.from(select.selectedOptions || [])
+        .map((option) => String(option.value || '').trim())
+        .filter(Boolean);
 }
 
 function setDiscordChannelInputDisplayValue(input, channelId, channelMaps) {
