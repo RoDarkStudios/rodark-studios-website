@@ -2723,6 +2723,7 @@ async function fetchAllGameStats() {
             : 'Description unavailable.';
         const visits = Number(game && game.visits);
         const playing = Number(game && game.playing);
+        const isDiscontinued = Boolean(game && game.isDiscontinued);
         const iconUrl = typeof (game && game.iconUrl) === 'string' && game.iconUrl.trim()
             ? game.iconUrl.trim()
             : `/api/roblox/game-icon?universeId=${encodeURIComponent(String(universeId))}&size=512x512`;
@@ -2761,6 +2762,17 @@ async function fetchAllGameStats() {
         title.className = 'game-title';
         title.textContent = name;
 
+        const titleRow = document.createElement('div');
+        titleRow.className = 'game-title-row';
+        titleRow.append(title);
+        if (isDiscontinued) {
+            const badge = document.createElement('span');
+            badge.className = 'game-status-badge discontinued';
+            badge.textContent = 'Discontinued';
+            badge.title = 'This game has not been updated in over six months.';
+            titleRow.append(badge);
+        }
+
         const descriptionElement = document.createElement('p');
         descriptionElement.className = 'game-description';
         descriptionElement.textContent = description;
@@ -2776,7 +2788,7 @@ async function fetchAllGameStats() {
         );
 
         info.append(
-            title,
+            titleRow,
             descriptionElement,
             stats,
             createRobloxLink(robloxUrl, 'btn btn-primary', 'Play on Roblox', 'fab fa-roblox')
