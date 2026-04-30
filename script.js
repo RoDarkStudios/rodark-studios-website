@@ -1769,16 +1769,27 @@ function renderDiscordBotControl(control, options) {
     const startupStaffInfoChannelInput = document.getElementById('discord-content-staff-info-channel-id');
     const startupGameTestInfoChannelInput = document.getElementById('discord-content-game-test-info-channel-id');
     const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
+    const ticketCategoryChannelInput = document.getElementById('discord-ticket-category-channel-id');
+    const ticketPanelChannelInput = document.getElementById('discord-ticket-panel-channel-id');
+    const ticketHelperRoleSelect = document.getElementById('discord-ticket-helper-role-ids');
+    const ticketSystemSaveButton = document.getElementById('discord-ticket-system-save-btn');
     const channelLookupSummary = document.getElementById('discord-channel-lookup-summary');
     const formatted = formatDiscordBotStatus(control);
     const preserveGuildForm = Boolean(options && options.preserveGuildForm);
     const preserveStartupSyncForm = Boolean(options && options.preserveStartupSyncForm);
+    const preserveTicketSystemForm = Boolean(options && options.preserveTicketSystemForm);
     const startupSyncControl = getDiscordStartupSyncControl(control);
+    const ticketSystemControl = getDiscordTicketSystemControl(control);
     const requestedChannelLookup = getDiscordChannelLookup(options);
+    const requestedRoleLookup = getDiscordRoleLookup(options);
     const shouldKeepExistingChannelLookup = !requestedChannelLookup.channels.length
         && Boolean(requestedChannelLookup.error)
         && Array.isArray(discordChannelLookupState.channels)
         && discordChannelLookupState.channels.length > 0;
+    const shouldKeepExistingRoleLookup = !requestedRoleLookup.roles.length
+        && Boolean(requestedRoleLookup.error)
+        && Array.isArray(discordRoleLookupState.roles)
+        && discordRoleLookupState.roles.length > 0;
     const channelLookup = shouldKeepExistingChannelLookup
         ? {
             guildId: discordChannelLookupState.guildId,
@@ -1786,11 +1797,24 @@ function renderDiscordBotControl(control, options) {
             error: requestedChannelLookup.error
         }
         : requestedChannelLookup;
+    const roleLookup = shouldKeepExistingRoleLookup
+        ? {
+            guildId: discordRoleLookupState.guildId,
+            roles: discordRoleLookupState.roles,
+            error: requestedRoleLookup.error
+        }
+        : requestedRoleLookup;
     discordChannelLookupState = channelLookup;
+    discordRoleLookupState = roleLookup;
     const channelMaps = buildDiscordChannelLookupMaps(channelLookup);
+    const categoryMaps = buildDiscordChannelLookupMaps({
+        channels: channelLookup.channels.filter((channel) => channel.type === 4)
+    });
     const textChannels = channelLookup.channels.filter((channel) => channel.type === 0);
+    const categoryChannels = channelLookup.channels.filter((channel) => channel.type === 4);
 
     fillDiscordChannelDatalist('discord-text-channel-options', textChannels);
+    fillDiscordChannelDatalist('discord-category-channel-options', categoryChannels);
 
     if (statusDot) {
         statusDot.className = `admin-discord-status-dot ${formatted.dotClass}`.trim();
@@ -1829,6 +1853,18 @@ function renderDiscordBotControl(control, options) {
     }
     if (startupSyncSaveButton) {
         startupSyncSaveButton.disabled = false;
+    }
+    if (!preserveTicketSystemForm && ticketCategoryChannelInput) {
+        setDiscordChannelInputDisplayValue(ticketCategoryChannelInput, ticketSystemControl.categoryChannelId, categoryMaps);
+    }
+    if (!preserveTicketSystemForm && ticketPanelChannelInput) {
+        setDiscordChannelInputDisplayValue(ticketPanelChannelInput, ticketSystemControl.panelChannelId, channelMaps);
+    }
+    if (!preserveTicketSystemForm && ticketHelperRoleSelect) {
+        fillDiscordRoleSelect('discord-ticket-helper-role-ids', roleLookup.roles, ticketSystemControl.helperRoleIds);
+    }
+    if (ticketSystemSaveButton) {
+        ticketSystemSaveButton.disabled = false;
     }
     if (channelLookupSummary) {
         let lookupMessage = '';
@@ -1879,7 +1915,8 @@ async function fetchDiscordBotControl() {
 
     return {
         control: payload.control || null,
-        channelLookup: getDiscordChannelLookup(payload)
+        channelLookup: getDiscordChannelLookup(payload),
+        roleLookup: getDiscordRoleLookup(payload)
     };
 }
 
@@ -1887,7 +1924,8 @@ async function setDiscordBotDesiredState(desiredEnabled) {
     const payload = await postJson('/api/admin/discord-bot-control', { desiredEnabled });
     return {
         control: payload.control || null,
-        channelLookup: getDiscordChannelLookup(payload)
+        channelLookup: getDiscordChannelLookup(payload),
+        roleLookup: getDiscordRoleLookup(payload)
     };
 }
 
@@ -1898,7 +1936,8 @@ async function saveDiscordBotGuildConfig(guildId) {
 
     return {
         control: payload.control || null,
-        channelLookup: getDiscordChannelLookup(payload)
+        channelLookup: getDiscordChannelLookup(payload),
+        roleLookup: getDiscordRoleLookup(payload)
     };
 }
 
@@ -1915,7 +1954,24 @@ async function saveDiscordBotStartupSyncConfig(config) {
 
     return {
         control: payload.control || null,
-        channelLookup: getDiscordChannelLookup(payload)
+        channelLookup: getDiscordChannelLookup(payload),
+        roleLookup: getDiscordRoleLookup(payload)
+    };
+}
+
+async function saveDiscordTicketSystemConfig(config) {
+    const payload = await postJson('/api/admin/discord-bot-control', {
+        ticketSystem: {
+            categoryChannelId: config && config.categoryChannelId ? String(config.categoryChannelId).trim() : '',
+            panelChannelId: config && config.panelChannelId ? String(config.panelChannelId).trim() : '',
+            helperRoleIds: config && Array.isArray(config.helperRoleIds) ? config.helperRoleIds : []
+        }
+    });
+
+    return {
+        control: payload.control || null,
+        channelLookup: getDiscordChannelLookup(payload),
+        roleLookup: getDiscordRoleLookup(payload)
     };
 }
 
@@ -1936,6 +1992,10 @@ async function initDiscordBotDashboard() {
     const startupStaffInfoChannelInput = document.getElementById('discord-content-staff-info-channel-id');
     const startupGameTestInfoChannelInput = document.getElementById('discord-content-game-test-info-channel-id');
     const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
+    const ticketCategoryChannelInput = document.getElementById('discord-ticket-category-channel-id');
+    const ticketPanelChannelInput = document.getElementById('discord-ticket-panel-channel-id');
+    const ticketHelperRoleSelect = document.getElementById('discord-ticket-helper-role-ids');
+    const ticketSystemSaveButton = document.getElementById('discord-ticket-system-save-btn');
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
 
@@ -1953,6 +2013,7 @@ async function initDiscordBotDashboard() {
     ownedContent.classList.remove('hidden');
     dashboard.dataset.guildDirty = 'false';
     dashboard.dataset.startupSyncDirty = 'false';
+    dashboard.dataset.ticketSystemDirty = 'false';
 
     async function refreshControl() {
         try {
@@ -1960,7 +2021,9 @@ async function initDiscordBotDashboard() {
             renderDiscordBotControl(control.control, {
                 preserveGuildForm: dashboard.dataset.guildDirty === 'true',
                 preserveStartupSyncForm: dashboard.dataset.startupSyncDirty === 'true',
-                channelLookup: control.channelLookup
+                preserveTicketSystemForm: dashboard.dataset.ticketSystemDirty === 'true',
+                channelLookup: control.channelLookup,
+                roleLookup: control.roleLookup
             });
             setDiscordBotStatusMessage('', 'info');
         } catch (error) {
@@ -1972,6 +2035,9 @@ async function initDiscordBotDashboard() {
             }
             if (guildSaveButton) {
                 guildSaveButton.disabled = true;
+            }
+            if (ticketSystemSaveButton) {
+                ticketSystemSaveButton.disabled = true;
             }
             setDiscordBotStatusMessage(error.message || 'Failed to load Discord bot status.', 'error');
         }
@@ -1987,7 +2053,8 @@ async function initDiscordBotDashboard() {
             try {
                 const control = await setDiscordBotDesiredState(nextDesiredEnabled);
                 renderDiscordBotControl(control.control, {
-                    channelLookup: control.channelLookup
+                    channelLookup: control.channelLookup,
+                    roleLookup: control.roleLookup
                 });
                 setDiscordBotStatusMessage(nextDesiredEnabled
                     ? 'Connect requested. The bot service will come online shortly.'
@@ -2008,8 +2075,18 @@ async function initDiscordBotDashboard() {
         dashboard.dataset.startupSyncDirty = 'true';
     }
 
+    function markTicketSystemFormDirty() {
+        dashboard.dataset.ticketSystemDirty = 'true';
+    }
+
     function getCurrentDiscordChannelMaps() {
         return buildDiscordChannelLookupMaps(discordChannelLookupState);
+    }
+
+    function getCurrentDiscordCategoryMaps() {
+        return buildDiscordChannelLookupMaps({
+            channels: discordChannelLookupState.channels.filter((channel) => channel.type === 4)
+        });
     }
 
     if (guildIdInput) {
@@ -2030,11 +2107,22 @@ async function initDiscordBotDashboard() {
     if (startupGameTestInfoChannelInput) {
         startupGameTestInfoChannelInput.addEventListener('input', markStartupSyncFormDirty);
     }
+    if (ticketCategoryChannelInput) {
+        ticketCategoryChannelInput.addEventListener('input', markTicketSystemFormDirty);
+    }
+    if (ticketPanelChannelInput) {
+        ticketPanelChannelInput.addEventListener('input', markTicketSystemFormDirty);
+    }
+    if (ticketHelperRoleSelect) {
+        ticketHelperRoleSelect.addEventListener('change', markTicketSystemFormDirty);
+    }
     bindDiscordChannelAutocompleteInput(startupRulesChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(startupInfoChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(startupRolesChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(startupStaffInfoChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(startupGameTestInfoChannelInput, getCurrentDiscordChannelMaps);
+    bindDiscordChannelAutocompleteInput(ticketCategoryChannelInput, getCurrentDiscordCategoryMaps);
+    bindDiscordChannelAutocompleteInput(ticketPanelChannelInput, getCurrentDiscordChannelMaps);
 
     if (guildSaveButton) {
         guildSaveButton.addEventListener('click', async () => {
@@ -2045,7 +2133,8 @@ async function initDiscordBotDashboard() {
                 const control = await saveDiscordBotGuildConfig(guildIdInput ? guildIdInput.value : '');
                 dashboard.dataset.guildDirty = 'false';
                 renderDiscordBotControl(control.control, {
-                    channelLookup: control.channelLookup
+                    channelLookup: control.channelLookup,
+                    roleLookup: control.roleLookup
                 });
                 setDiscordBotStatusMessage('Discord server ID saved.', 'success');
             } catch (error) {
@@ -2070,12 +2159,37 @@ async function initDiscordBotDashboard() {
                 });
                 dashboard.dataset.startupSyncDirty = 'false';
                 renderDiscordBotControl(control.control, {
-                    channelLookup: control.channelLookup
+                    channelLookup: control.channelLookup,
+                    roleLookup: control.roleLookup
                 });
                 setDiscordBotStatusMessage('Startup sync settings saved. They will apply on bot startup/reconnect.', 'success');
             } catch (error) {
                 startupSyncSaveButton.disabled = false;
                 setDiscordBotStatusMessage(error.message || 'Failed to save startup sync settings.', 'error');
+            }
+        });
+    }
+
+    if (ticketSystemSaveButton) {
+        ticketSystemSaveButton.addEventListener('click', async () => {
+            ticketSystemSaveButton.disabled = true;
+            setDiscordBotStatusMessage('Saving ticket settings...', 'info');
+
+            try {
+                const control = await saveDiscordTicketSystemConfig({
+                    categoryChannelId: ticketCategoryChannelInput ? resolveDiscordChannelInputValue(ticketCategoryChannelInput, getCurrentDiscordCategoryMaps()) : '',
+                    panelChannelId: ticketPanelChannelInput ? resolveDiscordChannelInputValue(ticketPanelChannelInput, getCurrentDiscordChannelMaps()) : '',
+                    helperRoleIds: getSelectedDiscordRoleIds(ticketHelperRoleSelect)
+                });
+                dashboard.dataset.ticketSystemDirty = 'false';
+                renderDiscordBotControl(control.control, {
+                    channelLookup: control.channelLookup,
+                    roleLookup: control.roleLookup
+                });
+                setDiscordBotStatusMessage('Ticket settings saved. The panel message will sync while the bot is online.', 'success');
+            } catch (error) {
+                ticketSystemSaveButton.disabled = false;
+                setDiscordBotStatusMessage(error.message || 'Failed to save ticket settings.', 'error');
             }
         });
     }

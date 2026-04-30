@@ -82,15 +82,15 @@ function createClient() {
             await setDiscordBotRuntimeStatus('error', error.message).catch(() => {});
 
             if (interaction && interaction.isRepliable && interaction.isRepliable()) {
-                const payload = {
-                    content: 'Something went wrong while handling that ticket action.',
-                    ephemeral: true
-                };
-
                 if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply(payload).catch(() => {});
+                    await interaction.editReply({
+                        content: 'Something went wrong while handling that ticket action.'
+                    }).catch(() => {});
                 } else {
-                    await interaction.reply(payload).catch(() => {});
+                    await interaction.reply({
+                        content: 'Something went wrong while handling that ticket action.',
+                        ephemeral: true
+                    }).catch(() => {});
                 }
             }
         }
