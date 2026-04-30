@@ -20,7 +20,7 @@ const { getAdminGroupId } = require('./api/_lib/roblox-groups');
 const rootDir = __dirname;
 const port = process.env.PORT || 3000;
 const socialPreviewUniverseIds = [9876258060, 5602610435];
-const socialPreviewFallbackDescription = '5.5M+ total Roblox visits and 326K+ group members.';
+const socialPreviewFallbackDescription = '5.5M visits and 327,124 group members.';
 const socialPreviewCacheTtlMs = 5 * 60 * 1000;
 const socialPreviewFailureTtlMs = 60 * 1000;
 const socialPreviewRequestTimeoutMs = 5000;
@@ -128,6 +128,21 @@ function formatInteger(value) {
     return Math.trunc(value).toLocaleString('en-US');
 }
 
+function formatCompactVisits(value) {
+    const visits = Math.trunc(value);
+    if (visits >= 1000000) {
+        const millions = visits / 1000000;
+        return `${millions.toFixed(millions >= 10 ? 0 : 1).replace(/\.0$/, '')}M`;
+    }
+
+    if (visits >= 1000) {
+        const thousands = visits / 1000;
+        return `${thousands.toFixed(thousands >= 10 ? 0 : 1).replace(/\.0$/, '')}K`;
+    }
+
+    return formatInteger(visits);
+}
+
 async function fetchRobloxJson(endpoint) {
     const response = await fetch(endpoint, {
         method: 'GET',
@@ -172,7 +187,7 @@ async function fetchSocialPreviewDescription() {
         throw new Error('Roblox group response was missing memberCount');
     }
 
-    return `${formatInteger(totalVisits)} total Roblox visits and ${formatInteger(memberCount)} group members.`;
+    return `${formatCompactVisits(totalVisits)} visits and ${formatInteger(memberCount)} group members.`;
 }
 
 async function getSocialPreviewDescription() {

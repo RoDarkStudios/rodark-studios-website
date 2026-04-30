@@ -210,21 +210,30 @@
                                         </label>
                                     </div>
 
-                                    <label class="admin-field admin-ticket-role-field">
+                                    <div class="admin-field admin-ticket-role-field">
                                         <span class="admin-label">Ticket Helper Roles</span>
-                                        <select
-                                            id="discord-ticket-helper-role-ids"
-                                            class="admin-input admin-select-multiple"
-                                            multiple
-                                            size="6"
-                                        ></select>
-                                    </label>
+                                        <div class="admin-inline-actions">
+                                            <input
+                                                id="discord-ticket-helper-role-input"
+                                                class="admin-input admin-inline-input"
+                                                type="text"
+                                                autocomplete="off"
+                                                list="discord-role-options"
+                                                placeholder="Search Discord roles"
+                                            >
+                                            <button id="discord-ticket-helper-role-add-btn" class="btn btn-secondary admin-compact-btn" type="button">
+                                                Add role
+                                            </button>
+                                        </div>
+                                        <div id="discord-ticket-helper-role-list" class="admin-selected-list" aria-live="polite"></div>
+                                    </div>
 
                                     <p class="admin-tool-note">
                                         Category permissions are copied to new tickets. Select helper roles here only if you want the bot to explicitly grant them ticket access.
                                     </p>
 
                                     <datalist id="discord-category-channel-options"></datalist>
+                                    <datalist id="discord-role-options"></datalist>
 
                                     <button id="discord-ticket-system-save-btn" class="btn btn-secondary admin-submit-btn" type="button" disabled>
                                         Save ticket settings

@@ -1560,6 +1560,14 @@ function formatDiscordChannelOptionLabel(channel) {
     return `#${channel.name}`;
 }
 
+function formatDiscordRoleOptionLabel(role) {
+    if (!role) {
+        return '';
+    }
+
+    return `@${role.name}`;
+}
+
 function buildDiscordChannelLookupMaps(channelLookup) {
     const byId = new Map();
     const labelToId = new Map();
@@ -1567,6 +1575,18 @@ function buildDiscordChannelLookupMaps(channelLookup) {
     (channelLookup && Array.isArray(channelLookup.channels) ? channelLookup.channels : []).forEach((channel) => {
         byId.set(channel.id, channel);
         labelToId.set(formatDiscordChannelOptionLabel(channel).toLowerCase(), channel.id);
+    });
+
+    return { byId, labelToId };
+}
+
+function buildDiscordRoleLookupMaps(roleLookup) {
+    const byId = new Map();
+    const labelToId = new Map();
+
+    (roleLookup && Array.isArray(roleLookup.roles) ? roleLookup.roles : []).forEach((role) => {
+        byId.set(role.id, role);
+        labelToId.set(formatDiscordRoleOptionLabel(role).toLowerCase(), role.id);
     });
 
     return { byId, labelToId };
@@ -1586,32 +1606,114 @@ function fillDiscordChannelDatalist(elementId, channels) {
     });
 }
 
-function fillDiscordRoleSelect(elementId, roles, selectedRoleIds) {
-    const select = document.getElementById(elementId);
-    if (!select) {
+function fillDiscordRoleDatalist(elementId, roles) {
+    const datalist = document.getElementById(elementId);
+    if (!datalist) {
         return;
     }
 
-    const selectedRoleIdSet = new Set((selectedRoleIds || []).map((roleId) => String(roleId)));
-    select.innerHTML = '';
+    datalist.innerHTML = '';
 
     roles.forEach((role) => {
         const option = document.createElement('option');
-        option.value = role.id;
-        option.textContent = `@${role.name}`;
-        option.selected = selectedRoleIdSet.has(role.id);
-        select.appendChild(option);
+        option.value = formatDiscordRoleOptionLabel(role);
+        datalist.appendChild(option);
     });
 }
 
-function getSelectedDiscordRoleIds(select) {
-    if (!select) {
+function getSelectedDiscordRoleIds(container) {
+    if (!container) {
         return [];
     }
 
-    return Array.from(select.selectedOptions || [])
-        .map((option) => String(option.value || '').trim())
+    try {
+        const selectedRoleIds = JSON.parse(container.dataset.selectedIds || '[]');
+        return Array.isArray(selectedRoleIds)
+            ? selectedRoleIds.map((roleId) => String(roleId)).filter(Boolean)
+            : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function setSelectedDiscordRoleIds(container, roleIds) {
+    if (!container) {
+        return;
+    }
+
+    const seenRoleIds = new Set();
+    const selectedRoleIds = [];
+    (Array.isArray(roleIds) ? roleIds : []).forEach((roleId) => {
+        const normalizedRoleId = String(roleId || '').trim();
+        if (!normalizedRoleId || seenRoleIds.has(normalizedRoleId)) {
+            return;
+        }
+
+        seenRoleIds.add(normalizedRoleId);
+        selectedRoleIds.push(normalizedRoleId);
+    });
+
+    container.dataset.selectedIds = JSON.stringify(selectedRoleIds);
+}
+
+function renderDiscordSelectedRoles(container, selectedRoleIds, roleMaps) {
+    if (!container) {
+        return;
+    }
+
+    const normalizedRoleIds = (Array.isArray(selectedRoleIds) ? selectedRoleIds : [])
+        .map((roleId) => String(roleId || '').trim())
         .filter(Boolean);
+
+    setSelectedDiscordRoleIds(container, normalizedRoleIds);
+    container.innerHTML = '';
+
+    if (!normalizedRoleIds.length) {
+        const empty = document.createElement('span');
+        empty.className = 'admin-selected-empty';
+        empty.textContent = 'No helper roles selected.';
+        container.appendChild(empty);
+        return;
+    }
+
+    normalizedRoleIds.forEach((roleId) => {
+        const role = roleMaps && roleMaps.byId ? roleMaps.byId.get(roleId) : null;
+        const pill = document.createElement('span');
+        pill.className = 'admin-selected-pill';
+
+        const label = document.createElement('span');
+        label.textContent = role ? formatDiscordRoleOptionLabel(role) : roleId;
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'admin-selected-remove';
+        removeButton.dataset.roleId = roleId;
+        removeButton.setAttribute('aria-label', `Remove ${label.textContent}`);
+        removeButton.textContent = 'x';
+
+        pill.appendChild(label);
+        pill.appendChild(removeButton);
+        container.appendChild(pill);
+    });
+}
+
+function resolveDiscordRoleInputValue(input, roleMaps) {
+    if (!input) {
+        return '';
+    }
+
+    const rawValue = String(input.value || '').trim();
+    if (!rawValue) {
+        return '';
+    }
+
+    if (/^\d{5,25}$/.test(rawValue)) {
+        return rawValue;
+    }
+
+    return roleMaps && roleMaps.labelToId
+        ? (roleMaps.labelToId.get(rawValue.toLowerCase()) || '')
+        : '';
 }
 
 function setDiscordChannelInputDisplayValue(input, channelId, channelMaps) {
@@ -1771,7 +1873,8 @@ function renderDiscordBotControl(control, options) {
     const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
     const ticketCategoryChannelInput = document.getElementById('discord-ticket-category-channel-id');
     const ticketPanelChannelInput = document.getElementById('discord-ticket-panel-channel-id');
-    const ticketHelperRoleSelect = document.getElementById('discord-ticket-helper-role-ids');
+    const ticketHelperRoleInput = document.getElementById('discord-ticket-helper-role-input');
+    const ticketHelperRoleList = document.getElementById('discord-ticket-helper-role-list');
     const ticketSystemSaveButton = document.getElementById('discord-ticket-system-save-btn');
     const channelLookupSummary = document.getElementById('discord-channel-lookup-summary');
     const formatted = formatDiscordBotStatus(control);
@@ -1807,6 +1910,7 @@ function renderDiscordBotControl(control, options) {
     discordChannelLookupState = channelLookup;
     discordRoleLookupState = roleLookup;
     const channelMaps = buildDiscordChannelLookupMaps(channelLookup);
+    const roleMaps = buildDiscordRoleLookupMaps(roleLookup);
     const categoryMaps = buildDiscordChannelLookupMaps({
         channels: channelLookup.channels.filter((channel) => channel.type === 4)
     });
@@ -1815,6 +1919,7 @@ function renderDiscordBotControl(control, options) {
 
     fillDiscordChannelDatalist('discord-text-channel-options', textChannels);
     fillDiscordChannelDatalist('discord-category-channel-options', categoryChannels);
+    fillDiscordRoleDatalist('discord-role-options', roleLookup.roles);
 
     if (statusDot) {
         statusDot.className = `admin-discord-status-dot ${formatted.dotClass}`.trim();
@@ -1860,8 +1965,11 @@ function renderDiscordBotControl(control, options) {
     if (!preserveTicketSystemForm && ticketPanelChannelInput) {
         setDiscordChannelInputDisplayValue(ticketPanelChannelInput, ticketSystemControl.panelChannelId, channelMaps);
     }
-    if (!preserveTicketSystemForm && ticketHelperRoleSelect) {
-        fillDiscordRoleSelect('discord-ticket-helper-role-ids', roleLookup.roles, ticketSystemControl.helperRoleIds);
+    if (!preserveTicketSystemForm && ticketHelperRoleList) {
+        renderDiscordSelectedRoles(ticketHelperRoleList, ticketSystemControl.helperRoleIds, roleMaps);
+    }
+    if (!preserveTicketSystemForm && ticketHelperRoleInput) {
+        ticketHelperRoleInput.value = '';
     }
     if (ticketSystemSaveButton) {
         ticketSystemSaveButton.disabled = false;
@@ -1994,7 +2102,9 @@ async function initDiscordBotDashboard() {
     const startupSyncSaveButton = document.getElementById('discord-startup-sync-save-btn');
     const ticketCategoryChannelInput = document.getElementById('discord-ticket-category-channel-id');
     const ticketPanelChannelInput = document.getElementById('discord-ticket-panel-channel-id');
-    const ticketHelperRoleSelect = document.getElementById('discord-ticket-helper-role-ids');
+    const ticketHelperRoleInput = document.getElementById('discord-ticket-helper-role-input');
+    const ticketHelperRoleAddButton = document.getElementById('discord-ticket-helper-role-add-btn');
+    const ticketHelperRoleList = document.getElementById('discord-ticket-helper-role-list');
     const ticketSystemSaveButton = document.getElementById('discord-ticket-system-save-btn');
     const adminStatus = await fetchAdminStatus();
     const isAdmin = Boolean(adminStatus && adminStatus.isAdmin);
@@ -2089,6 +2199,10 @@ async function initDiscordBotDashboard() {
         });
     }
 
+    function getCurrentDiscordRoleMaps() {
+        return buildDiscordRoleLookupMaps(discordRoleLookupState);
+    }
+
     if (guildIdInput) {
         guildIdInput.addEventListener('input', markGuildFormDirty);
     }
@@ -2113,8 +2227,8 @@ async function initDiscordBotDashboard() {
     if (ticketPanelChannelInput) {
         ticketPanelChannelInput.addEventListener('input', markTicketSystemFormDirty);
     }
-    if (ticketHelperRoleSelect) {
-        ticketHelperRoleSelect.addEventListener('change', markTicketSystemFormDirty);
+    if (ticketHelperRoleInput) {
+        ticketHelperRoleInput.addEventListener('input', markTicketSystemFormDirty);
     }
     bindDiscordChannelAutocompleteInput(startupRulesChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(startupInfoChannelInput, getCurrentDiscordChannelMaps);
@@ -2123,6 +2237,43 @@ async function initDiscordBotDashboard() {
     bindDiscordChannelAutocompleteInput(startupGameTestInfoChannelInput, getCurrentDiscordChannelMaps);
     bindDiscordChannelAutocompleteInput(ticketCategoryChannelInput, getCurrentDiscordCategoryMaps);
     bindDiscordChannelAutocompleteInput(ticketPanelChannelInput, getCurrentDiscordChannelMaps);
+
+    if (ticketHelperRoleAddButton) {
+        ticketHelperRoleAddButton.addEventListener('click', () => {
+            const roleId = resolveDiscordRoleInputValue(ticketHelperRoleInput, getCurrentDiscordRoleMaps());
+            if (!roleId || !ticketHelperRoleList) {
+                return;
+            }
+
+            const selectedRoleIds = getSelectedDiscordRoleIds(ticketHelperRoleList);
+            if (!selectedRoleIds.includes(roleId)) {
+                selectedRoleIds.push(roleId);
+            }
+
+            renderDiscordSelectedRoles(ticketHelperRoleList, selectedRoleIds, getCurrentDiscordRoleMaps());
+            if (ticketHelperRoleInput) {
+                ticketHelperRoleInput.value = '';
+            }
+            markTicketSystemFormDirty();
+        });
+    }
+
+    if (ticketHelperRoleList) {
+        ticketHelperRoleList.addEventListener('click', (event) => {
+            const removeButton = event.target && event.target.closest
+                ? event.target.closest('.admin-selected-remove')
+                : null;
+            if (!removeButton) {
+                return;
+            }
+
+            const removedRoleId = String(removeButton.dataset.roleId || '');
+            const selectedRoleIds = getSelectedDiscordRoleIds(ticketHelperRoleList)
+                .filter((roleId) => roleId !== removedRoleId);
+            renderDiscordSelectedRoles(ticketHelperRoleList, selectedRoleIds, getCurrentDiscordRoleMaps());
+            markTicketSystemFormDirty();
+        });
+    }
 
     if (guildSaveButton) {
         guildSaveButton.addEventListener('click', async () => {
@@ -2179,7 +2330,7 @@ async function initDiscordBotDashboard() {
                 const control = await saveDiscordTicketSystemConfig({
                     categoryChannelId: ticketCategoryChannelInput ? resolveDiscordChannelInputValue(ticketCategoryChannelInput, getCurrentDiscordCategoryMaps()) : '',
                     panelChannelId: ticketPanelChannelInput ? resolveDiscordChannelInputValue(ticketPanelChannelInput, getCurrentDiscordChannelMaps()) : '',
-                    helperRoleIds: getSelectedDiscordRoleIds(ticketHelperRoleSelect)
+                    helperRoleIds: getSelectedDiscordRoleIds(ticketHelperRoleList)
                 });
                 dashboard.dataset.ticketSystemDirty = 'false';
                 renderDiscordBotControl(control.control, {
