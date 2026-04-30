@@ -504,15 +504,17 @@ body {
 }
 
 .game-info {
-    padding: 2rem;
+    padding: 1.75rem 2rem;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    min-height: 0;
 }
 
 .game-title {
     font-size: 2rem;
     font-weight: 700;
+    line-height: 1.15;
     margin-bottom: 0;
     color: var(--text-primary);
 }
@@ -545,14 +547,15 @@ body {
 
 .game-description {
     color: var(--text-muted);
-    margin-bottom: 1.5rem;
-    line-height: 1.7;
-    max-height: calc(1.7em * 7);
-    overflow: auto;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+    max-height: calc(1.6em * 7);
+    overflow-x: hidden;
+    overflow-y: auto;
     padding-right: 0.35rem;
     white-space: pre-line;
     scrollbar-width: thin;
-    scrollbar-color: rgba(6, 182, 212, 0.45) rgba(10, 10, 10, 0.28);
+    scrollbar-color: rgba(6, 182, 212, 0.46) transparent;
 }
 
 .game-description::-webkit-scrollbar {
@@ -560,13 +563,21 @@ body {
 }
 
 .game-description::-webkit-scrollbar-track {
-    background: rgba(10, 10, 10, 0.28);
+    background: transparent;
     border-radius: 999px;
 }
 
 .game-description::-webkit-scrollbar-thumb {
     background: rgba(6, 182, 212, 0.45);
     border-radius: 999px;
+}
+
+.game-description::-webkit-scrollbar-button,
+.game-description::-webkit-scrollbar-corner {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
 }
 
 .game-description::-webkit-scrollbar-thumb:hover {
@@ -576,7 +587,7 @@ body {
 .game-stats {
     display: flex;
     gap: 2rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     justify-content: center;
     flex-wrap: wrap;
 }
