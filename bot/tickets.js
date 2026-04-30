@@ -35,7 +35,11 @@ function buildTicketPanelPayload() {
     const embed = new EmbedBuilder()
         .setTitle('Open a Ticket')
         .setColor(0xf97316)
-        .setDescription('Need help from RoDark Studios staff? Open a private ticket and describe what you need.');
+        .setDescription([
+            'Need help from RoDark Studios staff? Open a private ticket and describe what you need.',
+            '',
+            '⚠️ For bug reports, use #bug-reports channel instead. Rest assured, they will all be read even if developers are currently busy.'
+        ].join('\n'));
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
