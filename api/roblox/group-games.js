@@ -8,7 +8,6 @@ const DEFAULT_MIN_VISITS = 100000;
 const CACHE_TTL_MS = 60 * 1000;
 const FAILURE_CACHE_TTL_MS = 15 * 1000;
 const REQUEST_TIMEOUT_MS = 8000;
-const DISCONTINUED_AFTER_MONTHS = 6;
 
 let groupGamesCache = {
     key: '',
@@ -101,18 +100,14 @@ function normalizeGame(row) {
     const universeId = Number(row && row.id);
     const rootPlaceId = Number(row && row.rootPlaceId);
     const updatedAt = typeof (row && row.updated) === 'string' ? row.updated.trim() : '';
-    const updatedDate = updatedAt ? new Date(updatedAt) : null;
-    const discontinuedCutoff = new Date();
-    discontinuedCutoff.setMonth(discontinuedCutoff.getMonth() - DISCONTINUED_AFTER_MONTHS);
-    const isDiscontinued = updatedDate instanceof Date
-        && !Number.isNaN(updatedDate.getTime())
-        && updatedDate < discontinuedCutoff;
+    const description = typeof (row && row.description) === 'string' ? row.description.trim() : '';
+    const isDiscontinued = /\bdiscontinued\b/i.test(description);
 
     return {
         universeId,
         rootPlaceId,
         name: typeof (row && row.name) === 'string' ? row.name.trim() : '',
-        description: typeof (row && row.description) === 'string' ? row.description.trim() : '',
+        description,
         updatedAt,
         isDiscontinued,
         visits: Number(row && row.visits),

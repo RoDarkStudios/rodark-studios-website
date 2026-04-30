@@ -2769,7 +2769,7 @@ async function fetchAllGameStats() {
             const badge = document.createElement('span');
             badge.className = 'game-status-badge discontinued';
             badge.textContent = 'Discontinued';
-            badge.title = 'This game has not been updated in over six months.';
+            badge.title = 'This game is marked discontinued in its Roblox description.';
             titleRow.append(badge);
         }
 
