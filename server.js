@@ -19,11 +19,13 @@ const { getAdminGroupId } = require('./api/_lib/roblox-groups');
 
 const rootDir = __dirname;
 const port = process.env.PORT || 3000;
-const socialPreviewUniverseIds = [9876258060, 5602610435];
-const socialPreviewFallbackDescription = '5.5M visits and 327,124 group members.';
+const socialPreviewFallbackDescription = '1.1M visits, 3,212 concurrent players, and 327,543 group members.';
 const socialPreviewCacheTtlMs = 5 * 60 * 1000;
 const socialPreviewFailureTtlMs = 60 * 1000;
 const socialPreviewRequestTimeoutMs = 5000;
+const robloxGroupGamesPageLimit = 100;
+const robloxGameDetailsBatchSize = 20;
+const robloxGroupGamesMaxPages = 20;
 let socialPreviewCache = {
     description: socialPreviewFallbackDescription,
     expiresAt: 0,
@@ -160,22 +162,83 @@ async function fetchRobloxJson(endpoint) {
     return payload;
 }
 
-async function fetchSocialPreviewDescription() {
-    const gamesEndpoint = new URL('https://games.roblox.com/v1/games');
-    gamesEndpoint.searchParams.set('universeIds', socialPreviewUniverseIds.join(','));
+function parsePositiveId(value) {
+    const parsed = Number.parseInt(String(value || '').trim(), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
 
+async function fetchGroupUniverseIds(groupId) {
+    const universeIds = [];
+    const seen = new Set();
+    let cursor = '';
+
+    for (let page = 0; page < robloxGroupGamesMaxPages; page += 1) {
+        const endpoint = new URL(`https://games.roblox.com/v2/groups/${encodeURIComponent(groupId)}/games`);
+        endpoint.searchParams.set('accessFilter', 'All');
+        endpoint.searchParams.set('limit', String(robloxGroupGamesPageLimit));
+        endpoint.searchParams.set('sortOrder', 'Asc');
+        if (cursor) {
+            endpoint.searchParams.set('cursor', cursor);
+        }
+
+        const payload = await fetchRobloxJson(endpoint);
+        const games = Array.isArray(payload && payload.data) ? payload.data : [];
+        games.forEach((game) => {
+            const universeId = parsePositiveId(game && game.id);
+            if (universeId && !seen.has(universeId)) {
+                seen.add(universeId);
+                universeIds.push(universeId);
+            }
+        });
+
+        cursor = typeof (payload && payload.nextPageCursor) === 'string'
+            ? payload.nextPageCursor.trim()
+            : '';
+        if (!cursor) {
+            break;
+        }
+    }
+
+    return universeIds;
+}
+
+async function fetchGameDetails(universeIds) {
+    const games = [];
+    for (let index = 0; index < universeIds.length; index += robloxGameDetailsBatchSize) {
+        const batch = universeIds.slice(index, index + robloxGameDetailsBatchSize);
+        const endpoint = new URL('https://games.roblox.com/v1/games');
+        endpoint.searchParams.set('universeIds', batch.join(','));
+
+        const payload = await fetchRobloxJson(endpoint);
+        if (Array.isArray(payload && payload.data)) {
+            games.push(...payload.data);
+        }
+    }
+
+    return games;
+}
+
+async function fetchSocialPreviewDescription() {
     const groupId = getAdminGroupId();
     const groupEndpoint = `https://groups.roblox.com/v1/groups/${encodeURIComponent(groupId)}`;
 
-    const [gamesPayload, groupPayload] = await Promise.all([
-        fetchRobloxJson(gamesEndpoint),
+    const [universeIds, groupPayload] = await Promise.all([
+        fetchGroupUniverseIds(groupId),
         fetchRobloxJson(groupEndpoint)
     ]);
 
-    const games = Array.isArray(gamesPayload && gamesPayload.data) ? gamesPayload.data : [];
+    if (!universeIds.length) {
+        throw new Error('Roblox group games response did not include any universe IDs');
+    }
+
+    const games = await fetchGameDetails(universeIds);
     const totalVisits = games.reduce((sum, game) => {
         const visits = Number(game && game.visits);
         return Number.isFinite(visits) && visits >= 0 ? sum + Math.trunc(visits) : sum;
+    }, 0);
+    const totalPlaying = games.reduce((sum, game) => {
+        const playing = Number(game && game.playing);
+        return Number.isFinite(playing) && playing >= 0 ? sum + Math.trunc(playing) : sum;
     }, 0);
     const memberCount = Number(groupPayload && groupPayload.memberCount);
 
@@ -187,7 +250,7 @@ async function fetchSocialPreviewDescription() {
         throw new Error('Roblox group response was missing memberCount');
     }
 
-    return `${formatCompactVisits(totalVisits)} visits and ${formatInteger(memberCount)} group members.`;
+    return `${formatCompactVisits(totalVisits)} visits, ${formatInteger(totalPlaying)} concurrent players, and ${formatInteger(memberCount)} group members.`;
 }
 
 async function getSocialPreviewDescription() {

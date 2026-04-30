@@ -15,6 +15,7 @@ const {
 
 const OPEN_TICKET_CUSTOM_ID = 'rodark_ticket_open';
 const CLOSE_TICKET_CUSTOM_ID = 'rodark_ticket_close';
+const BUG_REPORT_CHANNEL_ID = '1208767046184345610';
 
 function getTicketSystemControl(control) {
     const ticketSystem = control && control.ticketSystem && typeof control.ticketSystem === 'object'
@@ -38,7 +39,7 @@ function buildTicketPanelPayload() {
         .setDescription([
             'Need help from RoDark Studios staff? Open a private ticket and describe what you need.',
             '',
-            '⚠️ For bug reports, use #bug-reports channel instead. Rest assured, they will all be read even if developers are currently busy.'
+            `For bug reports, use <#${BUG_REPORT_CHANNEL_ID}> instead. They will be read even if developers are currently busy.`
         ].join('\n'));
 
     const row = new ActionRowBuilder().addComponents(
