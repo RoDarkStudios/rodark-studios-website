@@ -16,6 +16,7 @@ const {
 const OPEN_TICKET_CUSTOM_ID = 'rodark_ticket_open';
 const CLOSE_TICKET_CUSTOM_ID = 'rodark_ticket_close';
 const BUG_REPORT_CHANNEL_ID = '1208767046184345610';
+const TICKET_OPEN_PING_DELETE_DELAY_MS = 1500;
 
 function getTicketSystemControl(control) {
     const ticketSystem = control && control.ticketSystem && typeof control.ticketSystem === 'object'
@@ -39,12 +40,13 @@ function buildTicketPanelPayload() {
         .setDescription([
             'Need help from RoDark Studios staff? Open a private ticket and describe what you need.',
             '',
-            `For bug reports, use <#${BUG_REPORT_CHANNEL_ID}> instead. They will be read even if developers are currently busy.`
+            `⚠️ For bug reports, use <#${BUG_REPORT_CHANNEL_ID}> instead. They will be read even if developers are currently busy.`
         ].join('\n'));
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(OPEN_TICKET_CUSTOM_ID)
+            .setEmoji('🎫')
             .setLabel('Open Ticket')
             .setStyle(ButtonStyle.Primary)
     );
@@ -56,31 +58,75 @@ function buildTicketPanelPayload() {
     };
 }
 
-function buildTicketWelcomePayload(ticketId, openerUserId) {
+function buildTicketWelcomePayload(openerLabel) {
     const embed = new EmbedBuilder()
-        .setTitle(`Ticket #${ticketId}`)
+        .setTitle('Support Ticket')
         .setColor(0x22d3ee)
         .setDescription([
-            `<@${openerUserId}> opened this ticket.`,
+            `${openerLabel || 'A member'} opened this ticket.`,
             '',
-            'Describe what you need and someone with ticket access will help when available.'
+            'Thank you for contacting support.',
+            '',
+            'Please describe your issue and wait for a response.'
         ].join('\n'));
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(CLOSE_TICKET_CUSTOM_ID)
-            .setLabel('Close Ticket')
+            .setEmoji('🔒')
+            .setLabel('Close')
             .setStyle(ButtonStyle.Danger)
     );
 
     return {
-        content: `<@${openerUserId}>`,
+        content: '',
         embeds: [embed],
         components: [row],
+        allowedMentions: { parse: [] }
+    };
+}
+
+async function sendTemporaryTicketOpenPing(ticketChannel, openerUserId) {
+    const pingMessage = await ticketChannel.send({
+        content: `<@${openerUserId}>`,
         allowedMentions: {
             users: [String(openerUserId)],
             roles: []
         }
+    }).catch((error) => {
+        console.error('Failed to send temporary ticket opener ping:', error);
+        return null;
+    });
+
+    if (!pingMessage) {
+        return;
+    }
+
+    setTimeout(() => {
+        pingMessage.delete('Remove temporary ticket opener ping').catch((error) => {
+            console.error('Failed to delete temporary ticket opener ping:', error);
+        });
+    }, TICKET_OPEN_PING_DELETE_DELAY_MS);
+}
+
+function buildTicketCreatedConfirmationPayload(ticketChannel) {
+    const embed = new EmbedBuilder()
+        .setTitle('Ticket')
+        .setColor(0x22c55e)
+        .setDescription(`Opened a new ticket: ${ticketChannel.toString()}`);
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setLabel('Go to Ticket')
+            .setEmoji('🎫')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://discord.com/channels/${ticketChannel.guild.id}/${ticketChannel.id}`)
+    );
+
+    return {
+        content: '',
+        embeds: [embed],
+        components: [row]
     };
 }
 
@@ -239,8 +285,9 @@ async function createTicketChannel(interaction, control) {
         openerUserId: interaction.user.id
     });
 
-    await ticketChannel.send(buildTicketWelcomePayload(ticketId, interaction.user.id));
-    await interaction.editReply(`Ticket created: ${ticketChannel.toString()}`);
+    await sendTemporaryTicketOpenPing(ticketChannel, interaction.user.id);
+    await ticketChannel.send(buildTicketWelcomePayload(interaction.user.tag || interaction.user.username || 'A member'));
+    await interaction.editReply(buildTicketCreatedConfirmationPayload(ticketChannel));
 }
 
 async function closeTicketChannel(interaction) {
