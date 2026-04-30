@@ -522,23 +522,25 @@ body {
 
 .game-status-badge {
     position: absolute;
-    top: 0.9rem;
-    left: 0.9rem;
+    top: 1rem;
+    left: 0;
     z-index: 2;
     display: inline-flex;
     align-items: center;
-    border-radius: 999px;
-    border: 1px solid rgba(248, 113, 113, 0.42);
-    background: rgba(10, 10, 10, 0.72);
+    border: 1px solid rgba(248, 113, 113, 0.78);
+    border-left: 0;
+    border-radius: 0 999px 999px 0;
+    background: rgba(127, 29, 29, 0.9);
     backdrop-filter: blur(8px);
-    color: #fecaca;
-    font-size: 0.72rem;
+    color: #fff7ed;
+    font-size: 0.82rem;
     font-weight: 800;
     line-height: 1;
-    letter-spacing: 0.04em;
-    padding: 0.38rem 0.55rem;
+    letter-spacing: 0.06em;
+    padding: 0.55rem 0.8rem;
     text-transform: uppercase;
-    box-shadow: 0 0 18px rgba(248, 113, 113, 0.16);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36), 0 0 18px rgba(248, 113, 113, 0.28);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .game-description-scroll {
