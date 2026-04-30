@@ -52,21 +52,41 @@
 
                         <div id="admin-owned-content" class="hidden">
                             <div id="discord-bot-dashboard" class="admin-discord-control">
-                                <div class="admin-discord-status-row">
-                                    <span id="discord-bot-status-dot" class="admin-discord-status-dot" aria-hidden="true"></span>
-                                    <div>
-                                        <h2 id="discord-bot-status-title" class="admin-tool-title">Discord bot status</h2>
-                                        <p id="discord-bot-status-detail" class="admin-tool-note">
-                                            Loading bot status...
-                                        </p>
-                                    </div>
+                                <div class="admin-discord-tabs" role="tablist" aria-label="Discord bot dashboard sections">
+                                    <button class="admin-discord-tab is-active" type="button" role="tab" aria-selected="true" data-discord-tab-target="discord-tab-status">
+                                        Status
+                                    </button>
+                                    <button class="admin-discord-tab" type="button" role="tab" aria-selected="false" data-discord-tab-target="discord-tab-server">
+                                        Server
+                                    </button>
+                                    <button class="admin-discord-tab" type="button" role="tab" aria-selected="false" data-discord-tab-target="discord-tab-startup-sync">
+                                        Startup Sync
+                                    </button>
+                                    <button class="admin-discord-tab" type="button" role="tab" aria-selected="false" data-discord-tab-target="discord-tab-tickets">
+                                        Tickets
+                                    </button>
+                                    <button class="admin-discord-tab" type="button" role="tab" aria-selected="false" data-discord-tab-target="discord-tab-transcripts">
+                                        Transcripts
+                                    </button>
                                 </div>
 
-                                <button id="discord-bot-toggle-btn" class="btn btn-primary admin-submit-btn" type="button" disabled>
-                                    Connect bot
-                                </button>
+                                <section id="discord-tab-status" class="admin-discord-tab-panel is-active" role="tabpanel">
+                                    <div class="admin-discord-status-row">
+                                        <span id="discord-bot-status-dot" class="admin-discord-status-dot" aria-hidden="true"></span>
+                                        <div>
+                                            <h2 id="discord-bot-status-title" class="admin-tool-title">Discord bot status</h2>
+                                            <p id="discord-bot-status-detail" class="admin-tool-note">
+                                                Loading bot status...
+                                            </p>
+                                        </div>
+                                    </div>
 
-                                <section class="admin-discord-feature-card" aria-labelledby="discord-server-title">
+                                    <button id="discord-bot-toggle-btn" class="btn btn-primary admin-submit-btn" type="button" disabled>
+                                        Connect bot
+                                    </button>
+                                </section>
+
+                                <section id="discord-tab-server" class="admin-discord-feature-card admin-discord-tab-panel" role="tabpanel" aria-labelledby="discord-server-title" hidden>
                                     <div class="admin-discord-feature-head">
                                         <div>
                                             <h2 id="discord-server-title" class="admin-tool-title">Discord Server</h2>
@@ -93,7 +113,7 @@
                                     </button>
                                 </section>
 
-                                <section class="admin-discord-feature-card" aria-labelledby="discord-startup-sync-title">
+                                <section id="discord-tab-startup-sync" class="admin-discord-feature-card admin-discord-tab-panel" role="tabpanel" aria-labelledby="discord-startup-sync-title" hidden>
                                     <div class="admin-discord-feature-head">
                                         <div>
                                             <h2 id="discord-startup-sync-title" class="admin-tool-title">Startup Channel Sync</h2>
@@ -174,7 +194,7 @@
                                     </button>
                                 </section>
 
-                                <section class="admin-discord-feature-card" aria-labelledby="discord-ticket-system-title">
+                                <section id="discord-tab-tickets" class="admin-discord-feature-card admin-discord-tab-panel" role="tabpanel" aria-labelledby="discord-ticket-system-title" hidden>
                                     <div class="admin-discord-feature-head">
                                         <div>
                                             <h2 id="discord-ticket-system-title" class="admin-tool-title">Ticket System</h2>
@@ -240,7 +260,7 @@
                                     </button>
                                 </section>
 
-                                <section class="admin-discord-feature-card" aria-labelledby="discord-ticket-transcripts-title">
+                                <section id="discord-tab-transcripts" class="admin-discord-feature-card admin-discord-tab-panel" role="tabpanel" aria-labelledby="discord-ticket-transcripts-title" hidden>
                                     <div class="admin-discord-feature-head">
                                         <div>
                                             <h2 id="discord-ticket-transcripts-title" class="admin-tool-title">Ticket Transcripts</h2>

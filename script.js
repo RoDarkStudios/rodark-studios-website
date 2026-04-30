@@ -2292,6 +2292,23 @@ async function initDiscordBotDashboard() {
     let ticketTranscriptOffset = 0;
     let hasMoreTicketTranscripts = false;
 
+    function activateDiscordDashboardTab(targetId) {
+        const tabButtons = Array.from(dashboard.querySelectorAll('[data-discord-tab-target]'));
+        const tabPanels = Array.from(dashboard.querySelectorAll('.admin-discord-tab-panel'));
+
+        tabButtons.forEach((button) => {
+            const isActive = String(button.dataset.discordTabTarget || '') === String(targetId);
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+
+        tabPanels.forEach((panel) => {
+            const isActive = panel.id === targetId;
+            panel.classList.toggle('is-active', isActive);
+            panel.hidden = !isActive;
+        });
+    }
+
     async function refreshControl() {
         try {
             const control = await fetchDiscordBotControl();
@@ -2409,6 +2426,15 @@ async function initDiscordBotDashboard() {
     function getCurrentDiscordRoleMaps() {
         return buildDiscordRoleLookupMaps(discordRoleLookupState);
     }
+
+    dashboard.querySelectorAll('[data-discord-tab-target]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const targetId = String(button.dataset.discordTabTarget || '');
+            if (targetId) {
+                activateDiscordDashboardTab(targetId);
+            }
+        });
+    });
 
     if (guildIdInput) {
         guildIdInput.addEventListener('input', markGuildFormDirty);

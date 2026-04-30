@@ -1210,6 +1210,54 @@ body {
     gap: 1rem;
 }
 
+.admin-discord-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+    padding-bottom: 0.7rem;
+}
+
+.admin-discord-tab {
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 8px;
+    background: rgba(10, 10, 10, 0.58);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 700;
+    padding: 0.55rem 0.75rem;
+    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.admin-discord-tab:hover,
+.admin-discord-tab.is-active {
+    border-color: rgba(249, 115, 22, 0.68);
+    background: rgba(249, 115, 22, 0.12);
+    color: var(--text-primary);
+}
+
+.admin-discord-tab-panel[hidden] {
+    display: none;
+}
+
+.admin-discord-tab-panel {
+    animation: admin-tab-fade 0.16s ease-out;
+}
+
+@keyframes admin-tab-fade {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .admin-discord-feature-card {
     border: 1px solid var(--border-color);
     border-radius: 14px;
