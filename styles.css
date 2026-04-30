@@ -521,7 +521,7 @@ body {
     color: var(--text-muted);
     margin-bottom: 1.5rem;
     line-height: 1.7;
-    max-height: 13rem;
+    max-height: calc(1.7em * 7);
     overflow: auto;
     padding-right: 0.35rem;
     white-space: pre-line;
@@ -1823,10 +1823,6 @@ body {
     .games-loading {
         min-height: 280px;
         border-radius: 18px;
-    }
-
-    .game-description {
-        max-height: 11rem;
     }
 
     .game-card.featured {
