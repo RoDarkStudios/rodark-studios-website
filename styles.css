@@ -543,48 +543,14 @@ body {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-.game-description-scroll {
-    position: relative;
-    margin-bottom: 1rem;
-}
-
 .game-description {
     color: var(--text-muted);
-    margin-bottom: 0;
+    margin-bottom: 1rem;
     line-height: 1.6;
     max-height: calc(1.6em * 7);
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding-right: 0.85rem;
+    overflow: hidden;
+    padding-right: 0;
     white-space: pre-line;
-    scrollbar-width: none;
-}
-
-.game-description::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
-}
-
-.game-description-thumb {
-    position: absolute;
-    top: 0;
-    right: 0.1rem;
-    width: 0.24rem;
-    border-radius: 999px;
-    background: rgba(148, 163, 184, 0.34);
-    box-shadow: none;
-    pointer-events: none;
-    transform: translateY(0);
-    transition: background 0.18s ease, opacity 0.18s ease;
-}
-
-.game-description-thumb[hidden] {
-    display: none;
-}
-
-.game-description-scroll:hover .game-description-thumb {
-    background: rgba(148, 163, 184, 0.48);
 }
 
 .game-stats {

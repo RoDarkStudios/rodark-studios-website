@@ -2713,50 +2713,6 @@ async function fetchAllGameStats() {
         return link;
     }
 
-    function bindGameDescriptionScrollbar(scroller, thumb) {
-        if (!scroller || !thumb) {
-            return;
-        }
-
-        let frameId = 0;
-        function updateThumb() {
-            frameId = 0;
-            const maxScroll = scroller.scrollHeight - scroller.clientHeight;
-            if (maxScroll <= 1 || scroller.clientHeight <= 0) {
-                thumb.hidden = true;
-                return;
-            }
-
-            const trackHeight = scroller.clientHeight;
-            const thumbHeight = Math.max(24, Math.round((scroller.clientHeight / scroller.scrollHeight) * trackHeight));
-            const maxThumbTop = Math.max(0, trackHeight - thumbHeight);
-            const thumbTop = Math.round((scroller.scrollTop / maxScroll) * maxThumbTop);
-
-            thumb.hidden = false;
-            thumb.style.height = `${thumbHeight}px`;
-            thumb.style.transform = `translateY(${thumbTop}px)`;
-        }
-
-        function requestUpdate() {
-            if (frameId) {
-                return;
-            }
-
-            frameId = window.requestAnimationFrame(updateThumb);
-        }
-
-        scroller.addEventListener('scroll', requestUpdate, { passive: true });
-        window.addEventListener('resize', requestUpdate, { passive: true });
-        window.addEventListener('game-card-active-change', requestUpdate);
-
-        if ('ResizeObserver' in window) {
-            const resizeObserver = new ResizeObserver(requestUpdate);
-            resizeObserver.observe(scroller);
-        }
-
-        requestUpdate();
-    }
-
     function createGameCard(game, index) {
         const universeId = Number(game && game.universeId);
         const name = typeof (game && game.name) === 'string' && game.name.trim()
@@ -2817,13 +2773,6 @@ async function fetchAllGameStats() {
         const descriptionElement = document.createElement('p');
         descriptionElement.className = 'game-description';
         descriptionElement.textContent = description;
-        const descriptionScroll = document.createElement('div');
-        descriptionScroll.className = 'game-description-scroll';
-        const descriptionThumb = document.createElement('span');
-        descriptionThumb.className = 'game-description-thumb';
-        descriptionThumb.setAttribute('aria-hidden', 'true');
-        descriptionScroll.append(descriptionElement, descriptionThumb);
-        bindGameDescriptionScrollbar(descriptionElement, descriptionThumb);
 
         const stats = document.createElement('div');
         stats.className = 'game-stats';
@@ -2844,7 +2793,7 @@ async function fetchAllGameStats() {
 
         info.append(
             title,
-            descriptionScroll,
+            descriptionElement,
             stats,
             createRobloxLink(robloxUrl, 'btn btn-primary', 'Play on Roblox', 'fab fa-roblox')
         );
@@ -2969,9 +2918,6 @@ function initGamesCarousel() {
             const isActive = index === activeIndex;
             card.classList.toggle('is-active', isActive);
             card.setAttribute('aria-hidden', isActive ? 'false' : 'true');
-        });
-        window.requestAnimationFrame(() => {
-            window.dispatchEvent(new Event('game-card-active-change'));
         });
     }
 
