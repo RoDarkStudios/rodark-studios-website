@@ -285,6 +285,14 @@ function createGameCard(game, index) {
     overlay.className = 'play-overlay';
     overlay.append(createRobloxLink(robloxUrl, 'play-btn', 'Play Now', 'fas fa-play'));
 
+    if (isDiscontinued) {
+        const badge = document.createElement('span');
+        badge.className = 'game-status-badge discontinued';
+        badge.textContent = 'Discontinued';
+        badge.title = 'This game is marked discontinued in its Roblox description.';
+        thumbnail.append(badge);
+    }
+
     thumbnail.append(image, overlay);
 
     const info = document.createElement('div');
@@ -293,17 +301,6 @@ function createGameCard(game, index) {
     const title = document.createElement('h3');
     title.className = 'game-title';
     title.textContent = name;
-
-    const titleRow = document.createElement('div');
-    titleRow.className = 'game-title-row';
-    titleRow.append(title);
-    if (isDiscontinued) {
-        const badge = document.createElement('span');
-        badge.className = 'game-status-badge discontinued';
-        badge.textContent = 'Discontinued';
-        badge.title = 'This game is marked discontinued in its Roblox description.';
-        titleRow.append(badge);
-    }
 
     const descriptionElement = document.createElement('p');
     descriptionElement.className = 'game-description';
@@ -318,7 +315,7 @@ function createGameCard(game, index) {
     ));
 
     info.append(
-        titleRow,
+        title,
         descriptionElement,
         stats,
         createRobloxLink(robloxUrl, 'btn btn-primary', 'Play on Roblox', 'fab fa-roblox')
