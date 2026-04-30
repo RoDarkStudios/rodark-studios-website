@@ -164,6 +164,32 @@ async function fetchRobloxJson(endpoint) {
     return payload;
 }
 
+function refreshSocialPreviewDescription() {
+    if (!socialPreviewCache.pending) {
+        socialPreviewCache.pending = fetchSocialPreviewDescription()
+            .then((description) => {
+                socialPreviewCache = {
+                    description,
+                    expiresAt: Date.now() + socialPreviewCacheTtlMs,
+                    pending: null
+                };
+                return description;
+            })
+            .catch((error) => {
+                console.error('Failed to refresh social preview stats:', error);
+                const description = socialPreviewCache.description || socialPreviewFallbackDescription;
+                socialPreviewCache = {
+                    description,
+                    expiresAt: Date.now() + socialPreviewFailureTtlMs,
+                    pending: null
+                };
+                return description;
+            });
+    }
+
+    return socialPreviewCache.pending;
+}
+
 function parsePositiveId(value) {
     const parsed = Number.parseInt(String(value || '').trim(), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -261,29 +287,8 @@ async function getSocialPreviewDescription() {
         return socialPreviewCache.description;
     }
 
-    if (!socialPreviewCache.pending) {
-        socialPreviewCache.pending = fetchSocialPreviewDescription()
-            .then((description) => {
-                socialPreviewCache = {
-                    description,
-                    expiresAt: Date.now() + socialPreviewCacheTtlMs,
-                    pending: null
-                };
-                return description;
-            })
-            .catch((error) => {
-                console.error('Failed to refresh social preview stats:', error);
-                const description = socialPreviewCache.description || socialPreviewFallbackDescription;
-                socialPreviewCache = {
-                    description,
-                    expiresAt: Date.now() + socialPreviewFailureTtlMs,
-                    pending: null
-                };
-                return description;
-            });
-    }
-
-    return socialPreviewCache.pending;
+    refreshSocialPreviewDescription();
+    return socialPreviewCache.description || socialPreviewFallbackDescription;
 }
 
 function injectSocialPreviewDescription(html, description) {
@@ -357,6 +362,13 @@ function sendFile(res, filename) {
         res.statusCode = 200;
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', stats.size);
+        if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'].includes(extension)) {
+            res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        } else if (['.css', '.js'].includes(extension)) {
+            res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
+        } else if (extension === '.html') {
+            res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+        }
         fs.createReadStream(filePath).pipe(res);
     });
 }

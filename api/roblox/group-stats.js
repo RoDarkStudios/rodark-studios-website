@@ -1,6 +1,8 @@
 const { methodNotAllowed, sendJson } = require('../_lib/http');
 const { getAdminGroupId } = require('../_lib/roblox-groups');
 
+const REQUEST_TIMEOUT_MS = 5000;
+
 module.exports = async (req, res) => {
     if (req.method !== 'GET') {
         return methodNotAllowed(req, res, ['GET']);
@@ -13,7 +15,8 @@ module.exports = async (req, res) => {
             method: 'GET',
             headers: {
                 Accept: 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
         });
 
         if (!robloxResponse.ok) {
