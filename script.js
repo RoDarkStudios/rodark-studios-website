@@ -2637,28 +2637,6 @@ function calculateAge(birthDate) {
     return age;
 }
 
-// Function to shuffle team members randomly
-function shuffleTeamMembers() {
-    const teamGrid = document.getElementById('team-grid');
-    if (!teamGrid) {
-        return;
-    }
-
-    const teamMembers = Array.from(teamGrid.children);
-
-    // Shuffle the array using Fisher-Yates algorithm
-    for (let i = teamMembers.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [teamMembers[i], teamMembers[j]] = [teamMembers[j], teamMembers[i]];
-    }
-
-    // Clear the grid and re-append in new order
-    teamGrid.innerHTML = '';
-    teamMembers.forEach(member => {
-        teamGrid.appendChild(member);
-    });    console.log('Team members shuffled for fairness!');
-}
-
 async function fetchAllGameStats() {
     const featuredGameCards = Array.from(document.querySelectorAll('.game-card.featured[data-universe-id]'));
     if (!featuredGameCards.length) {
@@ -2936,8 +2914,6 @@ document.addEventListener('DOMContentLoaded', function() {
         currentYearElement.textContent = new Date().getFullYear();
     }
 
-    // Shuffle team members randomly each time the page loads
-    shuffleTeamMembers();
     initGamesCarousel();
     // Fetch and display game statistics
     fetchAllGameStats();
