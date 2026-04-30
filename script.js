@@ -2638,8 +2638,8 @@ function calculateAge(birthDate) {
 }
 
 async function fetchAllGameStats() {
-    const featuredGameCards = Array.from(document.querySelectorAll('.game-card.featured[data-universe-id]'));
-    if (!featuredGameCards.length) {
+    const showcase = document.getElementById('games-showcase');
+    if (!showcase) {
         return;
     }
 
@@ -2647,8 +2647,19 @@ async function fetchAllGameStats() {
         return num.toLocaleString();
     }
 
-    async function fetchRobloxGames(universeIds) {
-        const response = await fetch(`/api/roblox/games?universeIds=${encodeURIComponent(universeIds.join(','))}`, {
+    function setCarouselNavDisabled(isDisabled) {
+        const prevButton = document.getElementById('games-prev');
+        const nextButton = document.getElementById('games-next');
+        if (prevButton) {
+            prevButton.disabled = isDisabled;
+        }
+        if (nextButton) {
+            nextButton.disabled = isDisabled;
+        }
+    }
+
+    async function fetchRobloxGroupGames() {
+        const response = await fetch('/api/roblox/group-games', {
             method: 'GET'
         });
         if (!response.ok) {
@@ -2661,7 +2672,7 @@ async function fetchAllGameStats() {
 
             const detail = payload && typeof payload.details === 'string' && payload.details.trim()
                 ? payload.details.trim()
-                : `Games API failed (${response.status})`;
+                : `Group games API failed (${response.status})`;
             throw new Error(detail);
         }
 
@@ -2669,97 +2680,145 @@ async function fetchAllGameStats() {
         return Array.isArray(payload && payload.games) ? payload.games : [];
     }
 
-    function setVisitsUnavailable(card) {
-        const visitsElementId = String(card.dataset.visitsElementId || '').trim();
-        if (!visitsElementId) {
-            return;
-        }
+    function createStat(iconClass, value, label) {
+        const stat = document.createElement('div');
+        stat.className = 'stat';
 
-        const visitsElement = document.getElementById(visitsElementId);
-        if (!visitsElement) {
-            return;
-        }
+        const icon = document.createElement('i');
+        icon.className = iconClass;
+        icon.setAttribute('aria-hidden', 'true');
 
-        visitsElement.textContent = 'Unavailable';
+        const valueElement = document.createElement('span');
+        valueElement.textContent = value;
+
+        const labelElement = document.createElement('small');
+        labelElement.textContent = label;
+
+        stat.append(icon, valueElement, labelElement);
+        return stat;
     }
 
-    function applyUnavailableMetadata(card) {
-        const titleElement = card.querySelector('[data-game-title]');
-        if (titleElement) {
-            titleElement.textContent = 'Unavailable';
-        }
+    function createRobloxLink(href, className, label, iconClass) {
+        const link = document.createElement('a');
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.className = className;
 
-        const imageElement = card.querySelector('.game-image');
-        if (imageElement) {
-            imageElement.alt = 'Roblox game unavailable';
-        }
+        const icon = document.createElement('i');
+        icon.className = iconClass;
+        icon.setAttribute('aria-hidden', 'true');
 
-        setVisitsUnavailable(card);
+        link.append(icon, document.createTextNode(label));
+        return link;
     }
 
-    const universeIds = Array.from(new Set(
-        featuredGameCards
-            .map((card) => Number(card.dataset.universeId))
-            .filter((universeId) => Number.isFinite(universeId) && universeId > 0)
-    ));
+    function createGameCard(game, index) {
+        const universeId = Number(game && game.universeId);
+        const name = typeof (game && game.name) === 'string' && game.name.trim()
+            ? game.name.trim()
+            : 'Roblox Game';
+        const description = typeof (game && game.description) === 'string' && game.description.trim()
+            ? game.description.trim()
+            : 'Description unavailable.';
+        const visits = Number(game && game.visits);
+        const playing = Number(game && game.playing);
+        const iconUrl = typeof (game && game.iconUrl) === 'string' && game.iconUrl.trim()
+            ? game.iconUrl.trim()
+            : `/api/roblox/game-icon?universeId=${encodeURIComponent(String(universeId))}&size=512x512`;
+        const robloxUrl = typeof (game && game.robloxUrl) === 'string' && game.robloxUrl.trim()
+            ? game.robloxUrl.trim()
+            : `https://www.roblox.com/games/${encodeURIComponent(String(game && game.rootPlaceId || ''))}`;
 
-    if (!universeIds.length) {
-        featuredGameCards.forEach(applyUnavailableMetadata);
-        return;
+        const card = document.createElement('div');
+        card.className = `game-card featured${index === 0 ? ' is-active' : ''}`;
+        card.dataset.gameIndex = String(index);
+        if (Number.isFinite(universeId) && universeId > 0) {
+            card.dataset.universeId = String(universeId);
+        }
+        card.setAttribute('aria-hidden', index === 0 ? 'false' : 'true');
+
+        const thumbnail = document.createElement('div');
+        thumbnail.className = 'game-thumbnail';
+
+        const image = document.createElement('img');
+        image.src = iconUrl;
+        image.alt = name;
+        image.className = 'game-image';
+        image.loading = index === 0 ? 'eager' : 'lazy';
+        image.decoding = 'async';
+
+        const overlay = document.createElement('div');
+        overlay.className = 'play-overlay';
+        overlay.append(createRobloxLink(robloxUrl, 'play-btn', 'Play Now', 'fas fa-play'));
+
+        thumbnail.append(image, overlay);
+
+        const info = document.createElement('div');
+        info.className = 'game-info';
+
+        const title = document.createElement('h3');
+        title.className = 'game-title';
+        title.textContent = name;
+
+        const descriptionElement = document.createElement('p');
+        descriptionElement.className = 'game-description';
+        descriptionElement.textContent = description;
+
+        const stats = document.createElement('div');
+        stats.className = 'game-stats';
+        stats.append(
+            createStat(
+                'fas fa-eye',
+                Number.isFinite(visits) && visits >= 0 ? formatNumber(Math.trunc(visits)) : 'Unavailable',
+                'Total Visits'
+            ),
+            createStat(
+                'fas fa-users',
+                Number.isFinite(playing) && playing >= 0 ? formatNumber(Math.trunc(playing)) : 'Unavailable',
+                'Playing Now'
+            )
+        );
+
+        info.append(
+            title,
+            descriptionElement,
+            stats,
+            createRobloxLink(robloxUrl, 'btn btn-primary', 'Play on Roblox', 'fab fa-roblox')
+        );
+
+        card.append(thumbnail, info);
+        return card;
+    }
+
+    function renderGameMessage(message, isError) {
+        showcase.replaceChildren();
+        const messageElement = document.createElement('div');
+        messageElement.className = `games-loading${isError ? ' games-error' : ''}`;
+        const icon = document.createElement('i');
+        icon.className = isError ? 'fas fa-triangle-exclamation' : 'fas fa-circle-info';
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = message;
+        messageElement.append(icon, text);
+        showcase.append(messageElement);
+        setCarouselNavDisabled(true);
     }
 
     try {
-        const games = await fetchRobloxGames(universeIds);
-        const gamesByUniverseId = new Map(
-            games.map((game) => [Number(game && game.universeId), game])
-        );
+        setCarouselNavDisabled(true);
+        const games = await fetchRobloxGroupGames();
+        if (!games.length) {
+            renderGameMessage('No group games with over 100,000 visits are available right now.', false);
+            return;
+        }
 
-        featuredGameCards.forEach((card) => {
-            const universeId = Number(card.dataset.universeId);
-            const game = gamesByUniverseId.get(universeId);
-            if (!game) {
-                applyUnavailableMetadata(card);
-                return;
-            }
-
-            const titleElement = card.querySelector('[data-game-title]');
-            if (titleElement && typeof game.name === 'string' && game.name.trim()) {
-                titleElement.textContent = game.name.trim();
-            }
-
-            const imageElement = card.querySelector('.game-image');
-            if (imageElement && typeof game.name === 'string' && game.name.trim()) {
-                imageElement.alt = game.name.trim();
-            }
-
-            const rootPlaceId = Number(game.rootPlaceId);
-            if (Number.isFinite(rootPlaceId) && rootPlaceId > 0) {
-                card.querySelectorAll('[data-roblox-link]').forEach((link) => {
-                    link.href = `https://www.roblox.com/games/${rootPlaceId}`;
-                });
-            }
-
-            const visitsElementId = String(card.dataset.visitsElementId || '').trim();
-            if (!visitsElementId) {
-                return;
-            }
-
-            const visitsElement = document.getElementById(visitsElementId);
-            if (!visitsElement) {
-                return;
-            }
-
-            const visits = Number(game.visits);
-            if (Number.isFinite(visits) && visits >= 0) {
-                visitsElement.textContent = formatNumber(Math.trunc(visits));
-                return;
-            }
-
-            setVisitsUnavailable(card);
-        });
+        const cards = games.map(createGameCard);
+        showcase.replaceChildren(...cards);
+        initGamesCarousel();
     } catch (error) {
         console.error('Failed to fetch featured game metadata:', error);
-        featuredGameCards.forEach(applyUnavailableMetadata);
+        renderGameMessage('Games are unavailable right now.', true);
     }
 }
 
@@ -2914,7 +2973,6 @@ document.addEventListener('DOMContentLoaded', function() {
         currentYearElement.textContent = new Date().getFullYear();
     }
 
-    initGamesCarousel();
     // Fetch and display game statistics
     fetchAllGameStats();
 

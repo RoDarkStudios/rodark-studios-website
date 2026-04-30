@@ -353,6 +353,29 @@ body {
     margin: 0 auto;
 }
 
+.games-loading {
+    min-height: 360px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    box-shadow: var(--shadow-lg);
+    font-weight: 600;
+}
+
+.games-loading .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+.games-error {
+    color: #fecaca;
+    border-color: rgba(248, 113, 113, 0.45);
+}
+
 .game-card {
     display: none;
     background: var(--card-bg);
@@ -495,6 +518,10 @@ body {
     color: var(--text-muted);
     margin-bottom: 1.5rem;
     line-height: 1.7;
+    max-height: 22rem;
+    overflow: auto;
+    padding-right: 0.35rem;
+    white-space: pre-line;
 }
 
 .game-stats {
@@ -1768,6 +1795,11 @@ body {
     .game-nav {
         width: 2.75rem;
         height: 2.75rem;
+    }
+
+    .games-loading {
+        min-height: 280px;
+        border-radius: 18px;
     }
 
     .game-card.featured {

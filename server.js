@@ -10,6 +10,7 @@ const authMe = require('./api/auth/me');
 const robloxAvatarHeadshot = require('./api/roblox/avatar-headshot');
 const robloxGameIcon = require('./api/roblox/game-icon');
 const robloxGames = require('./api/roblox/games');
+const robloxGroupGames = require('./api/roblox/group-games');
 const robloxGroupStats = require('./api/roblox/group-stats');
 const adminCopyMonetization = require('./api/admin/roblox-copy-monetization');
 const adminListMonetizationItems = require('./api/admin/roblox-list-monetization-items');
@@ -68,6 +69,7 @@ const apiRoutes = {
     '/api/roblox/avatar-headshot': robloxAvatarHeadshot,
     '/api/roblox/game-icon': robloxGameIcon,
     '/api/roblox/games': robloxGames,
+    '/api/roblox/group-games': robloxGroupGames,
     '/api/roblox/group-stats': robloxGroupStats,
     '/api/admin/roblox-copy-monetization': adminCopyMonetization,
     '/api/admin/roblox-list-monetization-items': adminListMonetizationItems,

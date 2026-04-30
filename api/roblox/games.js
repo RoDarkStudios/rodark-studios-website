@@ -61,7 +61,9 @@ async function fetchRobloxGames(universeIds) {
         universeId: Number(row && row.id),
         rootPlaceId: Number(row && row.rootPlaceId),
         name: typeof (row && row.name) === 'string' ? row.name.trim() : '',
-        visits: Number(row && row.visits)
+        description: typeof (row && row.description) === 'string' ? row.description.trim() : '',
+        visits: Number(row && row.visits),
+        playing: Number(row && row.playing)
     }));
 }
 

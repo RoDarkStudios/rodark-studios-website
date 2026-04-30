@@ -31,8 +31,6 @@
     <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=175190407&size=150x150">
     <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=290031319&size=150x150">
     <link rel="preload" as="image" href="/api/roblox/avatar-headshot?userId=2735760162&size=150x150">
-    <link rel="preload" as="image" href="/api/roblox/game-icon?universeId=9876258060&size=512x512">
-    <link rel="preload" as="image" href="/api/roblox/game-icon?universeId=5602610435&size=512x512">
 </head>
 <body>
     <!-- Navigation -->
@@ -129,84 +127,10 @@
                 <button id="games-prev" class="game-nav game-nav-prev" type="button" aria-label="Show previous game">
                     <i class="fas fa-chevron-left" aria-hidden="true"></i>
                 </button>
-                <div class="game-showcase">
-                    <div class="game-card featured is-active" data-game-index="0" data-universe-id="9876258060" data-visits-element-id="build-a-business-visit-count" aria-hidden="false">
-                        <div class="game-thumbnail">
-                            <img src="/api/roblox/game-icon?universeId=9876258060&size=512x512"
-                                 alt="Roblox game icon" class="game-image">
-                            <div class="play-overlay">
-                                <a href="https://www.roblox.com/games/109141895577255"
-                                   data-roblox-link
-                                   target="_blank" class="play-btn">
-                                    <i class="fas fa-play"></i>
-                                    Play Now
-                                </a>
-                            </div>
-                        </div>
-                        <div class="game-info">
-                            <h3 class="game-title" data-game-title>Loading game...</h3>
-                            <p class="game-description">
-                                💼 Upgrade your office!<br>
-                                💻 Buy better computers!<br>
-                                👨‍💻 Hire software developers!<br>
-                                📈 Invest in the stock market!<br>
-                                🏬 Unlock new companies!<br>
-                                🐶 Buy NFTs to multiply your cash flow!<br>
-                                ☄️ Collect meteors and craft Quantum Artifacts!
-                            </p>
-                            <div class="game-stats">
-                                <div class="stat">
-                                    <i class="fas fa-eye"></i>
-                                    <span id="build-a-business-visit-count">Loading...</span>
-                                    <small>Total Visits</small>
-                                </div>
-                            </div>
-                            <a href="https://www.roblox.com/games/109141895577255"
-                               data-roblox-link
-                               target="_blank" class="btn btn-primary">
-                                <i class="fab fa-roblox"></i>
-                                Play on Roblox
-                            </a>
-                        </div>
-                    </div>
-                    <div class="game-card featured" data-game-index="1" data-universe-id="5602610435" data-visits-element-id="coding-simulator-visit-count" aria-hidden="true">
-                        <div class="game-thumbnail">
-                            <img src="/api/roblox/game-icon?universeId=5602610435&size=512x512"
-                                 alt="Roblox game icon" class="game-image">
-                            <div class="play-overlay">
-                                <a href="https://www.roblox.com/games/16230991879/Coding-Simulator"
-                                   data-roblox-link
-                                   target="_blank" class="play-btn">
-                                    <i class="fas fa-play"></i>
-                                    Play Now
-                                </a>
-                            </div>
-                        </div>
-                        <div class="game-info">
-                            <h3 class="game-title" data-game-title>Loading game...</h3>
-                            <p class="game-description">
-                                💻 Upgrade your computer setup!<br>
-                                📈 Invest in the stock market!<br>
-                                👨‍💻 Hire programmers to code for you!<br>
-                                🏬 Unlock new companies!<br>
-                                🐶 Buy NFTs to multiply your cash flow!<br>
-                                ☄️ Collect meteors and craft Quantum Artifacts!<br>
-                                💱 Trade with other players!
-                            </p>
-                            <div class="game-stats">
-                                <div class="stat">
-                                    <i class="fas fa-eye"></i>
-                                    <span id="coding-simulator-visit-count">Loading...</span>
-                                    <small>Total Visits</small>
-                                </div>
-                            </div>
-                            <a href="https://www.roblox.com/games/16230991879/Coding-Simulator"
-                               data-roblox-link
-                               target="_blank" class="btn btn-primary">
-                                <i class="fab fa-roblox"></i>
-                                Play on Roblox
-                            </a>
-                        </div>
+                <div class="game-showcase" id="games-showcase" aria-live="polite">
+                    <div class="games-loading" id="games-loading">
+                        <i class="fas fa-spinner" aria-hidden="true"></i>
+                        <span>Loading games...</span>
                     </div>
                 </div>
                 <button id="games-next" class="game-nav game-nav-next" type="button" aria-label="Show next game">
